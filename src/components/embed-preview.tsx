@@ -45,7 +45,7 @@ export function EmbedPreview({
         
         {/* Footer */}
         <div className="text-[#949aa4] text-xs pt-2">
-            RaidAnnouncer Bot
+            Raid Troupers
         </div>
       </div>
     </div>

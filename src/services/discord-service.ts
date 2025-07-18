@@ -17,7 +17,7 @@ function createRaidEmbed(params: SendToDiscordParams): EmbedBuilder {
       .setDescription(`Gostaria de uma ajuda para superar a Raid **lvl ${params.level}** na dificuldade **${params.difficulty}**.\n\nFicarei grato!`)
       .setColor(0x666699) // Deep Indigo
       .setThumbnail(params.userAvatar)
-      .setFooter({ text: 'RaidAnnouncer Bot' })
+      .setFooter({ text: 'Raid Troupers' })
       .setTimestamp();
 }
 
