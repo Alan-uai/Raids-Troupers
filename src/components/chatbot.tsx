@@ -79,7 +79,6 @@ export default function Chatbot() {
     <Card className="h-[calc(100vh-8rem)] flex flex-col">
       <CardHeader>
         <CardTitle className="font-headline">Game Assistant</CardTitle>
-        <CardDescription>Ask me anything about Fruit Reborn!</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col gap-4 overflow-hidden">
         <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>

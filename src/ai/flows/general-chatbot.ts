@@ -49,7 +49,6 @@ const prompt = ai.definePrompt({
 
   Question: {{{question}}}
   `,
-  model: 'googleai/gemini-pro',
 });
 
 const askChatbotFlow = ai.defineFlow(
