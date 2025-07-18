@@ -5,9 +5,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { generateRaidAnnouncement } from "@/ai/flows/generate-raid-announcement";
-import { Bot, Loader2, User, Sparkles, AlertCircle } from "lucide-react";
+import { sendToDiscord } from "@/services/discord-service";
+import { Bot, Loader2, User, Sparkles, AlertCircle, Send } from "lucide-react";
 import Image from "next/image";
 
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -37,7 +39,9 @@ type FormValues = z.infer<typeof formSchema>;
 export default function RaidAnnouncer() {
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -61,6 +65,28 @@ export default function RaidAnnouncer() {
       console.error(e);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleSendToDiscord() {
+    if (!announcement) return;
+
+    setIsSending(true);
+    const result = await sendToDiscord(announcement);
+    setIsSending(false);
+
+    if (result.success) {
+      toast({
+        title: "Sucesso!",
+        description: "Anúncio enviado para o Discord.",
+        variant: "default",
+      });
+    } else {
+      toast({
+        title: "Erro",
+        description: result.error || "Falha ao enviar anúncio para o Discord.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -175,12 +201,8 @@ export default function RaidAnnouncer() {
                 <p className="whitespace-pre-wrap">{announcement}</p>
                 <Separator className="my-4"/>
                 <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm">
-                        <User className="mr-2"/> Add on Roblox
-                    </Button>
-                    <Button size="sm" className="bg-accent hover:bg-accent/90">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="m15.5 13.5-3 3-3-3"/><path d="M12 16.5V4.75"/><path d="M20.25 12c0 4.56-4.185 8.25-9.25 8.25A9.253 9.253 0 0 1 3.75 12 9.253 9.253 0 0 1 11 3.75c.448 0 .888.032 1.317.091"/><path d="m19.5 6-3 3"/></svg>
-                        Join Game
+                    <Button variant="outline" size="sm" onClick={handleSendToDiscord} disabled={isSending}>
+                        {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2"/>} Announce on Discord
                     </Button>
                 </div>
             </CardContent>
