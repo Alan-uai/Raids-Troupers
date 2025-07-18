@@ -2,6 +2,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyKey } from 'discord-interactions';
 import { createRaidAnnouncementFromInteraction } from '@/services/discord-service';
+import { askChatbot } from '@/ai/flows/general-chatbot';
+
+async function handleFollowup(interactionToken: string, content: string) {
+    const url = `https://discord.com/api/v10/webhooks/${process.env.DISCORD_CLIENT_ID}/${interactionToken}/messages/@original`;
+    await fetch(url, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+    });
+}
 
 export async function POST(req: NextRequest) {
   const signature = req.headers.get('x-signature-ed25519');
@@ -27,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (interaction.type === 2) { // APPLICATION_COMMAND
-    const { name, options } = interaction.data;
+    const { name, options, token: interactionToken } = interaction.data;
     const user = interaction.member.user;
 
     if (name === 'raid') {
@@ -42,8 +54,7 @@ export async function POST(req: NextRequest) {
       const robloxProfileUrl = 'https://www.roblox.com';
 
       // We defer the response while we send the message to the channel.
-      // A full response is sent later.
-      const responsePromise = createRaidAnnouncementFromInteraction({
+      createRaidAnnouncementFromInteraction({
           level,
           difficulty,
           userNickname,
@@ -56,18 +67,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         type: 5, // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
       });
+    }
+
+    if (name === 'cap') {
+      const questionOption = options.find((opt: any) => opt.name === 'pergunta');
+      const question = questionOption ? questionOption.value : 'No question provided.';
       
-      // After the initial acknowledgement, you can send followup messages,
-      // but for a simple "done" message, we can just respond directly.
-      // The below logic would be for a more complex flow where you update the user later.
-      /*
-      (async () => {
-        const result = await responsePromise;
-        // Here you would use a followup message API call to Discord's webhook
-        // to edit the original deferred response.
-        // For simplicity, we are not doing that in this prototype.
+      // Defer response
+      const responsePromise = (async () => {
+          try {
+              const result = await askChatbot({ question });
+              await handleFollowup(interaction.token, result.answer);
+          } catch (e) {
+              console.error(e);
+              await handleFollowup(interaction.token, 'Desculpe, não consegui obter uma resposta. Tente novamente.');
+          }
       })();
-      */
+
+      return NextResponse.json({
+          type: 5, // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
+      });
     }
   }
 

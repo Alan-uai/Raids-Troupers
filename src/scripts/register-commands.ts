@@ -31,6 +31,18 @@ const commands = [
       },
     ],
   },
+  {
+    name: 'cap',
+    description: 'Converse com o assistente de IA.',
+    options: [
+        {
+            name: 'pergunta',
+            description: 'A sua pergunta para o chatbot.',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+        },
+    ],
+  },
 ];
 
 const token = process.env.DISCORD_BOT_TOKEN;
