@@ -51,11 +51,15 @@ export default function RaidAnnouncer() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      level: "",
-      difficulty: "",
+      level: "200",
+      difficulty: "Difícil",
       prompt: "Looking for players to join a raid. We need a good team to clear it quickly!",
     },
   });
+
+  const { watch } = form;
+  const level = watch("level");
+  const difficulty = watch("difficulty");
 
   async function onSubmit(values: FormValues) {
     setIsLoading(true);
@@ -78,12 +82,10 @@ export default function RaidAnnouncer() {
   }
 
   async function handleSendToDiscord() {
-    if (!announcement) return;
-
     setIsSending(true);
     const result = await sendRaidAnnouncement({
-      level: announcement.level,
-      difficulty: announcement.difficulty,
+      level: level,
+      difficulty: difficulty,
       userNickname: 'Raid Master', // Placeholder
       userAvatar: 'https://placehold.co/100x100.png', // Placeholder
       robloxProfileUrl: 'https://www.roblox.com', // Placeholder
@@ -187,6 +189,18 @@ export default function RaidAnnouncer() {
                 <AlertDescription>{error}</AlertDescription>
             </Alert>
         )}
+        
+        <EmbedPreview
+            level={level || "..."}
+            difficulty={difficulty || "..."}
+            userNickname="Raid Master"
+            userAvatar="https://placehold.co/100x100.png"
+            robloxProfileUrl="https://www.roblox.com"
+         />
+         <Button variant="outline" size="sm" onClick={handleSendToDiscord} disabled={isSending}>
+             {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2"/>} Anunciar no Discord
+         </Button>
+        
         {isLoading && (
             <Card className="flex items-center justify-center p-10">
                 <div className="flex flex-col items-center gap-4">
@@ -195,26 +209,17 @@ export default function RaidAnnouncer() {
                 </div>
             </Card>
         )}
-        {announcement ? (
-          <div>
-            <EmbedPreview
-                level={announcement.level}
-                difficulty={announcement.difficulty}
-                userNickname="Raid Master"
-                userAvatar="https://placehold.co/100x100.png"
-                robloxProfileUrl="https://www.roblox.com"
-             />
-             <Button variant="outline" size="sm" onClick={handleSendToDiscord} disabled={isSending} className="mt-4">
-                 {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2"/>} Anunciar no Discord
-             </Button>
-          </div>
-        ) : !isLoading && !error && (
-            <Card className="flex items-center justify-center p-10 border-dashed">
-                 <div className="text-center text-muted-foreground">
-                    <p>Your generated announcement will appear here.</p>
-                </div>
+        {announcement && (
+            <Card className="mt-4">
+                <CardHeader>
+                    <CardTitle className="text-lg">AI Generated Text:</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground">{announcement.text}</p>
+                </CardContent>
             </Card>
         )}
+        
       </div>
     </div>
   );
