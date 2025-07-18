@@ -4,13 +4,20 @@ import { verifyKey } from 'discord-interactions';
 import { sendRaidAnnouncement } from '@/services/discord-service';
 import { askChatbot } from '@/ai/flows/general-chatbot';
 
-async function handleFollowup(interactionToken: string, content: string) {
-    const url = `https://discord.com/api/v10/webhooks/${process.env.DISCORD_CLIENT_ID}/${interactionToken}/messages/@original`;
+async function handleFollowup(interactionToken: string, content: string, ephemeral = false) {
+    const url = `https://discord.com/api/v10/webhooks/${process.env.DISCORD_CLIENT_ID}/${interactionToken}`;
     try {
+        const body: any = {
+            content: content,
+        };
+        if (ephemeral) {
+            body.flags = 1 << 6; // Ephemeral flag
+        }
+
         const res = await fetch(url, {
-            method: 'PATCH',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content }),
+            body: JSON.stringify(body),
         });
         if (!res.ok) {
             console.error(`Followup failed: ${res.status}`, await res.text());
@@ -66,11 +73,17 @@ export async function POST(req: NextRequest) {
              userAvatar,
              robloxProfileUrl,
          });
-         await handleFollowup(interactionToken, 'Anúncio de raid enviado com sucesso!');
+         // The original interaction response is now ephemeral, so the followup must be too.
+         // We must use a POST to `/webhooks/{application_id}/{interaction_token}` to create a new ephemeral followup.
+         await handleFollowup(interactionToken, 'Anúncio de raid enviado com sucesso!', true);
        })();
 
+      // Respond with a deferred ephemeral message
       return NextResponse.json({
         type: 5, // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
+        data: {
+          flags: 1 << 6, // Ephemeral flag
+        },
       });
     }
 
@@ -81,10 +94,21 @@ export async function POST(req: NextRequest) {
       (async () => {
           try {
               const result = await askChatbot({ question });
-              await handleFollowup(interactionToken, result.answer);
+              // PATCH /webhooks/{application_id}/{interaction_token}/messages/@original
+              const url = `https://discord.com/api/v10/webhooks/${process.env.DISCORD_CLIENT_ID}/${interactionToken}/messages/@original`;
+              await fetch(url, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ content: result.answer }),
+              });
           } catch (e) {
               console.error(e);
-              await handleFollowup(interactionToken, 'Desculpe, não consegui obter uma resposta. Tente novamente.');
+              const url = `https://discord.com/api/v10/webhooks/${process.env.DISCORD_CLIENT_ID}/${interactionToken}/messages/@original`;
+              await fetch(url, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ content: 'Desculpe, não consegui obter uma resposta. Tente novamente.' }),
+              });
           }
       })();
 
