@@ -58,13 +58,15 @@ export async function POST(req: NextRequest) {
     if (name === 'raid') {
       const levelOption = options.find((opt: any) => opt.name === 'level_ou_nome');
       const difficultyOption = options.find((opt: any) => opt.name === 'dificuldade');
+      const robloxProfileOption = options.find((opt: any) => opt.name === 'roblox_profile_url');
 
       const level = levelOption ? levelOption.value : 'Não especificado';
       const difficulty = difficultyOption ? difficultyOption.value : 'Não especificada';
       const userNickname = user.global_name || user.username;
       const userAvatar = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`;
-      const robloxProfileUrl = `https://www.roblox.com/users/${user.id}/profile`;
+      const robloxProfileUrl = robloxProfileOption ? robloxProfileOption.value : `https://www.roblox.com/users/${user.id}/profile`;
       
+      // Execute the long-running task without awaiting it in the main path
       (async () => {
          await sendRaidAnnouncement({
              level,
@@ -73,10 +75,11 @@ export async function POST(req: NextRequest) {
              userAvatar,
              robloxProfileUrl,
          });
+         // Send a followup message after the main task is done
          await handleFollowup(interactionToken, 'Anúncio de raid enviado com sucesso!', true);
        })();
 
-      // Respond with a deferred ephemeral message
+      // Immediately respond with a deferred ephemeral message
       return NextResponse.json({
         type: 5, // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
         data: {

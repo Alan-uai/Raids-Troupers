@@ -29,6 +29,12 @@ const commands = [
             { name: 'Hard', value: 'difícil' },
         ],
       },
+       {
+        name: 'roblox_profile_url',
+        description: 'A URL do seu perfil no Roblox (opcional).',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
     ],
   },
   {
