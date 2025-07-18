@@ -36,8 +36,14 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+type AnnouncementData = {
+  text: string;
+  level: string;
+  difficulty: string;
+};
+
 export default function RaidAnnouncer() {
-  const [announcement, setAnnouncement] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState<AnnouncementData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +65,11 @@ export default function RaidAnnouncer() {
     try {
       const fullPrompt = `Raid Level: ${values.level}, Difficulty: ${values.difficulty}. Prompt: ${values.prompt}`;
       const result = await generateRaidAnnouncement({ prompt: fullPrompt });
-      setAnnouncement(result.announcement);
+      setAnnouncement({
+        text: result.announcement,
+        level: values.level,
+        difficulty: values.difficulty,
+      });
     } catch (e) {
       setError("Failed to generate announcement. Please try again.");
       console.error(e);
@@ -72,7 +82,13 @@ export default function RaidAnnouncer() {
     if (!announcement) return;
 
     setIsSending(true);
-    const result = await sendToDiscord(announcement);
+    const result = await sendToDiscord({
+      level: announcement.level,
+      difficulty: announcement.difficulty,
+      userNickname: 'Raid Master', // Placeholder
+      userAvatar: 'https://placehold.co/100x100.png', // Placeholder
+      robloxProfileUrl: 'https://www.roblox.com', // Placeholder
+    });
     setIsSending(false);
 
     if (result.success) {
@@ -198,7 +214,7 @@ export default function RaidAnnouncer() {
                 </div>
             </CardHeader>
             <CardContent>
-                <p className="whitespace-pre-wrap">{announcement}</p>
+                <p className="whitespace-pre-wrap">{announcement.text}</p>
                 <Separator className="my-4"/>
                 <div className="flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={handleSendToDiscord} disabled={isSending}>

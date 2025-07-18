@@ -1,8 +1,16 @@
 'use server';
 
-import { Client, GatewayIntentBits, TextChannel } from 'discord.js';
+import { Client, GatewayIntentBits, TextChannel, EmbedBuilder } from 'discord.js';
 
-export async function sendToDiscord(message: string): Promise<{ success: boolean; error?: string }> {
+interface SendToDiscordParams {
+  level: string;
+  difficulty: string;
+  userNickname: string;
+  userAvatar: string;
+  robloxProfileUrl: string;
+}
+
+export async function sendToDiscord(params: SendToDiscordParams): Promise<{ success: boolean; error?: string }> {
   const token = process.env.DISCORD_BOT_TOKEN;
   const channelId = process.env.DISCORD_CHANNEL_ID;
 
@@ -40,7 +48,17 @@ export async function sendToDiscord(message: string): Promise<{ success: boolean
       return { success: false, error: 'Canal não encontrado ou não é um canal de texto.' };
     }
 
-    await channel.send(message);
+    const embed = new EmbedBuilder()
+      .setTitle(`Anúncio de Raid de ${params.userNickname}`)
+      .setURL(params.robloxProfileUrl)
+      .setDescription(`Gostaria de uma ajuda para superar a Raid **lvl ${params.level}** na dificuldade **${params.difficulty}**.\n\nFicarei grato!`)
+      .setColor(0x666699) // Deep Indigo
+      .setThumbnail(params.userAvatar)
+      .setFooter({ text: 'RaidAnnouncer Bot' })
+      .setTimestamp();
+      
+    await channel.send({ embeds: [embed] });
+
     await client.destroy();
     return { success: true };
   } catch (error) {

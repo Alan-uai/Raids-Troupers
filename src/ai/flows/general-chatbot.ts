@@ -27,14 +27,15 @@ export async function askChatbot(input: AskChatbotInput): Promise<AskChatbotOutp
 
 const gameInfoTool = ai.defineTool({
   name: 'getFruitRebornWiki',
-  description: 'Retrieves information from the Fruit Reborn Wiki to answer questions about the game.',
+  description: 'Retrieves information from the Fruit Reborn Wiki (https://anime-fruit.fandom.com/wiki/Anime_Fruit_Wiki) to answer questions about the game.',
   inputSchema: z.object({
     query: z.string().describe('The search query for the Fruit Reborn Wiki.'),
   }),
   outputSchema: z.string(),
 }, async (input) => {
-  // Placeholder implementation - replace with actual wiki retrieval logic
-  return `Information from Fruit Reborn Wiki related to ${input.query}`;
+  // In a real application, you would fetch from the URL.
+  // For this prototype, we'll return a placeholder acknowledging the source.
+  return `Based on information from the Fruit Reborn Wiki about "${input.query}", here is the answer... [Placeholder]`;
 });
 
 const prompt = ai.definePrompt({
@@ -42,12 +43,13 @@ const prompt = ai.definePrompt({
   tools: [gameInfoTool],
   input: {schema: AskChatbotInputSchema},
   output: {schema: AskChatbotOutputSchema},
-  prompt: `You are a chatbot that answers questions about the Fruit Reborn game.
-
-  Use the getFruitRebornWiki tool to get information about the game.
+  prompt: `You are a helpful chatbot assistant for the game Fruit Reborn.
+  Your knowledge comes from the Fruit Reborn Wiki.
+  Use the getFruitRebornWiki tool to find information and answer the user's question.
 
   Question: {{{question}}}
   `,
+  model: 'googleai/gemini-pro',
 });
 
 const askChatbotFlow = ai.defineFlow(
