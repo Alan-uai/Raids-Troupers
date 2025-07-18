@@ -24,6 +24,11 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+  // Add this experimental section
+  experimental: {
+    // This is to allow the Next.js dev server to work correctly with the Firebase Studio environment.
+    allowedDevOrigins: ["https://*.firebase.app", "https://*.web.app"],
+  },
 };
 
 export default nextConfig;

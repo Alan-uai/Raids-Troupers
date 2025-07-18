@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Bot, Loader2, SendHoriz, User } from "lucide-react";
+import { Bot, Loader2, SendHorizontal, User } from "lucide-react";
 
 const chatSchema = z.object({
   message: z.string().min(1, "Message cannot be empty."),
@@ -149,7 +149,7 @@ export default function Chatbot() {
                 )}
               />
               <Button type="submit" size="icon" disabled={isLoading}>
-                <SendHoriz />
+                <SendHorizontal />
                 <span className="sr-only">Send</span>
               </Button>
             </form>
