@@ -1,5 +1,5 @@
-import RaidAnnouncer from "@/components/raid-announcer";
+import SettingsPage from "./settings/page";
 
 export default function Home() {
-  return <RaidAnnouncer />;
+  return <SettingsPage />;
 }

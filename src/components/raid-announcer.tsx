@@ -24,9 +24,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { EmbedPreview } from "./embed-preview";
+
 
 const formSchema = z.object({
   level: z.string().min(1, "Level is required."),
@@ -124,9 +123,9 @@ export default function RaidAnnouncer() {
                   name="level"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Raid Level</FormLabel>
+                      <FormLabel>Raid Level or Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., 50" {...field} />
+                        <Input placeholder="e.g., 50 or 'Flame Lord'" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -197,32 +196,18 @@ export default function RaidAnnouncer() {
             </Card>
         )}
         {announcement ? (
-          <Card className="bg-primary/5 border-primary/20">
-            <CardHeader className="flex flex-row items-start gap-4">
-               <Avatar className="w-12 h-12 border-2 border-primary">
-                  <AvatarImage src="https://placehold.co/100x100.png" alt="User Avatar" data-ai-hint="warrior avatar" />
-                  <AvatarFallback>U</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                        <CardTitle className="text-primary font-bold">Raid Master</CardTitle>
-                        <Badge variant="secondary">Player</Badge>
-                    </div>
-                    <CardDescription className="text-xs">
-                        Posted just now in #announcements
-                    </CardDescription>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <p className="whitespace-pre-wrap">{announcement.text}</p>
-                <Separator className="my-4"/>
-                <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={handleSendToDiscord} disabled={isSending}>
-                        {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2"/>} Announce on Discord
-                    </Button>
-                </div>
-            </CardContent>
-          </Card>
+          <div>
+            <EmbedPreview
+                level={announcement.level}
+                difficulty={announcement.difficulty}
+                userNickname="Raid Master"
+                userAvatar="https://placehold.co/100x100.png"
+                robloxProfileUrl="https://www.roblox.com"
+             />
+             <Button variant="outline" size="sm" onClick={handleSendToDiscord} disabled={isSending} className="mt-4">
+                 {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2"/>} Announce on Discord
+             </Button>
+          </div>
         ) : !isLoading && !error && (
             <Card className="flex items-center justify-center p-10 border-dashed">
                  <div className="text-center text-muted-foreground">

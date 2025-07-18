@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Megaphone, MessageCircle, Bot } from "lucide-react";
+import { Megaphone, MessageCircle, Bot, Settings } from "lucide-react";
 
 import {
   SidebarProvider,
@@ -35,13 +35,25 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
+             <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === "/settings" || pathname === "/"}
+                tooltip="Configurações"
+              >
+                <Link href="/settings">
+                  <Settings />
+                  <span>Configurações</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                isActive={pathname === "/"}
+                isActive={pathname === "/raid-announcer"}
                 tooltip="Raid Announcer"
               >
-                <Link href="/">
+                <Link href="/raid-announcer">
                   <Megaphone />
                   <span>Raid Announcer</span>
                 </Link>
