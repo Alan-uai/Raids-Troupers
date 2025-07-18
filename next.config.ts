@@ -18,12 +18,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.alias['zlib-sync'] = false;
-    }
-    return config;
-  },
 };
 
 export default nextConfig;

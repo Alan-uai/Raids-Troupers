@@ -1,6 +1,6 @@
 'use server';
 
-import { Client, GatewayIntentBits, TextChannel, EmbedBuilder } from 'discord.js';
+import type { EmbedBuilder } from 'discord.js';
 
 interface SendToDiscordParams {
   level: string;
@@ -10,67 +10,71 @@ interface SendToDiscordParams {
   robloxProfileUrl: string;
 }
 
-function createRaidEmbed(params: SendToDiscordParams): EmbedBuilder {
-    return new EmbedBuilder()
-      .setTitle(`Anúncio de Raid de ${params.userNickname}`)
-      .setURL(params.robloxProfileUrl)
-      .setDescription(`Gostaria de uma ajuda para superar a Raid **lvl ${params.level}** na dificuldade **${params.difficulty}**.\n\nFicarei grato!`)
-      .setColor(0x666699) // Deep Indigo
-      .setThumbnail(params.userAvatar)
-      .setFooter({ text: 'Raid Troupers' })
-      .setTimestamp();
+// This function can be kept as it is, as it's just building a JSON object.
+// We just need to ensure discord.js types are available without the full library.
+// The EmbedBuilder from discord.js is just a helper, we can create the object directly.
+function createRaidEmbed(params: SendToDiscordParams) {
+  return {
+    title: `Anúncio de Raid de ${params.userNickname}`,
+    url: params.robloxProfileUrl,
+    description: `Gostaria de uma ajuda para superar a Raid **lvl ${params.level}** na dificuldade **${params.difficulty}**.\n\nFicarei grato!`,
+    color: 0x666699, // Deep Indigo
+    thumbnail: {
+      url: params.userAvatar,
+    },
+    footer: {
+      text: 'Raid Troupers',
+    },
+    timestamp: new Date().toISOString(),
+  };
 }
 
+async function postToWebhook(embed: any) {
+  const webhookUrl = `https://discord.com/api/v10/webhooks/${process.env.DISCORD_CLIENT_ID}/${process.env.DISCORD_BOT_TOKEN}`;
+  const announcementsChannelId = "1395591154208084049";
+
+  const response = await fetch(`${webhookUrl}?channel_id=${announcementsChannelId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ embeds: [embed] }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('Failed to send message to Discord via webhook:', errorData);
+    throw new Error(`Failed to send message to Discord: ${JSON.stringify(errorData)}`);
+  }
+}
 
 export async function sendToDiscord(params: SendToDiscordParams): Promise<{ success: boolean; error?: string }> {
-  const token = process.env.DISCORD_BOT_TOKEN;
-  const channelId = process.env.DISCORD_CHANNEL_ID;
-
-  if (!token) {
-    console.error('DISCORD_BOT_TOKEN is not configured.');
-    return { success: false, error: 'Token do bot do Discord não configurado.' };
-  }
-  if (!channelId) {
-    console.error('DISCORD_CHANNEL_ID is not configured.');
-    return { success: false, error: 'ID do canal do Discord não configurado.' };
-  }
-
-  const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
   try {
-    await new Promise<void>((resolve, reject) => {
-      client.once('ready', () => {
-        console.log(`Logged in as ${client.user?.tag}!`);
-        resolve();
-      });
-      client.once('error', (err) => {
-        console.error('Discord client error:', err);
-        reject(err);
-      });
-      
-      const timeout = setTimeout(() => reject(new Error('Login timeout')), 10000);
+    const embed = createRaidEmbed(params);
+    
+    // We can't use webhooks for this as the bot token is not a webhook token.
+    // We will post directly to the channel using the bot token.
+    const channelId = "1395591154208084049"; // announcements channel
+    const url = `https://discord.com/api/v10/channels/${channelId}/messages`;
 
-      client.login(token).then(() => clearTimeout(timeout)).catch(reject);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ embeds: [embed] }),
     });
 
-    const channel = await client.channels.fetch(channelId);
-
-    if (!channel || !(channel instanceof TextChannel)) {
-       await client.destroy();
-      return { success: false, error: 'Canal não encontrado ou não é um canal de texto.' };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Falha ao enviar mensagem para o Discord:', errorText);
+      return { success: false, error: `Falha ao enviar mensagem para o Discord: ${errorText}` };
     }
 
-    const embed = createRaidEmbed(params);
-      
-    await channel.send({ embeds: [embed] });
-
-    await client.destroy();
     return { success: true };
   } catch (error) {
     console.error('Falha ao enviar mensagem para o Discord:', error);
-    if(client.isReady()) {
-      await client.destroy();
-    }
     if (error instanceof Error) {
         return { success: false, error: `Falha ao enviar mensagem para o Discord: ${error.message}` };
     }
@@ -79,33 +83,28 @@ export async function sendToDiscord(params: SendToDiscordParams): Promise<{ succ
 }
 
 export async function createRaidAnnouncementFromInteraction(params: SendToDiscordParams): Promise<{ success: boolean; error?: string }> {
-  const token = process.env.DISCORD_BOT_TOKEN;
-  const channelId = process.env.DISCORD_CHANNEL_ID;
+   try {
+    const embed = createRaidEmbed(params);
+    const channelId = "1395591154208084049"; // announcements channel
+    const url = `https://discord.com/api/v10/channels/${channelId}/messages`;
 
-  if (!token || !channelId) {
-    console.error('Discord bot token or channel ID is not configured.');
-    return { success: false, error: 'Discord bot token or channel ID is not configured.' };
-  }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ embeds: [embed] }),
+    });
 
-  const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
-  try {
-    await client.login(token);
-    const channel = await client.channels.fetch(channelId);
-
-    if (channel && channel instanceof TextChannel) {
-      const embed = createRaidEmbed(params);
-      await channel.send({ embeds: [embed] });
-      return { success: true };
-    } else {
-      return { success: false, error: 'Channel not found or is not a text channel.' };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to send raid announcement:', errorText);
+      return { success: false, error: 'Failed to send raid announcement.' };
     }
+     return { success: true };
   } catch (error) {
     console.error('Failed to send raid announcement:', error);
-    return { success: false, error: 'Failed to send raid announcement.' };
-  } finally {
-    if (client.isReady()) {
-      await client.destroy();
-    }
+     return { success: false, error: 'Failed to send raid announcement.' };
   }
 }
