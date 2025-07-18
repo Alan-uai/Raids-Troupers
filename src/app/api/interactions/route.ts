@@ -4,30 +4,6 @@ import { verifyKey } from 'discord-interactions';
 import { sendRaidAnnouncement } from '@/services/discord-service';
 import { askChatbot } from '@/ai/flows/general-chatbot';
 
-async function handleFollowup(interactionToken: string, content: string, ephemeral = false) {
-    const url = `https://discord.com/api/v10/webhooks/${process.env.DISCORD_CLIENT_ID}/${interactionToken}`;
-    try {
-        const body: any = {
-            content: content,
-        };
-        if (ephemeral) {
-            body.flags = 1 << 6; // Ephemeral flag
-        }
-
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-            console.error(`Followup failed: ${res.status}`, await res.text());
-        }
-    } catch(e) {
-        console.error("Error in handleFollowup", e);
-    }
-}
-
-
 export async function POST(req: NextRequest) {
   const signature = req.headers.get('x-signature-ed25519');
   const timestamp = req.headers.get('x-signature-timestamp');
@@ -66,24 +42,20 @@ export async function POST(req: NextRequest) {
       const userAvatar = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`;
       const robloxProfileUrl = robloxProfileOption ? robloxProfileOption.value : `https://www.roblox.com/users/${user.id}/profile`;
       
-      // Execute the long-running task without awaiting it in the main path
-      (async () => {
-         await sendRaidAnnouncement({
-             level,
-             difficulty,
-             userNickname,
-             userAvatar,
-             robloxProfileUrl,
-         });
-         // Send a followup message after the main task is done
-         await handleFollowup(interactionToken, 'Anúncio de raid enviado com sucesso!', true);
-       })();
+      // Execute a tarefa de envio em segundo plano. Não aguarde aqui.
+      sendRaidAnnouncement({
+         level,
+         difficulty,
+         userNickname,
+         userAvatar,
+         robloxProfileUrl,
+      }).catch(console.error);
 
-      // Immediately respond with a deferred ephemeral message
+      // Responda imediatamente com uma mensagem de sucesso efêmera.
       return NextResponse.json({
-        type: 5, // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
+        type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
         data: {
-          content: "Pensando no seu caso...🤔💡",
+          content: 'Anúncio de raid enviado com sucesso!',
           flags: 1 << 6, // Ephemeral flag
         },
       });
