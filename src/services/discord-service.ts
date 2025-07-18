@@ -24,14 +24,16 @@ function createRaidEmbed(params: RaidAnnouncementParams) {
   };
 }
 
-async function postToChannel(embed: any) {
-    const channelId = "1395591154208084049"; // announcements channel
-    const url = `https://discord.com/api/v10/channels/${channelId}/messages`;
+async function postToWebhook(embed: any) {
+    const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+    
+    if (!webhookUrl) {
+      throw new Error('DISCORD_WEBHOOK_URL environment variable is not set.');
+    }
 
-    const response = await fetch(url, {
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bot ${process.env.DISCORD_BOT_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ embeds: [embed] }),
@@ -39,16 +41,17 @@ async function postToChannel(embed: any) {
 
     if (!response.ok) {
         const errorData = await response.text();
-        console.error('Failed to send message to Discord:', errorData);
+        console.error('Failed to send message to Discord via webhook:', errorData);
         throw new Error(`Failed to send message to Discord: ${errorData}`);
     }
-    return response.json();
+    // Webhooks return 204 No Content on success, so we don't need to parse JSON.
+    return { ok: response.ok, status: response.status };
 }
 
 export async function sendRaidAnnouncement(params: RaidAnnouncementParams): Promise<{ success: boolean; error?: string }> {
   try {
     const embed = createRaidEmbed(params);
-    await postToChannel(embed);
+    await postToWebhook(embed);
     return { success: true };
   } catch (error) {
     console.error('Falha ao enviar mensagem para o Discord:', error);
