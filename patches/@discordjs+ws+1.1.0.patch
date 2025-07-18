@@ -1,0 +1,13 @@
+diff --git a/node_modules/@discordjs/ws/dist/index.js b/node_modules/@discordjs/ws/dist/index.js
+index 9e248b6..69695d8 100644
+--- a/node_modules/@discordjs/ws/dist/index.js
++++ b/node_modules/@discordjs/ws/dist/index.js
+@@ -570,7 +570,7 @@
+ var import_util2 = require("@sapphire/utilities");
+ 
+ // src/ws/WebSocketShard.ts
+-var getZlibSync = (0, import_util2.lazy)(async () => import("zlib-sync").then((mod) => mod.default).catch(() => null));
++var getZlibSync = (0, import_util2.lazy)(async () => null);
+ var WebSocketShardEvents = /* @__PURE__ */ ((WebSocketShardEvents2) => {
+   WebSocketShardEvents2["Closed"] = "closed";
+   WebSocketShardEvents2["Debug"] = "debug";

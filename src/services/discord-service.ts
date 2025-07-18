@@ -7,9 +7,11 @@ export async function sendToDiscord(message: string): Promise<{ success: boolean
   const channelId = process.env.DISCORD_CHANNEL_ID;
 
   if (!token) {
+    console.error('DISCORD_BOT_TOKEN is not configured.');
     return { success: false, error: 'Token do bot do Discord não configurado.' };
   }
   if (!channelId) {
+    console.error('DISCORD_CHANNEL_ID is not configured.');
     return { success: false, error: 'ID do canal do Discord não configurado.' };
   }
 
@@ -18,10 +20,17 @@ export async function sendToDiscord(message: string): Promise<{ success: boolean
   try {
     await new Promise<void>((resolve, reject) => {
       client.once('ready', () => {
+        console.log(`Logged in as ${client.user?.tag}!`);
         resolve();
       });
-      client.once('error', reject);
-      client.login(token).catch(reject);
+      client.once('error', (err) => {
+        console.error('Discord client error:', err);
+        reject(err);
+      });
+      
+      const timeout = setTimeout(() => reject(new Error('Login timeout')), 10000);
+
+      client.login(token).then(() => clearTimeout(timeout)).catch(reject);
     });
 
     const channel = await client.channels.fetch(channelId);
@@ -36,7 +45,9 @@ export async function sendToDiscord(message: string): Promise<{ success: boolean
     return { success: true };
   } catch (error) {
     console.error('Falha ao enviar mensagem para o Discord:', error);
-    await client.destroy();
+    if(client.isReady()) {
+      await client.destroy();
+    }
     if (error instanceof Error) {
         return { success: false, error: `Falha ao enviar mensagem para o Discord: ${error.message}` };
     }
