@@ -6,7 +6,7 @@
     "dev": "next dev -p 3002",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3002",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "register-commands": "tsx src/scripts/register-commands.ts"
