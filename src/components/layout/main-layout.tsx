@@ -1,86 +1,51 @@
+// src/components/layout/main-layout.tsx
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Megaphone, MessageCircle, Bot, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarInset,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
+const navItems = [
+  { href: "/settings", icon: Settings, label: "Configurações" },
+  { href: "/raid-announcer", icon: Megaphone, label: "Raid Announcer" },
+  { href: "/chatbot", icon: MessageCircle, label: "Chatbot" },
+];
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <div className="flex items-center gap-2">
-             <Button variant="ghost" size="icon" asChild>
-                <Link href="/">
-                    <Bot className="size-6 text-primary" />
-                </Link>
-             </Button>
-            <h1 className="text-lg font-semibold font-headline">RaidAnnouncer</h1>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-             <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === "/settings" || pathname === "/"}
-                tooltip="Configurações"
-              >
-                <Link href="/settings">
-                  <Settings />
-                  <span>Configurações</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === "/raid-announcer"}
-                tooltip="Raid Announcer"
-              >
-                <Link href="/raid-announcer">
-                  <Megaphone />
-                  <span>Raid Announcer</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === "/chatbot"}
-                tooltip="Chatbot"
-              >
-                <Link href="/chatbot">
-                  <MessageCircle />
-                  <span>Chatbot</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarContent>
-      </Sidebar>
-      <SidebarInset>
-        <header className="flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sticky top-0 z-10 md:hidden">
-            <SidebarTrigger />
-            <h1 className="text-lg font-semibold font-headline">RaidAnnouncer</h1>
-        </header>
-        <main className="flex-1 p-4 md:p-6">{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
+    <div className="flex min-h-screen w-full flex-col">
+      <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
+        <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-lg font-semibold md:text-base"
+          >
+            <Bot className="h-6 w-6 text-primary" />
+            <span className="sr-only">RaidAnnouncer</span>
+          </Link>
+          {navItems.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={cn(
+                "transition-colors hover:text-foreground",
+                (pathname === item.href || (item.href === "/settings" && pathname === "/"))
+                  ? "text-foreground font-bold"
+                  : "text-muted-foreground"
+              )}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        {/* Mobile menu could be added here if needed */}
+      </header>
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
+        {children}
+      </main>
+    </div>
   );
 }
