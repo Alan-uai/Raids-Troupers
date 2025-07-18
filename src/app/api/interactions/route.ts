@@ -1,25 +1,16 @@
 // src/app/api/interactions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyKey } from 'discord-interactions';
-import { createRaidAnnouncementFromInteraction } from '@/services/discord-service';
+import { sendRaidAnnouncement } from '@/services/discord-service';
 import { askChatbot } from '@/ai/flows/general-chatbot';
 
-async function handleFollowup(interactionToken: string, content: string, embeds?: any[]) {
+async function handleFollowup(interactionToken: string, content: string) {
     const url = `https://discord.com/api/v10/webhooks/${process.env.DISCORD_CLIENT_ID}/${interactionToken}/messages/@original`;
-    const body: { content?: string, embeds?: any[] } = {};
-
-    if (content) {
-        body.content = content;
-    }
-    if (embeds) {
-        body.embeds = embeds;
-    }
-
     try {
         const res = await fetch(url, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            body: JSON.stringify({ content }),
         });
         if (!res.ok) {
             console.error(`Followup failed: ${res.status}`, await res.text());
@@ -38,14 +29,12 @@ export async function POST(req: NextRequest) {
   const publicKey = process.env.DISCORD_PUBLIC_KEY;
 
   if (!signature || !timestamp || !publicKey) {
-    console.error("Missing signature, timestamp or public key");
     return new NextResponse('Bad request', { status: 400 });
   }
 
   const isValid = verifyKey(rawBody, signature, timestamp, publicKey);
 
   if (!isValid) {
-    console.error("Invalid signature");
     return new NextResponse('Invalid signature', { status: 401 });
   }
 
@@ -68,12 +57,9 @@ export async function POST(req: NextRequest) {
       const userNickname = user.global_name || user.username;
       const userAvatar = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`;
       const robloxProfileUrl = `https://www.roblox.com/users/${user.id}/profile`;
-
-      // Acknowledge the interaction immediately with a deferred response.
-      // This tells Discord "I got it, I'm working on it."
-      // The actual message posting happens in the background.
-       (async () => {
-         await createRaidAnnouncementFromInteraction({
+      
+      (async () => {
+         await sendRaidAnnouncement({
              level,
              difficulty,
              userNickname,
@@ -108,6 +94,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  console.log("Unhandled interaction type", interaction.type);
   return NextResponse.json({error: 'Unhandled interaction type'}, {status: 400});
 }

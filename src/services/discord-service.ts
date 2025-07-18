@@ -1,6 +1,6 @@
 'use server';
 
-interface SendToDiscordParams {
+interface RaidAnnouncementParams {
   level: string;
   difficulty: string;
   userNickname: string;
@@ -8,7 +8,7 @@ interface SendToDiscordParams {
   robloxProfileUrl: string;
 }
 
-function createRaidEmbed(params: SendToDiscordParams) {
+function createRaidEmbed(params: RaidAnnouncementParams) {
   return {
     author: {
         name: `Anúncio de Raid de ${params.userNickname}`,
@@ -45,8 +45,7 @@ async function postToChannel(embed: any) {
     return response.json();
 }
 
-
-export async function sendToDiscord(params: SendToDiscordParams): Promise<{ success: boolean; error?: string }> {
+export async function sendRaidAnnouncement(params: RaidAnnouncementParams): Promise<{ success: boolean; error?: string }> {
   try {
     const embed = createRaidEmbed(params);
     await postToChannel(embed);
@@ -55,17 +54,5 @@ export async function sendToDiscord(params: SendToDiscordParams): Promise<{ succ
     console.error('Falha ao enviar mensagem para o Discord:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: `Falha ao enviar mensagem para o Discord: ${errorMessage}` };
-  }
-}
-
-export async function createRaidAnnouncementFromInteraction(params: SendToDiscordParams): Promise<{ success: boolean; error?: string }> {
-   try {
-    const embed = createRaidEmbed(params);
-    await postToChannel(embed);
-    return { success: true };
-  } catch (error) {
-    console.error('Failed to send raid announcement:', error);
-     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-     return { success: false, error: `Falha ao enviar mensagem para o Discord: ${errorMessage}` };
   }
 }

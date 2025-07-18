@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { generateRaidAnnouncement } from "@/ai/flows/generate-raid-announcement";
-import { sendToDiscord } from "@/services/discord-service";
+import { sendRaidAnnouncement } from "@/services/discord-service";
 import { Bot, Loader2, User, Sparkles, AlertCircle, Send } from "lucide-react";
 import Image from "next/image";
 
@@ -81,7 +81,7 @@ export default function RaidAnnouncer() {
     if (!announcement) return;
 
     setIsSending(true);
-    const result = await sendToDiscord({
+    const result = await sendRaidAnnouncement({
       level: announcement.level,
       difficulty: announcement.difficulty,
       userNickname: 'Raid Master', // Placeholder
