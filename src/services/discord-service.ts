@@ -10,7 +10,7 @@ interface SendToDiscordParams {
   robloxProfileUrl: string;
 }
 
-export function createRaidEmbed(params: SendToDiscordParams): EmbedBuilder {
+function createRaidEmbed(params: SendToDiscordParams): EmbedBuilder {
     return new EmbedBuilder()
       .setTitle(`Anúncio de Raid de ${params.userNickname}`)
       .setURL(params.robloxProfileUrl)
@@ -75,5 +75,37 @@ export async function sendToDiscord(params: SendToDiscordParams): Promise<{ succ
         return { success: false, error: `Falha ao enviar mensagem para o Discord: ${error.message}` };
     }
     return { success: false, error: 'Falha ao enviar mensagem para o Discord.' };
+  }
+}
+
+export async function createRaidAnnouncementFromInteraction(params: SendToDiscordParams): Promise<{ success: boolean; error?: string }> {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  const channelId = process.env.DISCORD_CHANNEL_ID;
+
+  if (!token || !channelId) {
+    console.error('Discord bot token or channel ID is not configured.');
+    return { success: false, error: 'Discord bot token or channel ID is not configured.' };
+  }
+
+  const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+  try {
+    await client.login(token);
+    const channel = await client.channels.fetch(channelId);
+
+    if (channel && channel instanceof TextChannel) {
+      const embed = createRaidEmbed(params);
+      await channel.send({ embeds: [embed] });
+      return { success: true };
+    } else {
+      return { success: false, error: 'Channel not found or is not a text channel.' };
+    }
+  } catch (error) {
+    console.error('Failed to send raid announcement:', error);
+    return { success: false, error: 'Failed to send raid announcement.' };
+  } finally {
+    if (client.isReady()) {
+      await client.destroy();
+    }
   }
 }

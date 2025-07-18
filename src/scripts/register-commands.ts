@@ -10,8 +10,8 @@ const commands = [
     description: 'Cria um anúncio de raid.',
     options: [
       {
-        name: 'level',
-        description: 'O nível da raid (ex: 200, 600, 1200)',
+        name: 'level_ou_nome',
+        description: 'O nível ou nome da raid (ex: 200, "Flame Lord")',
         type: ApplicationCommandOptionType.String,
         required: true,
       },
@@ -22,8 +22,11 @@ const commands = [
         required: true,
         choices: [
             { name: 'Fácil', value: 'fácil' },
+            { name: 'Easy', value: 'fácil' },
             { name: 'Médio', value: 'médio' },
+            { name: 'Medium', value: 'médio' },
             { name: 'Difícil', value: 'difícil' },
+            { name: 'Hard', value: 'difícil' },
         ],
       },
     ],

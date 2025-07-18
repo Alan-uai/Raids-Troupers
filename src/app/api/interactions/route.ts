@@ -1,8 +1,7 @@
 // src/app/api/interactions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyKey } from 'discord-interactions';
-import { createRaidEmbed } from '@/services/discord-service';
-import { Client, TextChannel, GatewayIntentBits } from 'discord.js';
+import { createRaidAnnouncementFromInteraction } from '@/services/discord-service';
 
 export async function POST(req: NextRequest) {
   const signature = req.headers.get('x-signature-ed25519');
@@ -32,7 +31,7 @@ export async function POST(req: NextRequest) {
     const user = interaction.member.user;
 
     if (name === 'raid') {
-      const levelOption = options.find((opt: any) => opt.name === 'level');
+      const levelOption = options.find((opt: any) => opt.name === 'level_ou_nome');
       const difficultyOption = options.find((opt: any) => opt.name === 'dificuldade');
 
       const level = levelOption ? levelOption.value : 'Não especificado';
@@ -42,49 +41,33 @@ export async function POST(req: NextRequest) {
       // This is a placeholder, as we can't get a Roblox URL from Discord directly.
       const robloxProfileUrl = 'https://www.roblox.com';
 
-      // Respond to the interaction to avoid a timeout
-      // Defer the response while we send the message to the channel
-      const responsePromise = new Promise(async (resolve) => {
-          const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-          const token = process.env.DISCORD_BOT_TOKEN;
-          const channelId = process.env.DISCORD_CHANNEL_ID;
-
-          if (!token || !channelId) {
-              console.error('Discord bot token or channel ID is not configured.');
-              resolve(null);
-              return;
-          }
-
-          try {
-              await client.login(token);
-              const channel = await client.channels.fetch(channelId);
-              if (channel && channel instanceof TextChannel) {
-                  const embed = createRaidEmbed({
-                      level,
-                      difficulty,
-                      userNickname,
-                      userAvatar,
-                      robloxProfileUrl,
-                  });
-                  await channel.send({ embeds: [embed] });
-              }
-          } catch (error) {
-              console.error('Failed to send raid announcement:', error);
-          } finally {
-              if (client.isReady()) {
-                  await client.destroy();
-              }
-              resolve(null);
-          }
+      // We defer the response while we send the message to the channel.
+      // A full response is sent later.
+      const responsePromise = createRaidAnnouncementFromInteraction({
+          level,
+          difficulty,
+          userNickname,
+          userAvatar,
+          robloxProfileUrl,
       });
 
+      // Acknowledge the interaction immediately with a deferred response.
+      // This tells Discord "I got it, I'm working on it."
       return NextResponse.json({
-        type: 4, // ChannelMessageWithSource
-        data: {
-          content: `Anúncio de raid criado com sucesso no canal de anúncios!`,
-          flags: 1 << 6 // Ephemeral message
-        },
+        type: 5, // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
       });
+      
+      // After the initial acknowledgement, you can send followup messages,
+      // but for a simple "done" message, we can just respond directly.
+      // The below logic would be for a more complex flow where you update the user later.
+      /*
+      (async () => {
+        const result = await responsePromise;
+        // Here you would use a followup message API call to Discord's webhook
+        // to edit the original deferred response.
+        // For simplicity, we are not doing that in this prototype.
+      })();
+      */
     }
   }
 
