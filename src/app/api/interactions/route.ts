@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       const question = questionOption ? questionOption.value : 'No question provided.';
       
       // Defer response
-      const responsePromise = (async () => {
+      (async () => {
           try {
               const result = await askChatbot({ question });
               await handleFollowup(interaction.token, result.answer);
