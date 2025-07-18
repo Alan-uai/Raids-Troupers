@@ -73,8 +73,6 @@ export async function POST(req: NextRequest) {
              userAvatar,
              robloxProfileUrl,
          });
-         // The original interaction response is now ephemeral, so the followup must be too.
-         // We must use a POST to `/webhooks/{application_id}/{interaction_token}` to create a new ephemeral followup.
          await handleFollowup(interactionToken, 'Anúncio de raid enviado com sucesso!', true);
        })();
 
@@ -82,6 +80,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         type: 5, // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
         data: {
+          content: "Pensando no seu caso...🤔💡",
           flags: 1 << 6, // Ephemeral flag
         },
       });
@@ -94,7 +93,6 @@ export async function POST(req: NextRequest) {
       (async () => {
           try {
               const result = await askChatbot({ question });
-              // PATCH /webhooks/{application_id}/{interaction_token}/messages/@original
               const url = `https://discord.com/api/v10/webhooks/${process.env.DISCORD_CLIENT_ID}/${interactionToken}/messages/@original`;
               await fetch(url, {
                   method: 'PATCH',
@@ -114,6 +112,9 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
           type: 5, // DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
+          data: {
+            content: "Consultando a sabedoria dos ancestrais... 📜",
+          }
       });
     }
   }
