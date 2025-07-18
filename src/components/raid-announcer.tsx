@@ -205,7 +205,7 @@ export default function RaidAnnouncer() {
                 robloxProfileUrl="https://www.roblox.com"
              />
              <Button variant="outline" size="sm" onClick={handleSendToDiscord} disabled={isSending} className="mt-4">
-                 {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2"/>} Announce on Discord
+                 {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2"/>} Anunciar no Discord
              </Button>
           </div>
         ) : !isLoading && !error && (
