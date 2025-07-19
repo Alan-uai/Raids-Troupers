@@ -43,6 +43,7 @@ const raidStates = new Map();
 const userStats = new Map(); // Armazena { level, xp, coins, class, raidsCreated, ... }
 const userProfiles = new Map(); // Armazena { channelId, messageId } do perfil do usuário
 const userItems = new Map(); // Armazena { inventory: [], equippedBackground: 'default' }
+const activeAuctions = new Map(); // Armazena leilões ativos
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,8 +63,7 @@ for (const file of commandFiles) {
 
 client.once(Events.ClientReady, async () => {
   console.log(`✅ Bot online como ${client.user.tag}`);
-
-  // O deploy de comandos foi movido para um script separado para melhor organização
+  setInterval(checkAuctionEnd, 5000); // Verifica a cada 5 segundos se algum leilão terminou
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -73,7 +73,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
     try {
       // Passa os mapas de dados para os comandos que precisarem
-      await command.execute(interaction, { userStats, userProfiles, userItems });
+      await command.execute(interaction, { userStats, userProfiles, userItems, activeAuctions });
     } catch (error) {
       console.error(error);
       const replyOptions = { content: 'Erro ao executar o comando!', ephemeral: true };
@@ -101,7 +101,14 @@ client.on(Events.InteractionCreate, async interaction => {
             await interaction.reply({ content: 'Ocorreu um erro ao processar sua ação.', ephemeral: true }).catch(() => {});
         }
       }
+    } else if (action === 'auction') {
+        if (subAction === 'bid') {
+            // Lógica para quando o usuário clica no botão "Dar Lance"
+            // Poderia abrir um modal ou simplesmente guiar o usuário a usar /dar_lance
+            await interaction.reply({ content: 'Para fazer um lance, por favor, use o comando `/dar_lance <valor>`.', ephemeral: true });
+        }
     }
+
   } else if (interaction.isStringSelectMenu()) {
       const [action, subAction, requesterId, raidId] = interaction.customId.split('_');
       if (action === 'raid' && subAction === 'kick') {
@@ -109,6 +116,63 @@ client.on(Events.InteractionCreate, async interaction => {
       }
   }
 });
+
+async function checkAuctionEnd() {
+    const auction = activeAuctions.get('current_auction');
+    if (!auction || new Date() < auction.endTime) {
+        return;
+    }
+
+    console.log('Finalizando leilão...');
+    activeAuctions.delete('current_auction'); // Remove o leilão para evitar processamento repetido
+
+    const auctionChannel = await client.channels.fetch(auction.channelId).catch(() => null);
+    if (!auctionChannel) return;
+
+    const auctionMessage = await auctionChannel.messages.fetch(auction.messageId).catch(() => null);
+
+    const finalEmbed = new EmbedBuilder()
+        .setColor('#808080')
+        .setTitle(`🌟 Leilão Finalizado! 🌟`)
+        .setDescription(`O leilão para **${auction.item.name}** terminou.`);
+
+    const bids = auction.bids;
+    if (bids.size === 0) {
+        finalEmbed.addFields({ name: 'Resultado', value: 'Nenhum lance foi feito.' });
+        if(auctionMessage) await auctionMessage.edit({ embeds: [finalEmbed], components: [] });
+        return;
+    }
+
+    const winnerEntry = [...bids.entries()].sort((a, b) => b[1] - a[1])[0];
+    const [winnerId, winningBid] = winnerEntry;
+    
+    const winnerUser = await client.users.fetch(winnerId);
+
+    // Processar o vencedor
+    const stats = userStats.get(winnerId);
+    stats.coins -= winningBid;
+    userStats.set(winnerId, stats);
+
+    const items = userItems.get(winnerId) || { inventory: [], equippedBackground: 'default' };
+    items.inventory.push(auction.item.id);
+    userItems.set(winnerId, items);
+
+    finalEmbed.addFields(
+        { name: '🏆 Vencedor', value: `${winnerUser.username}`, inline: true },
+        { name: '💰 Lance Vencedor', value: `${winningBid} TC`, inline: true }
+    );
+    finalEmbed.setThumbnail(winnerUser.displayAvatarURL());
+    finalEmbed.setFooter({text: 'O item foi adicionado ao inventário do vencedor.'});
+    
+    if (auctionMessage) await auctionMessage.edit({ embeds: [finalEmbed], components: [] });
+
+    try {
+        await winnerUser.send(`Parabéns! Você venceu o leilão para **${auction.item.name}** com um lance de ${winningBid} TC. O item já está no seu inventário!`);
+    } catch (e) {
+        console.log(`Não foi possível enviar DM para o vencedor do leilão ${winnerUser.username}`);
+    }
+}
+
 
 async function handleRaidButton(interaction, subAction, requesterId, raidId) {
     await interaction.deferUpdate();
