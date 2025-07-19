@@ -19,7 +19,6 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { v4 as uuidv4 } from 'uuid';
 import { REST, Routes } from 'discord.js';
-import fetch from 'node-fetch';
 
 const app = express();
 const port = process.env.PORT || 3000;
