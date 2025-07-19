@@ -209,6 +209,9 @@ async function handleRaidButton(interaction, subAction, requesterId) {
 
     // --- Join Action (happens on the original message) ---
     if (subAction === 'join') {
+        // Always defer the interaction first to avoid timeout errors
+        await interaction.deferUpdate();
+
         let currentThread = thread;
         if (!currentThread) {
              currentThread = await originalRaidMessage.startThread({
@@ -217,7 +220,7 @@ async function handleRaidButton(interaction, subAction, requesterId) {
             }).catch(e => console.error("Error creating thread:", e));
 
             if (!currentThread) {
-                 return interaction.reply({ content: "Não foi possível criar o tópico para a raid.", ephemeral: true });
+                 return interaction.followUp({ content: "Não foi possível criar o tópico para a raid.", ephemeral: true });
             }
             await currentThread.members.add(raidRequester.id);
             await currentThread.send(`Bem-vindo, ${raidRequester}! Este é o tópico para organizar sua raid.`);
@@ -228,23 +231,22 @@ async function handleRaidButton(interaction, subAction, requesterId) {
                     new ButtonBuilder().setCustomId(`raid_kick_menu_${requesterId}`).setLabel('❌ Expulsar Membro').setStyle(ButtonStyle.Danger),
                     new ButtonBuilder().setCustomId(`raid_close_${requesterId}`).setLabel('🔒 Fechar Raid').setStyle(ButtonStyle.Secondary)
                 );
-            // This needs to be a followup because the original interaction was the button click, which we defer.
+            
             await interaction.followUp({ content: `**Controles do Líder:**`, components: [leaderControls], ephemeral: true });
         }
 
         const members = await currentThread.members.fetch();
         if (members.has(interactor.id)) {
-            return await interaction.reply({ content: 'Você já está nesta raid!', ephemeral: true });
+            return await interaction.followUp({ content: 'Você já está nesta raid!', ephemeral: true });
         }
         
         const membersField = raidEmbed.fields.find(f => f.name === 'Membros na Equipe');
         let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
         
         if (currentMembers >= 5) {
-            return await interaction.reply({ content: 'Esta raid já está cheia!', ephemeral: true });
+            return await interaction.followUp({ content: 'Esta raid já está cheia!', ephemeral: true });
         }
 
-        await interaction.deferUpdate();
         await currentThread.members.add(interactor.id);
         await currentThread.send(`${interactor} entrou na equipe da raid!`);
         currentMembers++;
@@ -253,7 +255,6 @@ async function handleRaidButton(interaction, subAction, requesterId) {
             .addComponents(
                 new ButtonBuilder().setCustomId(`raid_leave_${requesterId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary)
             );
-        // Send ephemeral controls to the new member
         await interaction.followUp({ content: '**Controles de Membro:**', components: [memberControls], ephemeral: true });
 
         const newEmbed = EmbedBuilder.from(raidEmbed).setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
