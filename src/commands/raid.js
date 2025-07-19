@@ -11,7 +11,7 @@ export default {
     .addStringOption(option =>
         option.setName('tipo-chat')
             .setDescription('Escolha o tipo de canal de discussão para a raid (padrão: Texto)')
-            .setRequired(false) // Tornou-se opcional
+            .setRequired(false)
             .addChoices(
                 { name: 'Texto', value: 'texto' },
                 { name: 'Voz', value: 'voz' }
@@ -25,14 +25,11 @@ export default {
 
     const nivel = interaction.options.getString('nivel');
     const dificuldade = interaction.options.getString('dificuldade');
-    // Pega o tipo de chat ou define 'texto' como padrão
     const tipoChat = interaction.options.getString('tipo-chat') ?? 'texto';
     const user = interaction.user;
 
     const robloxUsername = user.username;
 
-    // A customId precisa ser única por anúncio e conter os dados necessários.
-    // Formato: acao_raid_idDoAnuncio_idDoRequisitante_tipoDeChat
     const customId = `join_raid_${interaction.id}_${user.id}_${tipoChat}`;
 
     const embed = new EmbedBuilder()
@@ -65,7 +62,6 @@ export default {
     if (channel) {
       try {
         await channel.send({ embeds: [embed], components: [row] });
-        // Edita a resposta inicial em vez de usar followUp
         await interaction.editReply({
           content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`
         });

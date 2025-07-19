@@ -6,7 +6,6 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { OpenAI } from 'openai';
 
-// Configuração do servidor HTTP
 const app = express();
 const port = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('Bot está online!'));
@@ -14,10 +13,8 @@ app.listen(port, () => console.log(`HTTP server rodando na porta ${port}`));
 
 dotenv.config();
 
-// Inicialização da OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Adiciona as intents necessárias para ler mensagens
 const client = new Client({ 
   intents: [
     GatewayIntentBits.Guilds,
@@ -48,7 +45,6 @@ client.once(Events.ClientReady, () => {
   console.log(`✅ Bot online como ${client.user.tag}`);
 });
 
-// Listener para interações de comandos e botões
 client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
@@ -91,12 +87,12 @@ client.on(Events.InteractionCreate, async interaction => {
                     await thread.members.add(raidRequester.id);
                     await thread.send(`Bem-vindo, ${raidRequester}! Este é o tópico para organizar sua raid. ${joiner} acabou de se juntar.`);
                 }
+            } else {
+                 await thread.members.add(joiner.id);
+                 await thread.send(`${joiner} entrou na equipe da raid!`);
             }
             
-            await thread.members.add(joiner.id);
-            await thread.send(`${joiner} entrou na equipe da raid!`);
-            
-            if(chatType === 'voz') {
+            if (chatType === 'voz') {
                 await thread.send('Lembrete: Este é um chat de voz! Por favor, entrem em um canal de voz para coordenar.');
             }
 
@@ -110,7 +106,6 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 });
 
-// Listener para menções ao bot
 client.on(Events.MessageCreate, async message => {
   if (message.author.bot || !message.mentions.has(client.user.id)) {
     return;
