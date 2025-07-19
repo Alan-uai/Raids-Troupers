@@ -10,6 +10,7 @@ import {
   EmbedBuilder,
   ChannelType,
   PermissionsBitField,
+  AttachmentBuilder,
 } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
@@ -18,6 +19,7 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { v4 as uuidv4 } from 'uuid';
 import { REST, Routes } from 'discord.js';
+import { generateProfileImage } from './profile-generator.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -212,11 +214,11 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
         }
 
         const membersField = raidEmbed.data.fields.find(f => f.name.includes('Membros na Equipe'));
-        const memberCount = membersField.name.match(/\*\*(\d+)\/(\d+)\*\*/);
+        const memberCount = membersField.value.match(/\*\*(\d+)\/(\d+)\*\*/);
         let [, currentMembers, maxMembers] = memberCount.map(Number);
         currentMembers = Math.max(1, currentMembers - 1);
 
-        raidEmbed.setFields({ name: `👥 Membros na Equipe: **${currentMembers}/${maxMembers}**`, value: '\u200B', inline: false });
+        raidEmbed.setFields({ name: '👥 Membros na Equipe', value: `**${currentMembers}/${maxMembers}**`, inline: true });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
         const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
         if (joinButton) {
@@ -283,7 +285,7 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
         await currentThread.send(`${interactor} entrou na equipe da raid!`);
         currentMembers++;
 
-        raidEmbed.setFields({ name: `👥 Membros na Equipe: **${currentMembers}/${maxMembers}**`, value: '\u200B', inline: false });
+        raidEmbed.setFields({ name: '👥 Membros na Equipe', value: `**${currentMembers}/${maxMembers}**`, inline: true });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
         const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
 
@@ -500,11 +502,11 @@ async function handleRaidKick(interaction, requesterId, raidId) {
 
         const raidEmbed = EmbedBuilder.from(originalRaidMessage.embeds[0]);
         const membersField = raidEmbed.data.fields.find(f => f.name.includes('Membros na Equipe'));
-        const memberCount = membersField.name.match(/\*\*(\d+)\/(\d+)\*\*/);
+        const memberCount = membersField.value.match(/\*\*(\d+)\/(\d+)\*\*/);
         let [, currentMembers, maxMembers] = memberCount.map(Number);
         currentMembers = Math.max(1, currentMembers - 1);
 
-        raidEmbed.setFields({ name: `👥 Membros na Equipe: **${currentMembers}/${maxMembers}**`, value: '\u200B', inline: false });
+        raidEmbed.setFields({ name: '👥 Membros na Equipe', value: `**${currentMembers}/${maxMembers}**`, inline: true });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
         const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
         if (joinButton) {
@@ -600,14 +602,13 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
 
 client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     const roleName = 'limpo';
-    const categoryId = '1395589412661887068';
+    const categoryId = '1395589412661887068'; 
 
     const oldHasRole = oldMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
     const newHasRole = newMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
 
     if (!oldHasRole && newHasRole) {
-        // User just got the role
-        console.log(`Usuário ${newMember.displayName} recebeu a role '${roleName}'. Criando canal.`);
+        console.log(`Usuário ${newMember.displayName} recebeu a role '${roleName}'. Criando canal e perfil.`);
 
         const guild = newMember.guild;
         const category = guild.channels.cache.get(categoryId);
@@ -635,15 +636,20 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
             });
 
             console.log(`Canal #${channel.name} criado para ${newMember.displayName}.`);
-            await channel.send(`Bem-vindo, ${newMember}! Este é o seu espaço de perfil pessoal.`);
-            // TODO: Add the detailed profile image generation here in the future.
+            
+            // Gerar a imagem do perfil
+            const profileImageBuffer = await generateProfileImage(newMember);
+            const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
+
+            await channel.send({
+                content: `Bem-vindo, ${newMember}! Este é o seu espaço de perfil pessoal.`,
+                files: [attachment]
+            });
 
         } catch (error) {
-            console.error(`Falha ao criar canal para ${newMember.displayName}:`, error);
+            console.error(`Falha ao criar canal ou perfil para ${newMember.displayName}:`, error);
         }
     }
 });
 
 client.login(process.env.DISCORD_TOKEN);
-
-    
