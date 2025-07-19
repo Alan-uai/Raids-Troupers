@@ -26,6 +26,9 @@ export default {
         )),
 
   async execute(interaction) {
+    // Responder imediatamente para evitar timeout
+    await interaction.deferReply({ ephemeral: true });
+
     const nivel = interaction.options.getString('nivel');
     const dificuldade = interaction.options.getString('dificuldade');
     const user = interaction.user;
@@ -37,34 +40,40 @@ export default {
 
     if (!channel) {
       console.error(`Canal com ID ${raidChannelId} não encontrado.`);
-      return await interaction.reply({
-        content: 'Não encontrei o canal para anunciar a raid. Avise um administrador!',
-        ephemeral: true
+      return await interaction.editReply({
+        content: 'Não encontrei o canal para anunciar a raid. Avise um administrador!'
       });
     }
 
-    // Delete existing raid announcements from this user
-    try {
-      const messages = await channel.messages.fetch({ limit: 50 });
-      const userRaidMessages = messages.filter(msg => 
-        msg.embeds.length > 0 && 
-        msg.embeds[0].footer && 
-        (msg.embeds[0].footer.text.includes(user.username) || msg.embeds[0].footer.text.includes(member.displayName))
-      );
-      
-      for (const msg of userRaidMessages.values()) {
-        try {
-          if (msg.thread) {
-            await msg.thread.delete();
+    // Delete existing raid announcements from this user (processo assíncrono em background)
+    const deletePromise = (async () => {
+      try {
+        const messages = await channel.messages.fetch({ limit: 30 });
+        const userRaidMessages = messages.filter(msg => 
+          msg.embeds.length > 0 && 
+          msg.embeds[0].footer && 
+          (msg.embeds[0].footer.text.includes(user.username) || msg.embeds[0].footer.text.includes(member.displayName))
+        );
+        
+        // Processar deletações em paralelo mas com limite
+        const deletePromises = Array.from(userRaidMessages.values()).map(async (msg) => {
+          try {
+            if (msg.thread) {
+              await msg.thread.delete().catch(() => {});
+            }
+            await msg.delete().catch(() => {});
+          } catch (deleteErr) {
+            console.log(`Erro ao deletar mensagem: ${deleteErr.message}`);
           }
-          await msg.delete();
-        } catch (deleteErr) {
-          console.log(`Não foi possível deletar mensagem anterior: ${deleteErr.message}`);
-        }
+        });
+
+        await Promise.allSettled(deletePromises);
+      } catch (fetchErr) {
+        console.log(`Erro ao buscar mensagens anteriores: ${fetchErr.message}`);
       }
-    } catch (fetchErr) {
-      console.log(`Erro ao buscar mensagens anteriores: ${fetchErr.message}`);
-    }
+    })();
+
+    // Não aguardar a conclusão das deletações para prosseguir
 
     const embed = new EmbedBuilder()
       .setTitle("📢 Novo Pedido de Ajuda em **__Raid__**!")
@@ -101,15 +110,13 @@ export default {
       // Update the message with buttons
       await sentMessage.edit({ embeds: [embed], components: [row] });
       
-      await interaction.reply({
-        content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`,
-        ephemeral: true
+      await interaction.editReply({
+        content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`
       });
     } catch (err) {
       console.error("Erro ao enviar a mensagem para o canal:", err);
-      await interaction.reply({
-        content: 'Não consegui enviar o anúncio no canal de raids. Verifique minhas permissões!',
-        ephemeral: true
+      await interaction.editReply({
+        content: 'Não consegui enviar o anúncio no canal de raids. Verifique minhas permissões!'
       });
     }
   }
