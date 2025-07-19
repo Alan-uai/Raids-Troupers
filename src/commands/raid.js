@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } from 'discord.js';
+import { checkMissionCompletion } from '../mission-system.js';
 
 // Map para armazenar o ID da última mensagem de raid de cada usuário
 const userLastRaidMessage = new Map();
@@ -28,7 +29,7 @@ export default {
             { name: 'Difícil', value: 'Difícil' }
         )),
 
-  async execute(interaction, userStats) { // Pass userStats here
+  async execute(interaction, { userStats, userMissions }) { // Pass userStats and userMissions here
     // Responder imediatamente para evitar timeout
     await interaction.deferReply({ ephemeral: true });
 
@@ -113,9 +114,12 @@ export default {
       userLastRaidMessage.set(user.id, sentMessage.id);
       
       // Update stats for raid created
-      const stats = userStats.get(user.id) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+      const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
       stats.raidsCreated += 1;
       userStats.set(user.id, stats);
+      
+      // Check for mission completion
+      await checkMissionCompletion(interaction.user, 'RAID_CREATED', interaction.channel, { userStats, userMissions });
 
       await interaction.editReply({
         content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`

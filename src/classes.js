@@ -25,7 +25,7 @@ export const classes = [
     description: 'Controla os elementos para causar dano em área e aplicar debuffs nos inimigos.',
     // Futuramente: bonus: { type: 'coin_find', value: 0.10 }
   },
-    {
+  {
     id: 'tank',
     name: 'Tank',
     icon: '🛡️',
@@ -33,4 +33,18 @@ export const classes = [
     description: 'Inabalável, protege os aliados atraindo a atenção dos inimigos e absorvendo dano.',
     // Futuramente: bonus: { type: 'kick_resist', value: 0.25 }
   },
+  {
+    id: 'arqueiro',
+    name: 'Arqueiro',
+    icon: '🏹',
+    color: '#F1C40F',
+    description: 'Especialista em dano à distância, abate alvos prioritários com precisão mortal.',
+  },
+  {
+    id: 'ladino',
+    name: 'Ladino',
+    icon: '🗡️',
+    color: '#717D7E',
+    description: 'Mestre da furtividade, ataca das sombras e causa dano crítico inesperado.',
+  }
 ];

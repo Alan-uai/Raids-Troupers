@@ -21,6 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { REST, Routes } from 'discord.js';
 import { generateProfileImage } from './profile-generator.js';
 import { rareItems } from './rare-items.js';
+import { assignMissions, checkMissionCompletion } from './mission-system.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -46,6 +47,7 @@ const userProfiles = new Map(); // Armazena { channelId, messageId } do perfil d
 const userItems = new Map(); // Armazena { inventory: [], equippedBackground: 'default', equippedTitle: null }
 const activeAuctions = new Map(); // Armazena leilões ativos
 const pendingRatings = new Map(); // Armazena { userId: [userIdToRate1, userIdToRate2] }
+const userMissions = new Map(); // Armazena { userId: [{missionId, progress}] }
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,9 +75,14 @@ client.on(Events.InteractionCreate, async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
 
+    // Atribui missões ao usuário se ele ainda não tiver
+    if (!userMissions.has(interaction.user.id)) {
+        assignMissions(interaction.user.id, userMissions);
+    }
+    
     try {
       // Passa os mapas de dados para os comandos que precisarem
-      await command.execute(interaction, { userStats, userProfiles, userItems, activeAuctions });
+      await command.execute(interaction, { userStats, userProfiles, userItems, activeAuctions, userMissions, pendingRatings });
     } catch (error) {
       console.error(error);
       const replyOptions = { content: 'Erro ao executar o comando!', ephemeral: true };
@@ -476,6 +483,9 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
             }
             userStats.set(user.id, stats);
 
+             // Check for mission completion
+            await checkMissionCompletion(user, 'RAID_HELPED', thread, { userStats, userMissions, client, userProfiles, userItems });
+
             const profileInfo = userProfiles.get(user.id);
             if (profileInfo?.channelId && profileInfo?.messageId) {
                 try {
@@ -579,6 +589,9 @@ async function handleRaidKick(interaction, requesterId, raidId) {
         const kickedStats = userStats.get(memberToKickId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
         kickedStats.wasKicked += 1;
         userStats.set(memberToKickId, kickedStats);
+        
+        // Check for mission completion
+        await checkMissionCompletion(interaction.user, 'KICK_MEMBER', thread, { userStats, userMissions, client, userProfiles, userItems });
 
         const raidEmbed = EmbedBuilder.from(originalRaidMessage.embeds[0]);
         const membersField = raidEmbed.data.fields.find(f => f.name.includes('Membros na Equipe'));
@@ -676,6 +689,9 @@ async function handleRating(interaction, raterId, ratedId, type) {
         await interaction.update({ content: 'Sua avaliação foi registrada. Você ainda tem outros membros para avaliar.', components: [] });
     }
     
+    // Check for mission completion
+    await checkMissionCompletion(interaction.user, 'RATE_PLAYER', interaction.channel, { userStats, userMissions, client, userProfiles, userItems });
+
     // Atualizar perfil do usuário avaliado
     const profileInfo = userProfiles.get(ratedId);
     if (profileInfo) {
@@ -777,6 +793,9 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
             const items = userItems.get(newMember.id) || { inventory: [], equippedBackground: 'default', equippedTitle: null };
             userItems.set(newMember.id, items);
+
+            // Atribui missões iniciais
+            assignMissions(newMember.id, userMissions);
 
             const profileImageBuffer = await generateProfileImage(newMember, stats, items);
             const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });

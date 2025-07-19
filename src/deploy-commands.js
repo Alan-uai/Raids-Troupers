@@ -17,20 +17,39 @@ const __dirname = path.dirname(__filename);
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-for (const file of commandFiles) {
+// Adicionando manualmente para garantir a ordem ou apenas para listar
+const commandFileNames = [
+    'raid.js',
+    'classes.js',
+    'escolher_classe.js',
+    'loja.js',
+    'comprar.js',
+    'inventario.js',
+    'equipar.js',
+    'iniciar_leilao.js',
+    'dar_lance.js',
+    'missoes.js' // Adicionado novo comando
+];
+
+for (const file of commandFileNames) {
     const filePath = path.join(commandsPath, file);
-    try {
-        const commandModule = await import(filePath);
-        const command = commandModule.default;
-        if (command && 'data' in command) {
-            commands.push(command.data.toJSON());
-        } else {
-            console.log(`[AVISO] O comando em ${filePath} está faltando a propriedade "data".`);
+    if (fs.existsSync(filePath)) {
+        try {
+            const commandModule = await import(filePath);
+            const command = commandModule.default;
+            if (command && 'data' in command) {
+                commands.push(command.data.toJSON());
+            } else {
+                console.log(`[AVISO] O comando em ${filePath} está faltando a propriedade "data".`);
+            }
+        } catch (error) {
+            console.error(`Erro ao carregar o comando de ${filePath}:`, error);
         }
-    } catch (error) {
-        console.error(`Erro ao carregar o comando de ${filePath}:`, error);
+    } else {
+        console.log(`[AVISO] O arquivo de comando ${file} não foi encontrado.`);
     }
 }
+
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
