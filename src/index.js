@@ -112,37 +112,59 @@ client.on(Events.InteractionCreate, async interaction => {
 
 // Listener para menções ao bot
 client.on(Events.MessageCreate, async message => {
-  // Ignora mensagens de outros bots e mensagens que não mencionam o cliente
   if (message.author.bot || !message.mentions.has(client.user.id)) {
     return;
   }
 
-  // Remove a menção para obter a pergunta do usuário
   const pergunta = message.content.replace(/<@!?\d+>/, '').trim();
 
-  // Se não houver pergunta após a menção, não faz nada
   if (!pergunta) {
     return;
   }
 
   try {
-    // Envia um indicador de "digitando..." para o usuário saber que o bot está processando
-    await message.channel.sendTyping();
+    const systemPrompt = `
+      Analise a frase do usuário e categorize-a em uma das três categorias: "pergunta", "pedido", "conversa".
+      - "pergunta": Para perguntas diretas que buscam uma informação específica (ex: "que horas são?", "quem descobriu o Brasil?").
+      - "pedido": Para solicitações de criação, informação detalhada ou ajuda (ex: "me dê uma referência", "fale sobre a segunda guerra", "crie uma imagem").
+      - "conversa": Para interações pessoais, saudações, desabafos ou comentários (ex: "e aí, como vai?", "estou triste", "você é uma IA?").
+      Responda apenas com a palavra da categoria, em minúsculas.
+    `;
 
-    const completion = await openai.chat.completions.create({
+    const categoryCompletion = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: pergunta }
+      ],
+      max_tokens: 10,
+    });
+    
+    const categoria = categoryCompletion.choices[0].message.content.toLowerCase().trim();
+    
+    let feedbackMessage = "Digitando...";
+    if (categoria.includes('pergunta')) {
+        feedbackMessage = "Pensando...🤔💡";
+    } else if (categoria.includes('pedido')) {
+        feedbackMessage = "Pensando no seu caso...🤔💡";
+    } else if (categoria.includes('conversa')) {
+        feedbackMessage = "Digitando nessa bagaça...";
+    }
+
+    await message.channel.send(feedbackMessage);
+    
+    const mainCompletion = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [{ role: 'user', content: pergunta }]
     });
 
-    const resposta = completion.choices[0].message.content;
+    const resposta = mainCompletion.choices[0].message.content;
 
-    // Responde diretamente à mensagem do usuário
     await message.reply(resposta.slice(0, 2000));
   } catch (err) {
     console.error("Erro ao responder menção:", err);
     await message.reply('Desculpe, ocorreu um erro ao tentar responder.');
   }
 });
-
 
 client.login(process.env.DISCORD_TOKEN);
