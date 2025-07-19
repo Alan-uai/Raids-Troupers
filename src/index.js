@@ -211,11 +211,12 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
             raidState.delete(interactor.id);
         }
 
-        const membersField = raidEmbed.data.fields.find(f => f.name === 'Membros na Equipe');
-        let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
+        const membersField = raidEmbed.data.fields.find(f => f.name.includes('Membros na Equipe'));
+        const memberCount = membersField.name.match(/\*\*(\d+)\/(\d+)\*\*/);
+        let [, currentMembers, maxMembers] = memberCount.map(Number);
         currentMembers = Math.max(1, currentMembers - 1);
 
-        raidEmbed.setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
+        raidEmbed.setFields({ name: `👥 Membros na Equipe: **${currentMembers}/${maxMembers}**`, value: '\u200B', inline: false });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
         const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
         if (joinButton) {
@@ -270,8 +271,9 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
             return await interaction.followUp({ content: 'Você já está nesta raid!', flags: [64] });
         }
 
-        const membersField = raidEmbed.data.fields.find(f => f.name === 'Membros na Equipe');
-        let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
+        const membersField = raidEmbed.data.fields.find(f => f.name.includes('Membros na Equipe'));
+        const memberCount = membersField.name.match(/\*\*(\d+)\/(\d+)\*\*/);
+        let [, currentMembers, maxMembers] = memberCount.map(Number);
 
         if (currentMembers >= 5) {
             return await interaction.followUp({ content: 'Esta raid já está cheia!', flags: [64] });
@@ -281,7 +283,7 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
         await currentThread.send(`${interactor} entrou na equipe da raid!`);
         currentMembers++;
 
-        raidEmbed.setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
+        raidEmbed.setFields({ name: `👥 Membros na Equipe: **${currentMembers}/${maxMembers}**`, value: '\u200B', inline: false });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
         const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
 
@@ -319,7 +321,7 @@ async function handleControlsButton(interaction, requesterId, raidId) {
                 new ButtonBuilder().setCustomId(`raid_start_${requesterId}_${raidId}`).setLabel('✅ Iniciar Raid').setStyle(ButtonStyle.Success),
                 new ButtonBuilder().setCustomId(`raid_kickmenu_${requesterId}_${raidId}`).setLabel('❌ Expulsar Membro').setStyle(ButtonStyle.Danger),
                 new ButtonBuilder().setCustomId(`raid_close_${requesterId}_${raidId}`).setLabel('🔒 Fechar Raid').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setLabel('🔊 Habilitar Chat de Voz').setStyle(ButtonStyle.Primary)
+                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setLabel('🔊 Criar Chat de Voz').setStyle(ButtonStyle.Primary)
             );
 
         await interaction.reply({ 
@@ -332,7 +334,7 @@ async function handleControlsButton(interaction, requesterId, raidId) {
         const memberControls = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder().setCustomId(`raid_leave_${requesterId}_${raidId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setLabel('🔊 Habilitar Chat de Voz').setStyle(ButtonStyle.Primary)
+                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setLabel('🔊 Criar Chat de Voz').setStyle(ButtonStyle.Primary)
             );
 
         await interaction.reply({ 
@@ -499,11 +501,12 @@ async function handleRaidKick(interaction, requesterId, raidId) {
         }
 
         const raidEmbed = EmbedBuilder.from(originalRaidMessage.embeds[0]);
-        const membersField = raidEmbed.data.fields.find(f => f.name === 'Membros na Equipe');
-        let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
+        const membersField = raidEmbed.data.fields.find(f => f.name.includes('Membros na Equipe'));
+        const memberCount = membersField.name.match(/\*\*(\d+)\/(\d+)\*\*/);
+        let [, currentMembers, maxMembers] = memberCount.map(Number);
         currentMembers = Math.max(1, currentMembers - 1);
 
-        raidEmbed.setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
+        raidEmbed.setFields({ name: `👥 Membros na Equipe: **${currentMembers}/${maxMembers}**`, value: '\u200B', inline: false });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
         const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
         if (joinButton) {
