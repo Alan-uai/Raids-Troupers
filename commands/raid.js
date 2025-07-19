@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } from 'discord.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -19,19 +19,30 @@ export default {
     const dificuldade = interaction.options.getString('dificuldade');
     const user = interaction.user;
 
+    // Nome de usuário do Roblox (usando o nome do Discord como padrão)
+    const robloxUsername = user.username;
+
     const embed = new EmbedBuilder()
-      .setTitle("📢 Pedido de Ajuda!")
+      .setTitle("📢 Novo Pedido de Ajuda em Raid!")
       .setDescription(`Gostaria de uma ajuda para superar a Raid **${nivel}** na dificuldade **${dificuldade}**.\n\nFicarei grato!`)
-      .setColor(0x5865F2)
+      .setColor("#FF0000")
       .setFooter({ text: `Solicitado por ${user.username}`, iconURL: user.displayAvatarURL() })
       .setTimestamp();
+      
+    const row = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setLabel("🔗 Add no Roblox")
+          .setStyle(ButtonStyle.Link)
+          .setURL(`https://www.roblox.com/users/profile?username=${encodeURIComponent(robloxUsername)}`)
+      );
 
     const raidChannelId = '1395591154208084049';
     const channel = interaction.client.channels.cache.get(raidChannelId);
     
     if (channel) {
       try {
-        await channel.send({ embeds: [embed] });
+        await channel.send({ embeds: [embed], components: [row] });
         await interaction.followUp({
           content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`,
           ephemeral: true
