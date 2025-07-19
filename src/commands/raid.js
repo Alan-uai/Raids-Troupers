@@ -67,8 +67,8 @@ export default {
     }
 
     const embed = new EmbedBuilder()
-      .setTitle("📢 Novo Pedido de Ajuda em Raid!")
-      .setDescription(`Gostaria de uma ajuda para superar a Raid **${nivel}** na dificuldade **${dificuldade}**.\n\nFicarei grato!`)
+      .setTitle("📢 Novo Pedido de Ajuda em **__Raid__**!")
+      .setDescription(`Gostaria de uma ajuda para superar a **__Raid ${nivel}__** na dificuldade **__${dificuldade}__**.\n\n__Ficarei grato!__`)
       .setColor("#FF0000")
       .addFields({ name: 'Membros na Equipe', value: `1/5`, inline: true })
       .setFooter({ text: `Solicitado por ${member.displayName || user.username}`, iconURL: user.displayAvatarURL() })
