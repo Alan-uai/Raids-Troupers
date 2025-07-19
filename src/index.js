@@ -94,11 +94,11 @@ client.on(Events.InteractionCreate, async interaction => {
       await command.execute(interaction);
     } catch (error) {
       console.error(error);
-      const replyOptions = { content: 'Erro ao executar o comando!', flags: [64] };
+      const replyOptions = { content: 'Erro ao executar o comando!', ephemeral: true };
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(replyOptions);
+        await interaction.followUp(replyOptions).catch(()=>{});
       } else {
-        await interaction.reply(replyOptions);
+        await interaction.reply(replyOptions).catch(()=>{});
       }
     }
   } else if (interaction.isButton()) {
@@ -116,7 +116,7 @@ client.on(Events.InteractionCreate, async interaction => {
       } catch (error) {
         console.error("Erro ao processar botão da raid:", error);
         if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'Ocorreu um erro ao processar sua ação.', flags: [64] }).catch(() => {});
+            await interaction.reply({ content: 'Ocorreu um erro ao processar sua ação.', ephemeral: true }).catch(() => {});
         }
       }
     }
@@ -140,7 +140,7 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
     const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
 
     if (!originalRaidMessage) {
-        return interaction.followUp({ content: "Não foi possível encontrar a mensagem de anúncio da raid original.", flags: [64] });
+        return interaction.followUp({ content: "Não foi possível encontrar a mensagem de anúncio da raid original.", ephemeral: true });
     }
 
     const thread = originalRaidMessage.thread;
@@ -169,7 +169,7 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
                 });
 
             if (memberOptions.length === 0) {
-                return await interaction.followUp({ content: 'Não há membros para expulsar.', flags: [64] });
+                return await interaction.followUp({ content: 'Não há membros para expulsar.', ephemeral: true });
             }
 
             const selectMenu = new ActionRowBuilder().addComponents(
@@ -178,7 +178,7 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
                     .setPlaceholder('Selecione um membro para expulsar')
                     .addOptions(memberOptions)
             );
-            return await interaction.followUp({ content: 'Quem você gostaria de expulsar?', components: [selectMenu], flags: [64] });
+            return await interaction.followUp({ content: 'Quem você gostaria de expulsar?', components: [selectMenu], ephemeral: true });
         }
 
         if (subAction === 'close') {
@@ -200,7 +200,7 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
 
     if (subAction === 'leave' && thread && interaction.channelId === thread.id) {
         if (isLeader) {
-            return await interaction.followUp({ content: 'O líder não pode sair da própria raid, apenas fechá-la.', flags: [64] });
+            return await interaction.followUp({ content: 'O líder não pode sair da própria raid, apenas fechá-la.', ephemeral: true });
         }
 
         await thread.send(`${interactor} saiu da equipe da raid.`);
@@ -220,7 +220,7 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
         const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
         if (joinButton) {
-            joinButton.setDisabled(false).setLabel('Juntar-se à Raid');
+            joinButton.setDisabled(false).setLabel('Entrar');
         }
         await originalRaidMessage.edit({ embeds: [raidEmbed], components: [originalRow] });
 
@@ -268,15 +268,15 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
 
         const members = await currentThread.members.fetch();
         if (members.has(interactor.id)) {
-            return await interaction.followUp({ content: 'Você já está nesta raid!', flags: [64] });
+            return await interaction.followUp({ content: 'Você já está nesta raid!', ephemeral: true });
         }
 
         const membersField = raidEmbed.data.fields.find(f => f.name.includes('Membros na Equipe'));
-        const memberCount = membersField.name.match(/\*\*(\d+)\/(\d+)\*\*/);
+        const memberCount = membersField.value.match(/\*\*(\d+)\/(\d+)\*\*/);
         let [, currentMembers, maxMembers] = memberCount.map(Number);
 
         if (currentMembers >= 5) {
-            return await interaction.followUp({ content: 'Esta raid já está cheia!', flags: [64] });
+            return await interaction.followUp({ content: 'Esta raid já está cheia!', ephemeral: true });
         }
 
         await currentThread.members.add(interactor.id).catch(e => console.error(`Failed to add member ${interactor.id} to thread:`, e));
@@ -291,7 +291,7 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
             if (currentMembers >= 5) {
                 joinButton.setDisabled(true).setLabel('Completo');
             } else {
-                joinButton.setDisabled(false).setLabel('Juntar-se à Raid');
+                joinButton.setDisabled(false).setLabel('Entrar');
             }
         }
 
@@ -427,7 +427,6 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
                 new ButtonBuilder().setLabel('Juntar-se ao Chat de Voz').setStyle(ButtonStyle.Link).setURL(voiceChannel.url)
             );
             try {
-                // We can't update ephemeral messages, so we send a new one
                 await user.send({ content: `A raid começou e um chat de voz foi criado!`, components: [joinVCButton] });
             } catch (dmError) {
                 console.log(`Could not DM user ${user.id}`);
@@ -459,17 +458,16 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
 
 async function handleRaidKick(interaction, requesterId, raidId) {
     if (interaction.user.id !== requesterId) {
-        return await interaction.reply({ content: 'Apenas o líder da raid pode executar esta ação.', flags: [64] });
+        return await interaction.reply({ content: 'Apenas o líder da raid pode executar esta ação.', ephemeral: true });
     }
     const memberToKickId = interaction.values[0];
 
-    // We need to fetch the original message from the original channel, not the thread.
     const raidChannelId = '1395591154208084049'; 
     const raidChannel = await client.channels.fetch(raidChannelId);
     const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
 
     if (!originalRaidMessage || !originalRaidMessage.thread) {
-        return await interaction.reply({ content: 'Não foi possível encontrar a raid ou o tópico associado.', flags: [64] });
+        return await interaction.reply({ content: 'Não foi possível encontrar a raid ou o tópico associado.', ephemeral: true });
     }
 
     const thread = originalRaidMessage.thread;
@@ -510,13 +508,13 @@ async function handleRaidKick(interaction, requesterId, raidId) {
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
         const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
         if (joinButton) {
-            joinButton.setDisabled(false).setLabel('Juntar-se à Raid');
+            joinButton.setDisabled(false).setLabel('Entrar');
         }
         await originalRaidMessage.edit({ embeds: [raidEmbed], components: [originalRow] });
 
     } catch(err) {
         console.error("Erro ao expulsar membro:", err);
-        await interaction.followUp({ content: 'Não foi possível expulsar o membro.', flags: [64] });
+        await interaction.followUp({ content: 'Não foi possível expulsar o membro.', ephemeral: true });
     }
 }
 
@@ -600,4 +598,52 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
     }
 });
 
+client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
+    const roleName = 'limpo';
+    const categoryId = '1395589412661887068';
+
+    const oldHasRole = oldMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
+    const newHasRole = newMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
+
+    if (!oldHasRole && newHasRole) {
+        // User just got the role
+        console.log(`Usuário ${newMember.displayName} recebeu a role '${roleName}'. Criando canal.`);
+
+        const guild = newMember.guild;
+        const category = guild.channels.cache.get(categoryId);
+
+        if (!category || category.type !== ChannelType.GuildCategory) {
+            console.error(`Categoria com ID ${categoryId} não encontrada ou não é uma categoria.`);
+            return;
+        }
+
+        try {
+            const channel = await guild.channels.create({
+                name: newMember.displayName,
+                type: ChannelType.GuildText,
+                parent: category,
+                permissionOverwrites: [
+                    {
+                        id: guild.id, // @everyone
+                        deny: [PermissionsBitField.Flags.ViewChannel],
+                    },
+                    {
+                        id: newMember.id,
+                        allow: [PermissionsBitField.Flags.ViewChannel],
+                    },
+                ],
+            });
+
+            console.log(`Canal #${channel.name} criado para ${newMember.displayName}.`);
+            await channel.send(`Bem-vindo, ${newMember}! Este é o seu espaço de perfil pessoal.`);
+            // TODO: Add the detailed profile image generation here in the future.
+
+        } catch (error) {
+            console.error(`Falha ao criar canal para ${newMember.displayName}:`, error);
+        }
+    }
+});
+
 client.login(process.env.DISCORD_TOKEN);
+
+    
