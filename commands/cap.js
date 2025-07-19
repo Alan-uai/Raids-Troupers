@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { OpenAI } from 'openai';
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default {
   data: new SlashCommandBuilder()
@@ -13,26 +13,21 @@ export default {
         .setRequired(true)),
 
   async execute(interaction) {
-    if (!openai) {
-        return interaction.reply({ content: 'A chave da API da OpenAI não foi configurada. O comando `/cap` está desativado.', ephemeral: true });
-    }
-  
-    await interaction.deferReply(); // Informa ao Discord que a resposta pode demorar.
-    
     const pergunta = interaction.options.getString('mensagem');
+    await interaction.deferReply(); // Informa ao Discord que estamos processando
 
     try {
       const completion = await openai.chat.completions.create({
         model: 'gpt-4',
-        messages: [{ role: 'system', content: 'Você é um assistente prestativo chamado Cap.' }, { role: 'user', content: pergunta }]
+        messages: [{ role: 'user', content: pergunta }]
       });
 
       const resposta = completion.choices[0].message.content;
 
-      await interaction.editReply(resposta.slice(0, 2000));
+      await interaction.editReply(resposta.slice(0, 2000)); // Discord limita a 2000 caracteres
     } catch (err) {
       console.error(err);
-      await interaction.editReply('Desculpe, ocorreu um erro ao tentar me comunicar com a API da OpenAI.');
+      await interaction.editReply({ content: 'Erro ao consultar o Cap.', ephemeral: true });
     }
   }
 };
