@@ -223,7 +223,7 @@ async function handleRaidButton(interaction, subAction, requesterId) {
                  return interaction.followUp({ content: "Não foi possível criar o tópico para a raid.", ephemeral: true });
             }
             await currentThread.members.add(raidRequester.id);
-            await currentThread.send(`Bem-vindo, ${raidRequester}! Este é o tópico para organizar sua raid.`);
+            await currentThread.send(`Bem-vindo, <@${raidRequester.id}>! Este é o tópico para organizar sua raid.`);
             
             const leaderControls = new ActionRowBuilder()
                 .addComponents(

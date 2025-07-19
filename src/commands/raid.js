@@ -5,9 +5,25 @@ export default {
     .setName('raid')
     .setDescription('Anunciar uma nova Raid')
     .addStringOption(option =>
-      option.setName('nivel').setDescription('Nível da Raid').setRequired(true))
+      option.setName('nivel')
+        .setDescription('Nível da Raid')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Level 200', value: '200' },
+          { name: 'Level 600', value: '600' },
+          { name: 'Level 1200', value: '1200' },
+          { name: 'Level 1500', value: '1500' },
+          { name: 'Level 1700', value: '1700' }
+        ))
     .addStringOption(option =>
-      option.setName('dificuldade').setDescription('Dificuldade').setRequired(true))
+      option.setName('dificuldade')
+        .setDescription('Dificuldade da Raid')
+        .setRequired(true)
+        .addChoices(
+            { name: 'Fácil', value: 'Fácil' },
+            { name: 'Média', value: 'Média' },
+            { name: 'Difícil', value: 'Difícil' }
+        ))
     .addStringOption(option =>
         option.setName('tipo-chat')
             .setDescription('Escolha o tipo de canal de discussão para a raid (padrão: Texto)')
@@ -80,5 +96,3 @@ export default {
     }
   }
 };
-
-    
