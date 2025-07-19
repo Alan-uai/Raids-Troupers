@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, ChannelType } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } from 'discord.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -29,7 +29,7 @@ export default {
 
     const robloxUsername = user.username;
 
-    // customId: action_requesterId_messageId_raidInfo...
+    // customId: action_subAction_requesterId
     const joinButtonId = `raid_join_${user.id}`;
 
     const embed = new EmbedBuilder()
@@ -80,3 +80,5 @@ export default {
     }
   }
 };
+
+    
