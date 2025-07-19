@@ -95,17 +95,23 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 async function getOriginalRaidMessage(interaction) {
-    if (interaction.channel.isThread()) {
+    if (interaction.message.channel.isThread()) {
         try {
-            return await interaction.channel.parent.messages.fetch(interaction.channel.id);
+            // If interaction is in a thread, the original message is the thread's parent message
+            return await interaction.message.channel.parent.messages.fetch(interaction.message.channel.id);
         } catch (e) {
-            console.error("Could not fetch original raid message from thread.", e);
-            return null;
+             console.error("Could not fetch original raid message from thread using parent.", e);
+             try {
+                // Fallback for different structures
+                 return await interaction.channel.messages.fetch(interaction.message.id);
+             } catch (e2) {
+                console.error("Could not fetch original raid message from thread as a normal message.", e2);
+                return null;
+             }
         }
     }
     return interaction.message;
 }
-
 
 async function handleRaidButton(interaction, subAction, requesterId) {
     const interactor = interaction.user;
@@ -120,7 +126,6 @@ async function handleRaidButton(interaction, subAction, requesterId) {
     const raidEmbed = originalRaidMessage.embeds[0];
     const raidRequester = await client.users.fetch(requesterId);
     
-    // --- LEADER ACTIONS (in thread) ---
     if (isLeader && thread && interaction.channelId === thread.id) {
         if (subAction === 'start') {
             await interaction.deferUpdate();
@@ -165,7 +170,7 @@ async function handleRaidButton(interaction, subAction, requesterId) {
             const membersToMention = Array.from(members.values()).filter(m => !m.user.bot).map(m => `<@${m.user.id}>`).join(' ');
             
             await thread.send(`O líder fechou a Raid. ${membersToMention}`);
-            if (members.size > 1) { // more than just the leader
+            if (members.size > 1) { 
                 await thread.send(`Agradeço a preocupação de todos.`);
             }
             await thread.send(`Fechando...`);
@@ -176,7 +181,6 @@ async function handleRaidButton(interaction, subAction, requesterId) {
         }
     }
     
-    // --- MEMBER ACTIONS (in thread) ---
     if (subAction === 'leave' && thread && interaction.channelId === thread.id) {
         if (isLeader) {
             return await interaction.reply({ content: 'O líder não pode sair da própria raid, apenas fechá-la.', ephemeral: true });
@@ -202,7 +206,6 @@ async function handleRaidButton(interaction, subAction, requesterId) {
     }
 
 
-    // --- JOIN ACTION (from main channel) ---
     if (subAction === 'join') {
         let currentThread = thread;
         if (!currentThread) {
@@ -370,3 +373,5 @@ client.on(Events.MessageCreate, async message => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
+    
