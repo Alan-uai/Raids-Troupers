@@ -3,13 +3,11 @@ import {
   GatewayIntentBits,
   Collection,
   Events,
-  ChannelType,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   StringSelectMenuBuilder,
   EmbedBuilder,
-  ComponentType
 } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
@@ -83,6 +81,8 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error("Erro ao processar botão da raid:", error);
         if (!interaction.replied && !interaction.deferred) {
             await interaction.reply({ content: 'Ocorreu um erro ao processar sua ação.', ephemeral: true }).catch(() => {});
+        } else {
+            await interaction.followUp({ content: 'Ocorreu um erro ao processar sua ação.', ephemeral: true }).catch(() => {});
         }
       }
     }
@@ -94,49 +94,59 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 });
 
+async function getOriginalRaidMessage(interaction) {
+    if (interaction.channel.isThread()) {
+        try {
+            return await interaction.channel.parent.messages.fetch(interaction.channel.id);
+        } catch (e) {
+            console.error("Could not fetch original raid message from thread.", e);
+            return null;
+        }
+    }
+    return interaction.message;
+}
+
+
 async function handleRaidButton(interaction, subAction, requesterId) {
-    const raidMessage = interaction.message;
     const interactor = interaction.user;
     const isLeader = interactor.id === requesterId;
 
-    let thread = raidMessage.thread;
-    let originalRaidMessage = raidMessage;
-
-    // If interaction is from within the thread, the original message is not `interaction.message`
-    if (interaction.channel.isThread()) {
-        thread = interaction.channel;
-        originalRaidMessage = await thread.parent.messages.fetch(thread.id);
+    const originalRaidMessage = await getOriginalRaidMessage(interaction);
+    if (!originalRaidMessage) {
+        return interaction.reply({ content: "Não foi possível encontrar a mensagem de anúncio da raid original.", ephemeral: true });
     }
     
+    const thread = originalRaidMessage.thread;
     const raidEmbed = originalRaidMessage.embeds[0];
     const raidRequester = await client.users.fetch(requesterId);
     
-    // --- LEADER ACTIONS ---
-    if (isLeader) {
+    // --- LEADER ACTIONS (in thread) ---
+    if (isLeader && thread && interaction.channelId === thread.id) {
         if (subAction === 'start') {
+            await interaction.deferUpdate();
             await thread.send(`Atenção, equipe! A raid foi iniciada pelo líder!`);
             const members = await thread.members.fetch();
-            const helpers = members.filter(m => !m.user.bot && m.id !== requesterId);
-            if(helpers.size > 0) {
-                 await thread.send(`Obrigado a todos que ajudaram: ${helpers.map(m => `<@${m.id}>`).join(' ')}. Vocês são pessoas incríveis!`);
+            const helpers = Array.from(members.values()).filter(m => !m.user.bot && m.user.id !== requesterId);
+            if (helpers.length > 0) {
+                 await thread.send(`Obrigado a todos que ajudaram: ${helpers.map(m => `<@${m.user.id}>`).join(' ')}. Vocês são pessoas incríveis!`);
             }
-            await originalRaidMessage.delete();
-            await thread.setLocked(true);
-            await thread.setArchived(true);
+            await originalRaidMessage.delete().catch(e => console.error("Error deleting original message:", e));
+            await thread.setLocked(true).catch(e => console.error("Error locking thread:", e));
+            await thread.setArchived(true).catch(e => console.error("Error archiving thread:", e));
             return;
         }
 
         if (subAction === 'kick_menu') {
              const members = await thread.members.fetch();
-             const memberOptions = members
-                .filter(m => !m.user.bot && m.id !== requesterId)
+             const memberOptions = Array.from(members.values())
+                .filter(m => !m.user.bot && m.user.id !== requesterId)
                 .map(member => ({
                     label: member.user.username,
-                    value: member.id,
+                    value: member.user.id,
                     description: `Expulsar ${member.user.username} da raid.`
                 }));
 
-            if(memberOptions.length === 0){
+            if (memberOptions.length === 0) {
                 return await interaction.reply({ content: 'Não há membros para expulsar.', ephemeral: true });
             }
 
@@ -150,24 +160,24 @@ async function handleRaidButton(interaction, subAction, requesterId) {
         }
         
         if (subAction === 'close') {
-            const members = await thread.members.fetch();
-            const membersToMention = members.filter(m => !m.user.bot).map(m => `<@${m.id}>`).join(' ');
-            
             await interaction.deferUpdate();
+            const members = await thread.members.fetch();
+            const membersToMention = Array.from(members.values()).filter(m => !m.user.bot).map(m => `<@${m.user.id}>`).join(' ');
+            
             await thread.send(`O líder fechou a Raid. ${membersToMention}`);
-            if (members.size > 1) {
+            if (members.size > 1) { // more than just the leader
                 await thread.send(`Agradeço a preocupação de todos.`);
             }
             await thread.send(`Fechando...`);
             
-            await originalRaidMessage.delete();
-            await thread.delete();
+            await originalRaidMessage.delete().catch(e => console.error("Error deleting original message:", e));
+            await thread.delete().catch(e => console.error("Error deleting thread:", e));
             return;
         }
     }
     
-    // --- MEMBER ACTIONS ---
-    if (subAction === 'leave') {
+    // --- MEMBER ACTIONS (in thread) ---
+    if (subAction === 'leave' && thread && interaction.channelId === thread.id) {
         if (isLeader) {
             return await interaction.reply({ content: 'O líder não pode sair da própria raid, apenas fechá-la.', ephemeral: true });
         }
@@ -176,28 +186,35 @@ async function handleRaidButton(interaction, subAction, requesterId) {
         await thread.send(`${interactor} saiu da equipe da raid.`);
         await thread.members.remove(interactor.id);
         
-        // Update embed
         const membersField = raidEmbed.fields.find(f => f.name === 'Membros na Equipe');
         let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
-        currentMembers--;
+        currentMembers = Math.max(1, currentMembers - 1);
         
         const newEmbed = EmbedBuilder.from(raidEmbed).setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
-        originalRow.components.find(c => c.customId && c.customId.startsWith('raid_join')).setDisabled(false).setLabel('Juntar-se à Raid');
+        const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
+        if (joinButton) {
+            joinButton.setDisabled(false).setLabel('Juntar-se à Raid');
+        }
         await originalRaidMessage.edit({ embeds: [newEmbed], components: [originalRow] });
         
         return;
     }
 
 
-    // --- JOIN ACTION ---
+    // --- JOIN ACTION (from main channel) ---
     if (subAction === 'join') {
-         if (!thread) {
-            thread = await originalRaidMessage.startThread({
+        let currentThread = thread;
+        if (!currentThread) {
+            currentThread = await originalRaidMessage.startThread({
                 name: `Raid de ${raidRequester.username}`,
                 autoArchiveDuration: 1440,
-            });
-            await thread.members.add(raidRequester.id);
+            }).catch(e => console.error("Error creating thread:", e));
+
+            if (!currentThread) {
+                 return interaction.reply({ content: "Não foi possível criar o tópico para a raid.", ephemeral: true });
+            }
+            await currentThread.members.add(raidRequester.id);
             
             const leaderControls = new ActionRowBuilder()
                 .addComponents(
@@ -211,11 +228,11 @@ async function handleRaidButton(interaction, subAction, requesterId) {
                     new ButtonBuilder().setCustomId(`raid_leave_${requesterId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary)
                 );
 
-            await thread.send({ content: `Bem-vindo, ${raidRequester}! Este é o tópico para organizar sua raid.\n\n**Controles do Líder:**`, components: [leaderControls] });
-            await thread.send({ content: `**Controles de Membro:**`, components: [memberControls] });
+            await currentThread.send({ content: `Bem-vindo, ${raidRequester}! Este é o tópico para organizar sua raid.\n\n**Controles do Líder:**`, components: [leaderControls] });
+            await currentThread.send({ content: `**Controles de Membro:**`, components: [memberControls] });
         }
 
-        const members = await thread.members.fetch();
+        const members = await currentThread.members.fetch();
         if (members.has(interactor.id)) {
             return await interaction.reply({ content: 'Você já está nesta raid!', ephemeral: true });
         }
@@ -228,19 +245,20 @@ async function handleRaidButton(interaction, subAction, requesterId) {
         }
 
         await interaction.deferUpdate();
-        await thread.members.add(interactor.id);
-        await thread.send(`${interactor} entrou na equipe da raid!`);
+        await currentThread.members.add(interactor.id);
+        await currentThread.send(`${interactor} entrou na equipe da raid!`);
         currentMembers++;
 
-        // Update Embed
         const newEmbed = EmbedBuilder.from(raidEmbed).setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
-        const joinButton = originalRow.components.find(c => c.customId && c.customId.startsWith('raid_join'));
+        const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
         
-        if (currentMembers >= 5) {
-            joinButton.setDisabled(true).setLabel('Completo');
-        } else {
-            joinButton.setDisabled(false).setLabel('Juntar-se à Raid');
+        if (joinButton) {
+            if (currentMembers >= 5) {
+                joinButton.setDisabled(true).setLabel('Completo');
+            } else {
+                joinButton.setDisabled(false).setLabel('Juntar-se à Raid');
+            }
         }
         
         await originalRaidMessage.edit({ embeds: [newEmbed], components: [originalRow] });
@@ -252,7 +270,13 @@ async function handleRaidKick(interaction, requesterId) {
         return await interaction.reply({ content: 'Apenas o líder da raid pode executar esta ação.', ephemeral: true });
     }
     const memberToKickId = interaction.values[0];
-    const thread = interaction.channel;
+    
+    const originalRaidMessage = await getOriginalRaidMessage(interaction);
+    if (!originalRaidMessage || !originalRaidMessage.thread) {
+        return await interaction.reply({ content: 'Não foi possível encontrar a raid ou o tópico associado.', ephemeral: true });
+    }
+
+    const thread = originalRaidMessage.thread;
     const leader = interaction.user;
     
     try {
@@ -262,7 +286,6 @@ async function handleRaidKick(interaction, requesterId) {
         await interaction.update({ content: `${kickedUser.username} foi expulso da raid pelo líder.`, components: [] });
         await thread.send(`O líder expulsou ${kickedUser}.`);
         
-        // Send DM to kicked user
         try {
             await kickedUser.send(`Perdão 🥺💔! ${leader.username}, o líder da raid, tinha outros planos. Boa sorte na próxima 🙌!`);
         } catch (dmError) {
@@ -270,19 +293,18 @@ async function handleRaidKick(interaction, requesterId) {
             thread.send(`(Não foi possível notificar ${kickedUser} por DM.)`);
         }
         
-        // Update original embed
-        const originalRaidMessage = await thread.parent.messages.fetch(thread.id);
-        if (originalRaidMessage) {
-            const raidEmbed = originalRaidMessage.embeds[0];
-            const membersField = raidEmbed.fields.find(f => f.name === 'Membros na Equipe');
-            let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
-            currentMembers--;
-            
-            const newEmbed = EmbedBuilder.from(raidEmbed).setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
-            const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
-            originalRow.components.find(c => c.customId && c.customId.startsWith('raid_join')).setDisabled(false).setLabel('Juntar-se à Raid');
-            await originalRaidMessage.edit({ embeds: [newEmbed], components: [originalRow] });
+        const raidEmbed = originalRaidMessage.embeds[0];
+        const membersField = raidEmbed.fields.find(f => f.name === 'Membros na Equipe');
+        let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
+        currentMembers = Math.max(1, currentMembers - 1);
+        
+        const newEmbed = EmbedBuilder.from(raidEmbed).setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
+        const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
+        const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
+        if (joinButton) {
+            joinButton.setDisabled(false).setLabel('Juntar-se à Raid');
         }
+        await originalRaidMessage.edit({ embeds: [newEmbed], components: [originalRow] });
 
     } catch(err) {
         console.error("Erro ao expulsar membro:", err);
@@ -296,7 +318,7 @@ client.on(Events.MessageCreate, async message => {
     return;
   }
 
-  const pergunta = message.content.replace(/<@!?\d+>/, '').trim();
+  const pergunta = message.content.replace(/<@!?\d+>/g, '').trim();
 
   if (!pergunta) {
     return;
@@ -348,5 +370,3 @@ client.on(Events.MessageCreate, async message => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
-
-    
