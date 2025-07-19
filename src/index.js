@@ -40,7 +40,7 @@ const client = new Client({
 
 client.commands = new Collection();
 const raidStates = new Map();
-const userStats = new Map(); // Armazena as estatísticas do usuário { level, xp, coins, raidsCreated, ... }
+const userStats = new Map(); // Armazena { level, xp, coins, class, raidsCreated, ... }
 const userProfiles = new Map(); // Armazena { channelId, messageId } do perfil do usuário
 const userItems = new Map(); // Armazena { inventory: [], equippedBackground: 'default' }
 
@@ -400,7 +400,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
         await thread.send(`Obrigado a todos que ajudaram: ${helpers.map(m => `<@${m.id}>`).join(' ')}. Vocês são pessoas incríveis!`);
         
         for (const helperMember of helpers) {
-            const stats = userStats.get(helperMember.id) || { level: 1, xp: 0, coins: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+            const stats = userStats.get(helperMember.id) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
             const xpGained = 25;
             const xpToLevelUp = 100;
             
@@ -487,11 +487,11 @@ async function handleRaidKick(interaction, requesterId, raidId) {
         const raidState = raidStates.get(raidId);
         if(raidState) raidState.delete(memberToKickId);
 
-        const leaderStats = userStats.get(requesterId) || { level: 1, xp: 0, coins: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+        const leaderStats = userStats.get(requesterId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
         leaderStats.kickedOthers += 1;
         userStats.set(requesterId, leaderStats);
 
-        const kickedStats = userStats.get(memberToKickId) || { level: 1, xp: 0, coins: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+        const kickedStats = userStats.get(memberToKickId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
         kickedStats.wasKicked += 1;
         userStats.set(memberToKickId, kickedStats);
 
@@ -590,7 +590,7 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
             console.log(`Canal #${channel.name} criado para ${newMember.displayName}.`);
             
-            const stats = userStats.get(newMember.id) || { level: 1, xp: 0, coins: 100, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+            const stats = userStats.get(newMember.id) || { level: 1, xp: 0, coins: 100, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
             userStats.set(newMember.id, stats);
 
             const items = userItems.get(newMember.id) || { inventory: [], equippedBackground: 'default' };

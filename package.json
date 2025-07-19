@@ -12,6 +12,7 @@
     "discord.js": "^14.11.0",
     "dotenv": "^16.3.1",
     "express": "^4.19.2",
+    "lucide-react": "^0.411.0",
     "uuid": "^9.0.1"
   }
 }

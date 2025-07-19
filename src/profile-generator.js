@@ -1,4 +1,5 @@
 import { createCanvas, loadImage } from 'canvas';
+import { classes } from './classes.js';
 
 const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
     const words = text.split(' ');
@@ -20,7 +21,7 @@ const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
 
 export async function generateProfileImage(member, stats, equippedBackground = 'default') {
     const width = 800;
-    const height = 400;
+    const height = 450; // Aumentar a altura para caber a classe
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
@@ -46,7 +47,7 @@ export async function generateProfileImage(member, stats, equippedBackground = '
     }
     
     // Card de fundo translúcido para melhor legibilidade
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -77,46 +78,58 @@ export async function generateProfileImage(member, stats, equippedBackground = '
     ctx.font = 'bold 36px sans-serif';
     ctx.fillText(member.displayName, avatarX + avatarSize + 25, avatarY + 50);
 
-    // Roles do usuário
-    ctx.font = '16px sans-serif';
-    ctx.fillStyle = '#B9BBBE';
-    const roles = member.roles.cache.filter(r => r.name !== '@everyone').map(r => r.name).join(', ');
-    wrapText(ctx, `Roles: ${roles || 'Nenhuma'}`, avatarX + avatarSize + 25, avatarY + 85, 450, 20);
+    // Classe do usuário
+    if (stats.class) {
+        const userClass = classes.find(c => c.id === stats.class);
+        if (userClass) {
+            ctx.font = 'bold 24px sans-serif';
+            ctx.fillStyle = userClass.color || '#D2AC47';
+            ctx.fillText(`${userClass.icon} ${userClass.name}`, avatarX + avatarSize + 25, avatarY + 90);
+        }
+    }
 
     // --- Seção de Estatísticas ---
-    const statsX = 50;
     const statsY = 220;
-    const statsSpacing = 35;
+    const statsX = 50;
     const col2X = 320;
     const col3X = 570;
+    const statsSpacing = 35;
+    const valueOffsetX = 180;
+
 
     ctx.font = 'bold 20px sans-serif';
     ctx.fillStyle = '#FFFFFF';
 
     // Coluna 1
     ctx.fillText('Nível', statsX, statsY);
-    ctx.fillText(String(stats.level || 1), statsX + 150, statsY);
-
-    ctx.fillText('XP', statsX, statsY + statsSpacing);
-    ctx.fillText(`${stats.xp || 0} / 100`, statsX + 150, statsY + statsSpacing);
+    ctx.fillText(String(stats.level || 1), statsX + valueOffsetX, statsY);
     
-    ctx.fillText('Moedas (TC)', statsX, statsY + statsSpacing * 2);
-    ctx.fillText(String(stats.coins || 0), statsX + 150, statsY + statsSpacing * 2);
+    ctx.fillText('XP', statsX, statsY + statsSpacing);
+    ctx.fillText(`${stats.xp || 0} / 100`, statsX + valueOffsetX, statsY + statsSpacing);
+    
+    ctx.fillText('Troup Coins', statsX, statsY + statsSpacing * 2);
+    ctx.fillText(String(stats.coins || 0), statsX + valueOffsetX, statsY + statsSpacing * 2);
 
 
     // Coluna 2
     ctx.fillText('Raids Criadas', col2X, statsY);
-    ctx.fillText(String(stats.raidsCreated || 0), col2X + 180, statsY);
+    ctx.fillText(String(stats.raidsCreated || 0), col2X + valueOffsetX, statsY);
 
     ctx.fillText('Raids Ajudadas', col2X, statsY + statsSpacing);
-    ctx.fillText(String(stats.raidsHelped || 0), col2X + 180, statsY + statsSpacing);
+    ctx.fillText(String(stats.raidsHelped || 0), col2X + valueOffsetX, statsY + statsSpacing);
 
     // Coluna 3
     ctx.fillText('Expulsou', col3X, statsY);
-    ctx.fillText(String(stats.kickedOthers || 0), col3X + 150, statsY);
+    ctx.fillText(String(stats.kickedOthers || 0), col3X + valueOffsetX, statsY);
 
     ctx.fillText('Foi Expulso', col3X, statsY + statsSpacing);
-    ctx.fillText(String(stats.wasKicked || 0), col3X + 150, statsY + statsSpacing);
+    ctx.fillText(String(stats.wasKicked || 0), col3X + valueOffsetX, statsY + statsSpacing);
+    
+    // Roles
+    ctx.font = '16px sans-serif';
+    ctx.fillStyle = '#B9BBBE';
+    const roles = member.roles.cache.filter(r => r.name !== '@everyone' && r.name.toLowerCase() !== 'limpo').map(r => r.name).join(', ');
+    wrapText(ctx, `Cargos: ${roles || 'Nenhum'}`, 50, height - 50, width - 100, 20);
 
     return canvas.toBuffer('image/png');
 }
