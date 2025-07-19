@@ -477,7 +477,7 @@ client.on(Events.MessageCreate, async message => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "google/gemini-pro",
+        "model": "google/gemini-2.5-pro-exp-03-25",
         "messages": [
           { "role": "system", "content": systemPrompt },
           { "role": "user", "content": pergunta }
@@ -506,7 +506,7 @@ client.on(Events.MessageCreate, async message => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "google/gemini-pro",
+        "model": "google/gemini-2.5-pro-exp-03-25",
         "messages": [{ "role": "user", "content": pergunta }]
       })
     });
