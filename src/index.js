@@ -126,7 +126,7 @@ client.on(Events.MessageCreate, async message => {
   }
 
   try {
-    // Envia um indicador de "digitando..."
+    // Envia um indicador de "digitando..." para o usuário saber que o bot está processando
     await message.channel.sendTyping();
 
     const completion = await openai.chat.completions.create({

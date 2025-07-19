@@ -16,6 +16,7 @@ const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('
 for (const file of commandFiles) {
   // O caminho para importação agora precisa ser construído corretamente
   const filePath = path.join(commandsPath, file);
+  // Usamos um import dinâmico para carregar o módulo
   const command = (await import(filePath)).default;
   if ('data' in command && 'execute' in command) {
     commands.push(command.data.toJSON());
