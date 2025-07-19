@@ -228,8 +228,7 @@ async function handleRaidButton(interaction, subAction, requesterId) {
                     new ButtonBuilder().setCustomId(`raid_kick_menu_${requesterId}`).setLabel('❌ Expulsar Membro').setStyle(ButtonStyle.Danger),
                     new ButtonBuilder().setCustomId(`raid_close_${requesterId}`).setLabel('🔒 Fechar Raid').setStyle(ButtonStyle.Secondary)
                 );
-
-            // Send ephemeral controls to the leader
+            // This needs to be a followup because the original interaction was the button click, which we defer.
             await interaction.followUp({ content: `**Controles do Líder:**`, components: [leaderControls], ephemeral: true });
         }
 
@@ -344,7 +343,7 @@ client.on(Events.MessageCreate, async message => {
     `;
 
     const categoryCompletion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-3.5-turbo',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: pergunta }
@@ -366,7 +365,7 @@ client.on(Events.MessageCreate, async message => {
     const feedbackMsg = await message.channel.send(feedbackMessage);
     
     const mainCompletion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: pergunta }]
     });
 
