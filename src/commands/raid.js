@@ -87,7 +87,7 @@ export default {
       // Now create the buttons with the actual message ID
       const joinButtonId = `raid_join_${user.id}_${sentMessage.id}`;
 
-      const row1 = new ActionRowBuilder()
+      const row = new ActionRowBuilder()
         .addComponents(
           new ButtonBuilder()
             .setLabel("Add")
@@ -98,11 +98,7 @@ export default {
             .setLabel("DM")
             .setEmoji('✉️')
             .setStyle(ButtonStyle.Link)
-            .setURL(`https://discord.com/users/${user.id}`)
-        );
-
-      const row2 = new ActionRowBuilder()
-        .addComponents(
+            .setURL(`https://discord.com/users/${user.id}`),
           new ButtonBuilder()
             .setCustomId(joinButtonId)
             .setLabel("Entrar")
@@ -111,7 +107,7 @@ export default {
         );
 
       // Update the message with buttons
-      await sentMessage.edit({ embeds: [embed], components: [row1, row2] });
+      await sentMessage.edit({ embeds: [embed], components: [row] });
 
       // Armazenar o ID da nova mensagem para este usuário
       userLastRaidMessage.set(user.id, sentMessage.id);
