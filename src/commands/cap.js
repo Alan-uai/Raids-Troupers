@@ -13,8 +13,10 @@ export default {
         .setRequired(true)),
 
   async execute(interaction) {
+    // Adia a resposta para ganhar mais tempo (até 15 minutos)
+    await interaction.deferReply({ ephemeral: true });
+
     const pergunta = interaction.options.getString('mensagem');
-    await interaction.reply({ content: "Pensando no seu caso...🤔💡", ephemeral: true });
 
     try {
       const completion = await openai.chat.completions.create({
@@ -24,10 +26,12 @@ export default {
 
       const resposta = completion.choices[0].message.content;
 
-      await interaction.editReply(resposta.slice(0, 2000)); // Discord limita a 2000 caracteres
+      // Edita a resposta adiada com o resultado do GPT
+      await interaction.editReply(resposta.slice(0, 2000));
     } catch (err) {
-      console.error(err);
-      await interaction.editReply({ content: 'Erro ao consultar o Cap.'});
+      console.error("Erro no comando /cap:", err);
+      // Edita a resposta adiada com uma mensagem de erro
+      await interaction.editReply({ content: 'Erro ao consultar o Cap.' });
     }
   }
 };
