@@ -28,7 +28,7 @@ export default {
             { name: 'Difícil', value: 'Difícil' }
         )),
 
-  async execute(interaction) {
+  async execute(interaction, userStats) { // Pass userStats here
     // Responder imediatamente para evitar timeout
     await interaction.deferReply({ ephemeral: true });
 
@@ -111,6 +111,11 @@ export default {
 
       // Armazenar o ID da nova mensagem para este usuário
       userLastRaidMessage.set(user.id, sentMessage.id);
+      
+      // Update stats for raid created
+      const stats = userStats.get(user.id) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+      stats.raidsCreated += 1;
+      userStats.set(user.id, stats);
 
       await interaction.editReply({
         content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`

@@ -40,6 +40,7 @@ const client = new Client({
 
 client.commands = new Collection();
 const raidStates = new Map();
+const userStats = new Map(); // Store user statistics
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -93,7 +94,8 @@ client.on(Events.InteractionCreate, async interaction => {
     if (!command) return;
 
     try {
-      await command.execute(interaction);
+      // Pass the userStats map to the command executor
+      await command.execute(interaction, userStats);
     } catch (error) {
       console.error(error);
       const replyOptions = { content: 'Erro ao executar o comando!', ephemeral: true };
@@ -438,6 +440,12 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
 
     if (helpers.length > 0) {
         await thread.send(`Obrigado a todos que ajudaram: ${helpers.map(m => `<@${m.id}>`).join(' ')}. Vocês são pessoas incríveis!`);
+        // Update stats for helpers
+        helpers.forEach(helperMember => {
+            const stats = userStats.get(helperMember.id) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+            stats.raidsHelped += 1;
+            userStats.set(helperMember.id, stats);
+        });
     }
 
     if (voiceChannel) {
@@ -499,6 +507,16 @@ async function handleRaidKick(interaction, requesterId, raidId) {
         if(raidState) {
             raidState.delete(memberToKickId);
         }
+
+        // Update stats for kick
+        const leaderStats = userStats.get(requesterId) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+        leaderStats.kickedOthers += 1;
+        userStats.set(requesterId, leaderStats);
+
+        const kickedStats = userStats.get(memberToKickId) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+        kickedStats.wasKicked += 1;
+        userStats.set(memberToKickId, kickedStats);
+
 
         const raidEmbed = EmbedBuilder.from(originalRaidMessage.embeds[0]);
         const membersField = raidEmbed.data.fields.find(f => f.name.includes('Membros na Equipe'));
@@ -637,8 +655,12 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
             console.log(`Canal #${channel.name} criado para ${newMember.displayName}.`);
             
+            // Get user stats or create default if not exists
+            const stats = userStats.get(newMember.id) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+            userStats.set(newMember.id, stats); // Ensure it's in the map
+
             // Gerar a imagem do perfil
-            const profileImageBuffer = await generateProfileImage(newMember);
+            const profileImageBuffer = await generateProfileImage(newMember, stats);
             const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
 
             await channel.send({

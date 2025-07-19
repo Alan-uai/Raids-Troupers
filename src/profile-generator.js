@@ -20,7 +20,7 @@ const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
 };
 
 
-export async function generateProfileImage(member) {
+export async function generateProfileImage(member, stats) {
     const width = 800;
     const height = 400;
     const canvas = createCanvas(width, height);
@@ -76,7 +76,7 @@ export async function generateProfileImage(member) {
         .join(', ');
     wrapText(ctx, `Roles: ${roles || 'Nenhuma'}`, avatarX + avatarSize + 25, avatarY + 90, 450, 22);
 
-    // --- Seção de Estatísticas (com placeholders) ---
+    // --- Seção de Estatísticas ---
     const statsX = 50;
     const statsY = 220;
     const statsSpacing = 40;
@@ -86,25 +86,25 @@ export async function generateProfileImage(member) {
 
     // Level & XP
     ctx.fillText('Nível', statsX, statsY);
-    ctx.fillText('1', statsX + 150, statsY);
+    ctx.fillText(String(stats.level || 1), statsX + 150, statsY);
 
     ctx.fillText('XP', statsX, statsY + statsSpacing);
-    ctx.fillText('0 / 100', statsX + 150, statsY + statsSpacing);
+    ctx.fillText(`${stats.xp || 0} / 100`, statsX + 150, statsY + statsSpacing);
 
     // Raids
     const statsX2 = 400;
     ctx.fillText('Raids Criadas', statsX2, statsY);
-    ctx.fillText('0', statsX2 + 200, statsY);
+    ctx.fillText(String(stats.raidsCreated || 0), statsX2 + 200, statsY);
 
     ctx.fillText('Raids Ajudadas', statsX2, statsY + statsSpacing);
-    ctx.fillText('0', statsX2 + 200, statsY + statsSpacing);
+    ctx.fillText(String(stats.raidsHelped || 0), statsX2 + 200, statsY + statsSpacing);
 
     // Reputação
     ctx.fillText('Expulsou', statsX, statsY + statsSpacing * 2.5);
-    ctx.fillText('0', statsX + 150, statsY + statsSpacing * 2.5);
+    ctx.fillText(String(stats.kickedOthers || 0), statsX + 150, statsY + statsSpacing * 2.5);
 
     ctx.fillText('Foi Expulso', statsX2, statsY + statsSpacing * 2.5);
-    ctx.fillText('0', statsX2 + 200, statsY + statsSpacing * 2.5);
+    ctx.fillText(String(stats.wasKicked || 0), statsX2 + 200, statsY + statsSpacing * 2.5);
 
     return canvas.toBuffer('image/png');
 }
