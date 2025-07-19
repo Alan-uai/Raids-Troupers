@@ -8,6 +8,8 @@ import {
   ButtonStyle,
   StringSelectMenuBuilder,
   EmbedBuilder,
+  ChannelType,
+  PermissionsBitField,
 } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
@@ -15,6 +17,7 @@ import path from 'node:path';
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { OpenAI } from 'openai';
+import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -30,11 +33,13 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildVoiceStates, // Needed for voice channel actions
   ]
 });
 
 client.commands = new Collection();
+const raidStates = new Map(); // Tracks voice opt-ins for raids
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,46 +77,33 @@ client.on(Events.InteractionCreate, async interaction => {
       }
     }
   } else if (interaction.isButton()) {
-    const [action, subAction, requesterId] = interaction.customId.split('_');
+    const [action, subAction, ...args] = interaction.customId.split('_');
+    const requesterId = args[0];
+    const raidId = args[1];
 
     if (action === 'raid') {
       try {
-        await handleRaidButton(interaction, subAction, requesterId);
+        if(subAction === 'vc_opt_in') {
+            await handleVoiceOptIn(interaction, requesterId, raidId);
+        } else {
+            await handleRaidButton(interaction, subAction, requesterId, raidId);
+        }
       } catch (error) {
         console.error("Erro ao processar botão da raid:", error);
         if (!interaction.replied && !interaction.deferred) {
             await interaction.reply({ content: 'Ocorreu um erro ao processar sua ação.', ephemeral: true }).catch(() => {});
-        } else {
-            await interaction.followUp({ content: 'Ocorreu um erro ao processar sua ação.', ephemeral: true }).catch(() => {});
         }
       }
     }
   } else if (interaction.isStringSelectMenu()) {
-      const [action, subAction, requesterId] = interaction.customId.split('_');
+      const [action, subAction, requesterId, raidId] = interaction.customId.split('_');
       if (action === 'raid' && subAction === 'kick') {
-          await handleRaidKick(interaction, requesterId);
+          await handleRaidKick(interaction, requesterId, raidId);
       }
   }
 });
 
-async function getOriginalRaidMessage(interaction) {
-    try {
-        // The original message is always in the channel where the command was run, not the thread.
-        return await interaction.channel.messages.fetch(interaction.message.reference.messageId);
-    } catch (e) {
-        console.error("Could not fetch original raid message from interaction reference.", e);
-        try {
-            // Fallback for interactions that are not in a thread or are on the original message itself
-            return await interaction.channel.messages.fetch(interaction.message.id);
-        } catch (e2) {
-             console.error("Could not fetch original raid message using direct ID.", e2);
-             return null;
-        }
-    }
-}
-
-
-async function handleRaidButton(interaction, subAction, requesterId) {
+async function handleRaidButton(interaction, subAction, requesterId, raidId) {
     const interactor = interaction.user;
     const isLeader = interactor.id === requesterId;
 
@@ -129,15 +121,7 @@ async function handleRaidButton(interaction, subAction, requesterId) {
     if (isLeader && thread && interaction.channelId === thread.id) {
         if (subAction === 'start') {
             await interaction.deferUpdate();
-            await thread.send(`Atenção, equipe! A raid foi iniciada pelo líder!`);
-            const members = await thread.members.fetch();
-            const helpers = Array.from(members.values()).filter(m => !m.user.bot && m.user.id !== requesterId);
-            if (helpers.length > 0) {
-                 await thread.send(`Obrigado a todos que ajudaram: ${helpers.map(m => `<@${m.user.id}>`).join(' ')}. Vocês são pessoas incríveis!`);
-            }
-            await originalRaidMessage.delete().catch(e => console.error("Error deleting original message:", e));
-            await thread.setLocked(true).catch(e => console.error("Error locking thread:", e));
-            await thread.setArchived(true).catch(e => console.error("Error archiving thread:", e));
+            await handleRaidStart(interaction, originalRaidMessage, requesterId, raidId);
             return;
         }
 
@@ -157,7 +141,7 @@ async function handleRaidButton(interaction, subAction, requesterId) {
 
             const selectMenu = new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
-                    .setCustomId(`raid_kick_${requesterId}`)
+                    .setCustomId(`raid_kick_${requesterId}_${raidId}`)
                     .setPlaceholder('Selecione um membro para expulsar')
                     .addOptions(memberOptions)
             );
@@ -166,6 +150,7 @@ async function handleRaidButton(interaction, subAction, requesterId) {
         
         if (subAction === 'close') {
             await interaction.deferUpdate();
+            raidStates.delete(raidId); // Clean up state
             const members = await thread.members.fetch();
             const membersToMention = Array.from(members.values()).filter(m => !m.user.bot).map(m => `<@${m.user.id}>`).join(' ');
             
@@ -191,6 +176,11 @@ async function handleRaidButton(interaction, subAction, requesterId) {
         await thread.send(`${interactor} saiu da equipe da raid.`);
         await thread.members.remove(interactor.id);
         
+        const raidState = raidStates.get(raidId);
+        if(raidState) {
+            raidState.delete(interactor.id);
+        }
+        
         const membersField = raidEmbed.fields.find(f => f.name === 'Membros na Equipe');
         let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
         currentMembers = Math.max(1, currentMembers - 1);
@@ -209,9 +199,9 @@ async function handleRaidButton(interaction, subAction, requesterId) {
 
     // --- Join Action (happens on the original message) ---
     if (subAction === 'join') {
-        // Always defer the interaction first to avoid timeout errors
         await interaction.deferUpdate();
 
+        const newRaidId = uuidv4(); // Unique ID for this raid instance
         let currentThread = thread;
         if (!currentThread) {
              currentThread = await originalRaidMessage.startThread({
@@ -220,16 +210,20 @@ async function handleRaidButton(interaction, subAction, requesterId) {
             }).catch(e => console.error("Error creating thread:", e));
 
             if (!currentThread) {
-                 return interaction.followUp({ content: "Não foi possível criar o tópico para a raid.", ephemeral: true });
+                 return; // Silently fail if thread can't be created.
             }
+
+            raidStates.set(newRaidId, new Map()); // Initialize state for this new raid
+
             await currentThread.members.add(raidRequester.id);
             await currentThread.send(`Bem-vindo, <@${raidRequester.id}>! Este é o tópico para organizar sua raid.`);
             
             const leaderControls = new ActionRowBuilder()
                 .addComponents(
-                    new ButtonBuilder().setCustomId(`raid_start_${requesterId}`).setLabel('✅ Iniciar Raid').setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId(`raid_kick_menu_${requesterId}`).setLabel('❌ Expulsar Membro').setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder().setCustomId(`raid_close_${requesterId}`).setLabel('🔒 Fechar Raid').setStyle(ButtonStyle.Secondary)
+                    new ButtonBuilder().setCustomId(`raid_start_${requesterId}_${newRaidId}`).setLabel('✅ Iniciar Raid').setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId(`raid_kick_menu_${requesterId}_${newRaidId}`).setLabel('❌ Expulsar Membro').setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder().setCustomId(`raid_close_${requesterId}_${newRaidId}`).setLabel('🔒 Fechar Raid').setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder().setCustomId(`raid_vc_opt_in_${requesterId}_${newRaidId}`).setEmoji('🔉').setStyle(ButtonStyle.Primary)
                 );
             
             await interaction.followUp({ content: `**Controles do Líder:**`, components: [leaderControls], ephemeral: true });
@@ -251,9 +245,13 @@ async function handleRaidButton(interaction, subAction, requesterId) {
         await currentThread.send(`${interactor} entrou na equipe da raid!`);
         currentMembers++;
 
+        const activeRaidId = Array.from(raidStates.keys()).find(key => originalRaidMessage.thread?.id === currentThread.id);
+        const memberRaidId = activeRaidId || newRaidId;
+
         const memberControls = new ActionRowBuilder()
             .addComponents(
-                new ButtonBuilder().setCustomId(`raid_leave_${requesterId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary)
+                new ButtonBuilder().setCustomId(`raid_leave_${requesterId}_${memberRaidId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`raid_vc_opt_in_${requesterId}_${memberRaidId}`).setEmoji('🔉').setStyle(ButtonStyle.Primary)
             );
         await interaction.followUp({ content: '**Controles de Membro:**', components: [memberControls], ephemeral: true });
 
@@ -273,13 +271,97 @@ async function handleRaidButton(interaction, subAction, requesterId) {
     }
 }
 
-async function handleRaidKick(interaction, requesterId) {
+async function handleVoiceOptIn(interaction, requesterId, raidId) {
+    if (!raidId) {
+        return interaction.reply({ content: 'Não foi possível encontrar os dados desta raid para ativar o chat de voz.', ephemeral: true });
+    }
+
+    const raidState = raidStates.get(raidId);
+    if (!raidState) {
+        return interaction.reply({ content: 'Esta raid não parece estar mais ativa.', ephemeral: true });
+    }
+
+    const userHasOptedIn = raidState.get(interaction.user.id) || false;
+    raidState.set(interaction.user.id, !userHasOptedIn);
+
+    const feedbackMessage = !userHasOptedIn
+        ? 'Você ativou a entrada automática no chat de voz quando a raid começar.'
+        : 'Você desativou a entrada automática no chat de voz.';
+    
+    await interaction.reply({ content: feedbackMessage, ephemeral: true });
+}
+
+async function handleRaidStart(interaction, originalRaidMessage, requesterId, raidId) {
+    const thread = originalRaidMessage.thread;
+    const raidState = raidStates.get(raidId);
+    const leaderOptedIn = raidState ? raidState.get(requesterId) : false;
+    let voiceChannel = null;
+
+    if (leaderOptedIn) {
+        const leader = await interaction.guild.members.fetch(requesterId);
+        voiceChannel = await interaction.guild.channels.create({
+            name: `Raid de ${leader.displayName}`,
+            type: ChannelType.GuildVoice,
+            userLimit: 5,
+            parent: interaction.channel.parent,
+            permissionOverwrites: [{
+                id: interaction.guild.id,
+                deny: [PermissionsBitField.Flags.Connect],
+            }, ],
+        }).catch(e => console.error("Failed to create voice channel:", e));
+    }
+
+    await thread.send(`Atenção, equipe! A raid foi iniciada pelo líder!`);
+    const members = await thread.members.fetch();
+    const helpers = [];
+
+    for (const member of members.values()) {
+        if (member.user.bot) continue;
+        if (member.user.id !== requesterId) {
+            helpers.push(member);
+        }
+
+        if (voiceChannel && raidState.get(member.user.id)) {
+            const guildMember = await interaction.guild.members.fetch(member.user.id).catch(() => null);
+            if (guildMember && guildMember.voice.channel) {
+                await guildMember.voice.setChannel(voiceChannel).catch(e => console.log(`Failed to move ${guildMember.displayName}: ${e.message}`));
+            }
+        } else if (voiceChannel && member.user.id !== requesterId) {
+            const joinVCButton = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setLabel('Juntar-se ao Chat de Voz').setStyle(ButtonStyle.Link).setURL(voiceChannel.url)
+            );
+            await member.user.send({ content: `A raid começou e um chat de voz foi criado!`, components: [joinVCButton] }).catch(() => {});
+        }
+    }
+
+    if (helpers.length > 0) {
+        await thread.send(`Obrigado a todos que ajudaram: ${helpers.map(m => `<@${m.user.id}>`).join(' ')}. Vocês são pessoas incríveis!`);
+    }
+
+    if (voiceChannel) {
+        // Set permissions for members
+        for (const member of members.values()) {
+            if (!member.user.bot) {
+                await voiceChannel.permissionOverwrites.edit(member.user.id, {
+                    [PermissionsBitField.Flags.Connect]: true,
+                }).catch(() => {});
+            }
+        }
+    }
+    
+    await originalRaidMessage.delete().catch(e => console.error("Error deleting original message:", e));
+    await thread.setLocked(true).catch(e => console.error("Error locking thread:", e));
+    await thread.setArchived(true).catch(e => console.error("Error archiving thread:", e));
+    raidStates.delete(raidId); // Clean up raid state
+}
+
+
+async function handleRaidKick(interaction, requesterId, raidId) {
     if (interaction.user.id !== requesterId) {
         return await interaction.reply({ content: 'Apenas o líder da raid pode executar esta ação.', ephemeral: true });
     }
     const memberToKickId = interaction.values[0];
     
-    // We need the original message to get the thread
     const originalRaidMessage = await interaction.channel.messages.fetch(interaction.message.reference.messageId).catch(() => null);
 
     if (!originalRaidMessage || !originalRaidMessage.thread) {
@@ -303,6 +385,11 @@ async function handleRaidKick(interaction, requesterId) {
             thread.send(`(Não foi possível notificar ${kickedUser} por DM.)`);
         }
         
+        const raidState = raidStates.get(raidId);
+        if(raidState) {
+            raidState.delete(memberToKickId);
+        }
+
         const raidEmbed = originalRaidMessage.embeds[0];
         const membersField = raidEmbed.fields.find(f => f.name === 'Membros na Equipe');
         let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
@@ -377,6 +464,13 @@ client.on(Events.MessageCreate, async message => {
     console.error("Erro ao responder menção:", err);
     await message.reply('Desculpe, ocorreu um erro ao tentar responder.');
   }
+});
+
+client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+    const oldChannel = oldState.channel;
+    if (oldChannel && oldChannel.name.startsWith('Raid de ') && oldChannel.members.size === 0) {
+        oldChannel.delete('Canal da raid ficou vazio.').catch(e => console.error("Failed to delete empty voice channel:", e));
+    }
 });
 
 client.login(process.env.DISCORD_TOKEN);

@@ -23,16 +23,8 @@ export default {
             { name: 'Fácil', value: 'Fácil' },
             { name: 'Média', value: 'Média' },
             { name: 'Difícil', value: 'Difícil' }
-        ))
-    .addStringOption(option =>
-        option.setName('tipo-chat')
-            .setDescription('Escolha o tipo de canal de discussão para a raid (padrão: Texto)')
-            .setRequired(false)
-            .addChoices(
-                { name: 'Texto', value: 'texto' },
-                { name: 'Voz', value: 'voz' }
-            )),
-    
+        )),
+
   async execute(interaction) {
     await interaction.reply({
       content: "Pensando no seu caso...🤔💡",
@@ -45,7 +37,6 @@ export default {
 
     const robloxUsername = user.username;
 
-    // customId: action_subAction_requesterId
     const joinButtonId = `raid_join_${user.id}`;
 
     const embed = new EmbedBuilder()
@@ -55,7 +46,7 @@ export default {
       .addFields({ name: 'Membros na Equipe', value: `1/5`, inline: true })
       .setFooter({ text: `Solicitado por ${user.username}`, iconURL: user.displayAvatarURL() })
       .setTimestamp();
-      
+
     const row = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
@@ -73,9 +64,9 @@ export default {
           .setEmoji('🤝')
       );
 
-    const raidChannelId = '1395591154208084049'; 
+    const raidChannelId = '1395591154208084049';
     const channel = interaction.client.channels.cache.get(raidChannelId);
-    
+
     if (channel) {
       try {
         await channel.send({ embeds: [embed], components: [row] });
