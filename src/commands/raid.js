@@ -45,31 +45,28 @@ export default {
       });
     }
 
-    // Delete existing raid announcements from this user (processo assíncrono em background)
+    // Delete existing raid announcement from this user (processo assíncrono em background)
     const deletePromise = (async () => {
       try {
-        const messages = await channel.messages.fetch({ limit: 30 });
-        const userRaidMessages = messages.filter(msg => 
+        const messages = await channel.messages.fetch({ limit: 1 });
+        const userRaidMessage = messages.find(msg => 
           msg.embeds.length > 0 && 
           msg.embeds[0].footer && 
           (msg.embeds[0].footer.text.includes(user.username) || msg.embeds[0].footer.text.includes(member.displayName))
         );
-        
-        // Processar deletações em paralelo mas com limite
-        const deletePromises = Array.from(userRaidMessages.values()).map(async (msg) => {
-          try {
-            if (msg.thread) {
-              await msg.thread.delete().catch(() => {});
-            }
-            await msg.delete().catch(() => {});
-          } catch (deleteErr) {
-            console.log(`Erro ao deletar mensagem: ${deleteErr.message}`);
-          }
-        });
 
-        await Promise.allSettled(deletePromises);
+        if (userRaidMessage) {
+          try {
+            if (userRaidMessage.thread) {
+              await userRaidMessage.thread.delete().catch(() => {});
+            }
+            await userRaidMessage.delete().catch(() => {});
+          } catch (deleteErr) {
+            console.log(`Erro ao deletar mensagem anterior: ${deleteErr.message}`);
+          }
+        }
       } catch (fetchErr) {
-        console.log(`Erro ao buscar mensagens anteriores: ${fetchErr.message}`);
+        console.log(`Erro ao buscar mensagem anterior: ${fetchErr.message}`);
       }
     })();
 
@@ -86,10 +83,10 @@ export default {
     // Create the message first, then update the button with the message ID
     try {
       const sentMessage = await channel.send({ embeds: [embed], components: [] });
-      
+
       // Now create the buttons with the actual message ID
       const joinButtonId = `raid_join_${user.id}_${sentMessage.id}`;
-      
+
       const row = new ActionRowBuilder()
         .addComponents(
           new ButtonBuilder()
@@ -109,7 +106,7 @@ export default {
 
       // Update the message with buttons
       await sentMessage.edit({ embeds: [embed], components: [row] });
-      
+
       await interaction.editReply({
         content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`
       });
