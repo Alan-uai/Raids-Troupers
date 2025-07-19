@@ -14,7 +14,7 @@ export default {
 
   async execute(interaction) {
     const pergunta = interaction.options.getString('mensagem');
-    await interaction.deferReply(); // Informa ao Discord que estamos processando
+    await interaction.reply({ content: "Pensando no seu caso...🤔💡", ephemeral: true });
 
     try {
       const completion = await openai.chat.completions.create({
@@ -27,7 +27,7 @@ export default {
       await interaction.editReply(resposta.slice(0, 2000)); // Discord limita a 2000 caracteres
     } catch (err) {
       console.error(err);
-      await interaction.editReply({ content: 'Erro ao consultar o Cap.', ephemeral: true });
+      await interaction.editReply({ content: 'Erro ao consultar o Cap.'});
     }
   }
 };
