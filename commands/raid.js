@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, ChannelType } from 'discord.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -7,7 +7,15 @@ export default {
     .addStringOption(option =>
       option.setName('nivel').setDescription('Nível da Raid').setRequired(true))
     .addStringOption(option =>
-      option.setName('dificuldade').setDescription('Dificuldade').setRequired(true)),
+      option.setName('dificuldade').setDescription('Dificuldade').setRequired(true))
+    .addStringOption(option =>
+        option.setName('tipo-chat')
+            .setDescription('Escolha o tipo de canal de discussão para a raid')
+            .setRequired(true)
+            .addChoices(
+                { name: 'Texto', value: 'texto' },
+                { name: 'Voz', value: 'voz' }
+            )),
     
   async execute(interaction) {
     await interaction.reply({
@@ -17,10 +25,14 @@ export default {
 
     const nivel = interaction.options.getString('nivel');
     const dificuldade = interaction.options.getString('dificuldade');
+    const tipoChat = interaction.options.getString('tipo-chat');
     const user = interaction.user;
 
-    // Nome de usuário do Roblox (usando o nome do Discord como padrão)
     const robloxUsername = user.username;
+
+    // A customId precisa ser única por anúncio e conter os dados necessários.
+    // Formato: acao_raid_idDoAnuncio_idDoRequisitante_tipoDeChat
+    const customId = `join_raid_${interaction.id}_${user.id}_${tipoChat}`;
 
     const embed = new EmbedBuilder()
       .setTitle("📢 Novo Pedido de Ajuda em Raid!")
@@ -36,9 +48,14 @@ export default {
           .setStyle(ButtonStyle.Link)
           .setURL(`https://www.roblox.com/users/profile?username=${encodeURIComponent(robloxUsername)}`),
         new ButtonBuilder()
-          .setLabel("💬 Falar no Discord")
+          .setLabel("Chamar Pessoal")
           .setStyle(ButtonStyle.Link)
-          .setURL(`https://discord.com/users/${user.id}`)
+          .setURL(`https://discord.com/users/${user.id}`),
+        new ButtonBuilder()
+          .setCustomId(customId)
+          .setLabel("Juntar-se à Raid")
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('🤝')
       );
 
     const raidChannelId = '1395591154208084049';

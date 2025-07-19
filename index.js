@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, Events, ChannelType } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,23 +35,67 @@ client.once(Events.ClientReady, () => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
-  if (!interaction.isChatInputCommand()) return;
+  if (interaction.isChatInputCommand()) {
+    const command = client.commands.get(interaction.commandName);
+    if (!command) {
+      console.error(`Comando não encontrado: ${interaction.commandName}`);
+      return;
+    }
 
-  const command = client.commands.get(interaction.commandName);
-  if (!command) {
-    console.error(`Comando não encontrado: ${interaction.commandName}`);
-    return;
-  }
+    try {
+      await command.execute(interaction);
+    } catch (error) {
+      console.error(error);
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: 'Erro ao executar o comando!', ephemeral: true });
+      } else {
+        await interaction.reply({ content: 'Erro ao executar o comando!', ephemeral: true });
+      }
+    }
+  } else if (interaction.isButton()) {
+    const [action, announcementId, requesterId, chatType] = interaction.customId.split('_');
 
-  try {
-    await command.execute(interaction);
-  } catch (error) {
-    console.error(error);
-    if (interaction.replied || interaction.deferred) {
-			await interaction.followUp({ content: 'Erro ao executar o comando!', ephemeral: true });
-		} else {
-			await interaction.reply({ content: 'Erro ao executar o comando!', ephemeral: true });
-		}
+    if (action === 'join_raid') {
+        try {
+            const raidMessage = interaction.message;
+            const raidRequester = await client.users.fetch(requesterId);
+            const joiner = interaction.user;
+
+            const threadName = `Raid de ${raidRequester.username}`;
+            
+            // Tenta encontrar um tópico existente para esta raid
+            let thread = raidMessage.thread;
+
+            if (!thread) {
+                // Se não houver tópico, cria um novo
+                if (raidMessage.channel.type === ChannelType.GuildText) {
+                    thread = await raidMessage.startThread({
+                        name: threadName,
+                        autoArchiveDuration: 60, // arquiva após 1h de inatividade
+                        reason: `Tópico para a raid de ${raidRequester.username}`,
+                    });
+
+                    await thread.members.add(raidRequester.id);
+                    await thread.send(`Bem-vindo, ${raidRequester}! Este é o tópico para organizar sua raid. ${joiner} acabou de se juntar.`);
+                }
+            }
+            
+            // Adiciona o novo membro ao tópico
+            await thread.members.add(joiner.id);
+            await thread.send(`${joiner} entrou na equipe da raid!`);
+            
+            // Se o tipo for voz, envia uma mensagem sugerindo
+            if(chatType === 'voz') {
+                await thread.send('Lembrete: Este é um chat de voz! Por favor, entrem em um canal de voz para coordenar.');
+            }
+
+            await interaction.reply({ content: `Você se juntou à raid! Vá para o tópico <#${thread.id}> para conversar.`, ephemeral: true });
+
+        } catch (error) {
+            console.error("Erro ao processar o botão da raid:", error);
+            await interaction.reply({ content: 'Ocorreu um erro ao tentar juntar-se à raid. Verifique se tenho permissão para criar tópicos (threads).', ephemeral: true });
+        }
+    }
   }
 });
 
