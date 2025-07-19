@@ -40,7 +40,8 @@ const client = new Client({
 
 client.commands = new Collection();
 const raidStates = new Map();
-const userStats = new Map(); // Store user statistics
+const userStats = new Map(); // Armazena as estatísticas do usuário { level, xp, raidsCreated, raidsHelped, ... }
+const userProfiles = new Map(); // Armazena { channelId, messageId } do perfil do usuário
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -440,22 +441,44 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
 
     if (helpers.length > 0) {
         await thread.send(`Obrigado a todos que ajudaram: ${helpers.map(m => `<@${m.id}>`).join(' ')}. Vocês são pessoas incríveis!`);
-        // Update stats and XP for helpers
-        const xpGained = 25;
-        const xpToLevelUp = 100;
         
-        helpers.forEach(helperMember => {
+        // Update stats, XP, and profile images for helpers
+        for (const helperMember of helpers) {
             const stats = userStats.get(helperMember.id) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+            const xpGained = 25;
+            const xpToLevelUp = 100;
+            
             stats.raidsHelped += 1;
             stats.xp += xpGained;
 
             if (stats.xp >= xpToLevelUp) {
                 stats.level += 1;
-                stats.xp -= xpToLevelUp; // Reset XP for the new level
-                thread.send(`🎉 Parabéns, <@${helperMember.id}>! Você subiu para o nível ${stats.level}!`);
+                stats.xp -= xpToLevelUp;
+                // We'll notify in the thread for public recognition
+                await thread.send(`🎉 Parabéns, <@${helperMember.id}>! Você subiu para o nível ${stats.level}!`);
             }
             userStats.set(helperMember.id, stats);
-        });
+
+            // Now, update the profile image in their private channel
+            const profileInfo = userProfiles.get(helperMember.id);
+            if (profileInfo && profileInfo.channelId && profileInfo.messageId) {
+                try {
+                    const profileChannel = await client.channels.fetch(profileInfo.channelId);
+                    const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
+                    const member = await interaction.guild.members.fetch(helperMember.id);
+                    
+                    const newProfileImageBuffer = await generateProfileImage(member, stats);
+                    const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
+                    
+                    await profileMessage.edit({
+                        content: `Bem-vindo, ${member}! Este é o seu espaço de perfil pessoal.`,
+                        files: [newAttachment]
+                    });
+                } catch (updateError) {
+                    console.error(`Falha ao editar a imagem de perfil para ${helperMember.id}:`, updateError);
+                }
+            }
+        }
     }
 
     if (voiceChannel) {
@@ -659,6 +682,7 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
                     {
                         id: newMember.id,
                         allow: [PermissionsBitField.Flags.ViewChannel],
+                        deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageMessages]
                     },
                 ],
             });
@@ -667,15 +691,21 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
             
             // Get user stats or create default if not exists
             const stats = userStats.get(newMember.id) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
-            userStats.set(newMember.id, stats); // Ensure it's in the map
+            userStats.set(newMember.id, stats);
 
             // Gerar a imagem do perfil
             const profileImageBuffer = await generateProfileImage(newMember, stats);
             const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
 
-            await channel.send({
+            const profileMessage = await channel.send({
                 content: `Bem-vindo, ${newMember}! Este é o seu espaço de perfil pessoal.`,
                 files: [attachment]
+            });
+            
+            // Store the profile channel and message IDs for future updates
+            userProfiles.set(newMember.id, {
+                channelId: channel.id,
+                messageId: profileMessage.id
             });
 
         } catch (error) {
@@ -685,3 +715,5 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
+    
