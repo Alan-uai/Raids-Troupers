@@ -16,8 +16,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { fileURLToPath } from 'node:url';
-import { OpenAI } from 'openai';
 import { v4 as uuidv4 } from 'uuid';
+import { REST, Routes } from 'discord.js';
+import fetch from 'node-fetch';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -25,8 +26,6 @@ app.get('/', (req, res) => res.send('Bot está online!'));
 app.listen(port, () => console.log(`HTTP server rodando na porta ${port}`));
 
 dotenv.config();
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const client = new Client({
   intents: [
@@ -57,8 +56,35 @@ for (const file of commandFiles) {
   }
 }
 
-client.once(Events.ClientReady, () => {
+client.once(Events.ClientReady, async () => {
   console.log(`✅ Bot online como ${client.user.tag}`);
+
+  // Deploy commands logic
+  const commands = [];
+  for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = (await import(filePath)).default;
+    if ('data' in command && 'execute' in command) {
+      commands.push(command.data.toJSON());
+    } else {
+      console.log(`[AVISO] O comando em ${filePath} está faltando a propriedade "data" ou "execute".`);
+    }
+  }
+
+  const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+
+  try {
+    console.log(`🔁 Atualizando ${commands.length} comandos Slash (/).`);
+    
+    const data = await rest.put(
+      Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
+      { body: commands }
+    );
+
+    console.log(`✅ ${data.length} comandos Slash (/) registrados com sucesso.`);
+  } catch (error) {
+    console.error('Erro ao registrar comandos:', error);
+  }
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -444,16 +470,23 @@ client.on(Events.MessageCreate, async message => {
       Responda apenas com a palavra da categoria, em minúsculas.
     `;
 
-    const categoryCompletion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: pergunta }
-      ],
-      max_tokens: 10,
+    const categoryResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        "model": "google/gemini-pro",
+        "messages": [
+          { "role": "system", "content": systemPrompt },
+          { "role": "user", "content": pergunta }
+        ]
+      })
     });
-    
-    const categoria = categoryCompletion.choices[0].message.content.toLowerCase().trim();
+
+    const categoryData = await categoryResponse.json();
+    const categoria = categoryData.choices[0].message.content.toLowerCase().trim();
     
     let feedbackMessage = "Digitando...";
     if (categoria.includes('pergunta')) {
@@ -466,12 +499,21 @@ client.on(Events.MessageCreate, async message => {
 
     const feedbackMsg = await message.channel.send(feedbackMessage);
 
-    const mainCompletion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: pergunta }]
+    const mainResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        "model": "google/gemini-pro",
+        "messages": [{ "role": "user", "content": pergunta }]
+      })
     });
 
-    const resposta = mainCompletion.choices[0].message.content;
+    const mainData = await mainResponse.json();
+    const resposta = mainData.choices[0].message.content;
+
     await feedbackMsg.delete();
     await message.reply(resposta.slice(0, 2000));
   } catch (err) {
