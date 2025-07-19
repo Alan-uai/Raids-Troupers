@@ -95,29 +95,28 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 async function getOriginalRaidMessage(interaction) {
-    if (interaction.message.channel.isThread()) {
+    try {
+        // The original message is always in the channel where the command was run, not the thread.
+        return await interaction.channel.messages.fetch(interaction.message.reference.messageId);
+    } catch (e) {
+        console.error("Could not fetch original raid message from interaction reference.", e);
         try {
-            // If interaction is in a thread, the original message is the thread's parent message
-            return await interaction.message.channel.parent.messages.fetch(interaction.message.channel.id);
-        } catch (e) {
-             console.error("Could not fetch original raid message from thread using parent.", e);
-             try {
-                // Fallback for different structures
-                 return await interaction.channel.messages.fetch(interaction.message.id);
-             } catch (e2) {
-                console.error("Could not fetch original raid message from thread as a normal message.", e2);
-                return null;
-             }
+            // Fallback for interactions that are not in a thread or are on the original message itself
+            return await interaction.channel.messages.fetch(interaction.message.id);
+        } catch (e2) {
+             console.error("Could not fetch original raid message using direct ID.", e2);
+             return null;
         }
     }
-    return interaction.message;
 }
+
 
 async function handleRaidButton(interaction, subAction, requesterId) {
     const interactor = interaction.user;
     const isLeader = interactor.id === requesterId;
 
-    const originalRaidMessage = await getOriginalRaidMessage(interaction);
+    const originalRaidMessage = await interaction.channel.messages.fetch(interaction.message.id).catch(() => null);
+
     if (!originalRaidMessage) {
         return interaction.reply({ content: "Não foi possível encontrar a mensagem de anúncio da raid original.", ephemeral: true });
     }
@@ -126,6 +125,7 @@ async function handleRaidButton(interaction, subAction, requesterId) {
     const raidEmbed = originalRaidMessage.embeds[0];
     const raidRequester = await client.users.fetch(requesterId);
     
+    // --- Leader Actions (must be in the thread) ---
     if (isLeader && thread && interaction.channelId === thread.id) {
         if (subAction === 'start') {
             await interaction.deferUpdate();
@@ -181,6 +181,7 @@ async function handleRaidButton(interaction, subAction, requesterId) {
         }
     }
     
+    // --- Member Actions (must be in the thread) ---
     if (subAction === 'leave' && thread && interaction.channelId === thread.id) {
         if (isLeader) {
             return await interaction.reply({ content: 'O líder não pode sair da própria raid, apenas fechá-la.', ephemeral: true });
@@ -206,10 +207,11 @@ async function handleRaidButton(interaction, subAction, requesterId) {
     }
 
 
+    // --- Join Action (happens on the original message) ---
     if (subAction === 'join') {
         let currentThread = thread;
         if (!currentThread) {
-            currentThread = await originalRaidMessage.startThread({
+             currentThread = await originalRaidMessage.startThread({
                 name: `Raid de ${raidRequester.username}`,
                 autoArchiveDuration: 1440,
             }).catch(e => console.error("Error creating thread:", e));
@@ -218,6 +220,7 @@ async function handleRaidButton(interaction, subAction, requesterId) {
                  return interaction.reply({ content: "Não foi possível criar o tópico para a raid.", ephemeral: true });
             }
             await currentThread.members.add(raidRequester.id);
+            await currentThread.send(`Bem-vindo, ${raidRequester}! Este é o tópico para organizar sua raid.`);
             
             const leaderControls = new ActionRowBuilder()
                 .addComponents(
@@ -226,13 +229,8 @@ async function handleRaidButton(interaction, subAction, requesterId) {
                     new ButtonBuilder().setCustomId(`raid_close_${requesterId}`).setLabel('🔒 Fechar Raid').setStyle(ButtonStyle.Secondary)
                 );
 
-            const memberControls = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder().setCustomId(`raid_leave_${requesterId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary)
-                );
-
-            await currentThread.send({ content: `Bem-vindo, ${raidRequester}! Este é o tópico para organizar sua raid.\n\n**Controles do Líder:**`, components: [leaderControls] });
-            await currentThread.send({ content: `**Controles de Membro:**`, components: [memberControls] });
+            // Send ephemeral controls to the leader
+            await interaction.followUp({ content: `**Controles do Líder:**`, components: [leaderControls], ephemeral: true });
         }
 
         const members = await currentThread.members.fetch();
@@ -251,6 +249,13 @@ async function handleRaidButton(interaction, subAction, requesterId) {
         await currentThread.members.add(interactor.id);
         await currentThread.send(`${interactor} entrou na equipe da raid!`);
         currentMembers++;
+
+        const memberControls = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder().setCustomId(`raid_leave_${requesterId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary)
+            );
+        // Send ephemeral controls to the new member
+        await interaction.followUp({ content: '**Controles de Membro:**', components: [memberControls], ephemeral: true });
 
         const newEmbed = EmbedBuilder.from(raidEmbed).setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
@@ -274,7 +279,9 @@ async function handleRaidKick(interaction, requesterId) {
     }
     const memberToKickId = interaction.values[0];
     
-    const originalRaidMessage = await getOriginalRaidMessage(interaction);
+    // We need the original message to get the thread
+    const originalRaidMessage = await interaction.channel.messages.fetch(interaction.message.reference.messageId).catch(() => null);
+
     if (!originalRaidMessage || !originalRaidMessage.thread) {
         return await interaction.reply({ content: 'Não foi possível encontrar a raid ou o tópico associado.', ephemeral: true });
     }
@@ -373,5 +380,3 @@ client.on(Events.MessageCreate, async message => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
-
-    
