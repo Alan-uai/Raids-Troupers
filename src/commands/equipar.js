@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, AttachmentBuilder } from 'discord.js';
 import { shopItems } from '../shop-items.js';
+import { rareItems } from '../rare-items.js';
 import { generateProfileImage } from '../profile-generator.js';
 
 
@@ -23,13 +24,24 @@ export default {
       return await interaction.editReply({ content: '❌ Você não possui este item.', ephemeral: true });
     }
     
-    const itemToEquip = shopItems.find(item => item.id === itemId);
+    const allItems = [...shopItems, ...rareItems];
+    const itemToEquip = allItems.find(item => item.id === itemId);
+
     if (!itemToEquip) {
         return await interaction.editReply({ content: '❌ Esse item não parece mais existir.', ephemeral: true });
     }
 
-    // Equipar o item
-    items.equippedBackground = itemToEquip.url;
+    // Lógica para equipar diferentes tipos de item
+    if (itemToEquip.type === 'background') {
+        items.equippedBackground = itemToEquip.url;
+        await interaction.editReply({ content: `✅ Você equipou o fundo **${itemToEquip.name}**! Seu perfil foi atualizado.`, ephemeral: true });
+    } else if (itemToEquip.type === 'title') {
+        items.equippedTitle = itemToEquip.name;
+         await interaction.editReply({ content: `✅ Você equipou o título **${itemToEquip.name}**! Seu perfil foi atualizado.`, ephemeral: true });
+    } else {
+        return await interaction.editReply({ content: '❌ Este tipo de item não pode ser equipado diretamente.', ephemeral: true });
+    }
+
     userItems.set(userId, items);
     
     // Atualizar a imagem do perfil
@@ -39,7 +51,7 @@ export default {
             const stats = userStats.get(userId);
             const member = await interaction.guild.members.fetch(userId);
 
-            const newProfileImageBuffer = await generateProfileImage(member, stats, items.equippedBackground);
+            const newProfileImageBuffer = await generateProfileImage(member, stats, items);
             const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
 
             const profileChannel = await interaction.client.channels.fetch(profileInfo.channelId);
@@ -47,14 +59,10 @@ export default {
             
             await profileMessage.edit({ files: [newAttachment] });
 
-             await interaction.editReply({ content: `✅ Você equipou **${itemToEquip.name}**! Seu perfil foi atualizado.`, ephemeral: true });
-
         } catch (updateError) {
             console.error(`Falha ao editar a imagem de perfil para ${userId}:`, updateError);
-            await interaction.editReply({ content: '✅ Item equipado, mas não consegui atualizar a imagem do seu perfil. Tente novamente mais tarde.', ephemeral: true });
+            // A mensagem de resposta já foi enviada, então apenas logamos o erro.
         }
-    } else {
-        await interaction.editReply({ content: `✅ Item equipado! A mudança aparecerá da próxima vez que seu perfil for atualizado.`, ephemeral: true });
     }
   },
 };

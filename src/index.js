@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { v4 as uuidv4 } from 'uuid';
 import { REST, Routes } from 'discord.js';
 import { generateProfileImage } from './profile-generator.js';
+import { rareItems } from './rare-items.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -40,10 +41,11 @@ const client = new Client({
 
 client.commands = new Collection();
 const raidStates = new Map();
-const userStats = new Map(); // Armazena { level, xp, coins, class, raidsCreated, ... }
+const userStats = new Map(); // Armazena { level, xp, coins, class, ... }
 const userProfiles = new Map(); // Armazena { channelId, messageId } do perfil do usuário
-const userItems = new Map(); // Armazena { inventory: [], equippedBackground: 'default' }
+const userItems = new Map(); // Armazena { inventory: [], equippedBackground: 'default', equippedTitle: null }
 const activeAuctions = new Map(); // Armazena leilões ativos
+const pendingRatings = new Map(); // Armazena { userId: [userIdToRate1, userIdToRate2] }
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,10 +86,12 @@ client.on(Events.InteractionCreate, async interaction => {
       }
     }
   } else if (interaction.isButton()) {
-    const [action, subAction, requesterId, raidId] = interaction.customId.split('_');
+    const customIdParts = interaction.customId.split('_');
+    const [action, subAction, ...args] = customIdParts;
 
     if (action === 'raid') {
       try {
+        const [requesterId, raidId] = args;
         if (subAction === 'controls') {
           await handleControlsButton(interaction, requesterId, raidId);
         } else if (subAction === 'vc') { 
@@ -103,19 +107,26 @@ client.on(Events.InteractionCreate, async interaction => {
       }
     } else if (action === 'auction') {
         if (subAction === 'bid') {
-            // Lógica para quando o usuário clica no botão "Dar Lance"
-            // Poderia abrir um modal ou simplesmente guiar o usuário a usar /dar_lance
             await interaction.reply({ content: 'Para fazer um lance, por favor, use o comando `/dar_lance <valor>`.', ephemeral: true });
         }
+    } else if (action === 'rate') {
+        const [raterId, ratedId] = args;
+        await handleRating(interaction, raterId, ratedId, subAction);
     }
 
   } else if (interaction.isStringSelectMenu()) {
-      const [action, subAction, requesterId, raidId] = interaction.customId.split('_');
+      const [action, subAction, ...args] = interaction.customId.split('_');
       if (action === 'raid' && subAction === 'kick') {
+          const [requesterId, raidId] = args;
           await handleRaidKick(interaction, requesterId, raidId);
+      }
+      if (action === 'rating' && subAction === 'select') {
+          const [raterId] = args;
+          await handleRatingSelection(interaction, raterId);
       }
   }
 });
+
 
 async function checkAuctionEnd() {
     const auction = activeAuctions.get('current_auction');
@@ -150,10 +161,13 @@ async function checkAuctionEnd() {
 
     // Processar o vencedor
     const stats = userStats.get(winnerId);
-    stats.coins -= winningBid;
-    userStats.set(winnerId, stats);
+    if(stats){
+        stats.coins -= winningBid;
+        userStats.set(winnerId, stats);
+    }
 
-    const items = userItems.get(winnerId) || { inventory: [], equippedBackground: 'default' };
+
+    const items = userItems.get(winnerId) || { inventory: [], equippedBackground: 'default', equippedTitle: null };
     items.inventory.push(auction.item.id);
     userItems.set(winnerId, items);
 
@@ -167,7 +181,7 @@ async function checkAuctionEnd() {
     if (auctionMessage) await auctionMessage.edit({ embeds: [finalEmbed], components: [] });
 
     try {
-        await winnerUser.send(`Parabéns! Você venceu o leilão para **${auction.item.name}** com um lance de ${winningBid} TC. O item já está no seu inventário!`);
+        await winnerUser.send(`Parabéns! Você venceu o leilão para **${auction.item.name}** com um lance de ${winningBid} TC. O item já está no seu inventário! Use /equipar para usá-lo.`);
     } catch (e) {
         console.log(`Não foi possível enviar DM para o vencedor do leilão ${winnerUser.username}`);
     }
@@ -438,12 +452,47 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
 
     await thread.send(`Atenção, equipe! A raid foi iniciada pelo líder!`);
     const members = await thread.members.fetch();
-    const helpers = [];
+    const participants = [];
 
     for (const member of members.values()) {
         const user = client.users.cache.get(member.id);
         if (!user || user.bot) continue;
-        if (user.id !== requesterId) helpers.push(member);
+        participants.push(user);
+
+        if (user.id !== requesterId) { // Leader doesn't get XP for their own raid
+            const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
+            const xpGained = 25;
+            const coinsGained = 10;
+            const xpToLevelUp = 100;
+            
+            stats.raidsHelped += 1;
+            stats.xp += xpGained;
+            stats.coins += coinsGained;
+
+            if (stats.xp >= xpToLevelUp) {
+                stats.level += 1;
+                stats.xp -= xpToLevelUp;
+                await thread.send(`🎉 Parabéns, <@${user.id}>! Você subiu para o nível ${stats.level}!`);
+            }
+            userStats.set(user.id, stats);
+
+            const profileInfo = userProfiles.get(user.id);
+            if (profileInfo?.channelId && profileInfo?.messageId) {
+                try {
+                    const profileChannel = await client.channels.fetch(profileInfo.channelId);
+                    const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
+                    const guildMember = await interaction.guild.members.fetch(user.id);
+                    const items = userItems.get(user.id) || { inventory: [], equippedBackground: 'default', equippedTitle: null };
+                    
+                    const newProfileImageBuffer = await generateProfileImage(guildMember, stats, items);
+                    const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
+                    
+                    await profileMessage.edit({ files: [newAttachment] });
+                } catch (updateError) {
+                    console.error(`Falha ao editar a imagem de perfil para ${user.id}:`, updateError);
+                }
+            }
+        }
 
         const guildMember = await interaction.guild.members.fetch(user.id).catch(() => null);
         if (voiceChannel && raidState?.get(user.id) && guildMember) {
@@ -459,50 +508,21 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
             }
         }
     }
+    
+    // Iniciar o processo de avaliação
+    if(participants.length > 1) {
+        await startRatingProcess(participants);
+    }
 
+
+    const helpers = participants.filter(p => p.id !== requesterId);
     if (helpers.length > 0) {
         await thread.send(`Obrigado a todos que ajudaram: ${helpers.map(m => `<@${m.id}>`).join(' ')}. Vocês são pessoas incríveis!`);
-        
-        for (const helperMember of helpers) {
-            const stats = userStats.get(helperMember.id) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
-            const xpGained = 25;
-            const xpToLevelUp = 100;
-            
-            stats.raidsHelped += 1;
-            stats.xp += xpGained;
-
-            if (stats.xp >= xpToLevelUp) {
-                stats.level += 1;
-                stats.xp -= xpToLevelUp;
-                await thread.send(`🎉 Parabéns, <@${helperMember.id}>! Você subiu para o nível ${stats.level}!`);
-            }
-            userStats.set(helperMember.id, stats);
-
-            const profileInfo = userProfiles.get(helperMember.id);
-            if (profileInfo?.channelId && profileInfo?.messageId) {
-                try {
-                    const profileChannel = await client.channels.fetch(profileInfo.channelId);
-                    const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
-                    const member = await interaction.guild.members.fetch(helperMember.id);
-                    const items = userItems.get(helperMember.id) || { inventory: [], equippedBackground: 'default' };
-                    
-                    const newProfileImageBuffer = await generateProfileImage(member, stats, items.equippedBackground);
-                    const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
-                    
-                    await profileMessage.edit({ files: [newAttachment] });
-                } catch (updateError) {
-                    console.error(`Falha ao editar a imagem de perfil para ${helperMember.id}:`, updateError);
-                }
-            }
-        }
     }
 
     if (voiceChannel) {
-        for (const member of members.values()) {
-            const user = client.users.cache.get(member.id);
-            if (user && !user.bot) {
-                await voiceChannel.permissionOverwrites.edit(user.id, { [PermissionsBitField.Flags.Connect]: true }).catch(() => {});
-            }
+        for (const user of participants) {
+           await voiceChannel.permissionOverwrites.edit(user.id, { [PermissionsBitField.Flags.Connect]: true }).catch(() => {});
         }
     }
 
@@ -511,6 +531,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
     await thread.setArchived(true).catch(e => console.error("Error archiving thread:", e));
     raidStates.delete(raidId);
 }
+
 
 async function handleRaidKick(interaction, requesterId, raidId) {
     if (interaction.user.id !== requesterId) {
@@ -551,11 +572,11 @@ async function handleRaidKick(interaction, requesterId, raidId) {
         const raidState = raidStates.get(raidId);
         if(raidState) raidState.delete(memberToKickId);
 
-        const leaderStats = userStats.get(requesterId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+        const leaderStats = userStats.get(requesterId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
         leaderStats.kickedOthers += 1;
         userStats.set(requesterId, leaderStats);
 
-        const kickedStats = userStats.get(memberToKickId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+        const kickedStats = userStats.get(memberToKickId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
         kickedStats.wasKicked += 1;
         userStats.set(memberToKickId, kickedStats);
 
@@ -578,6 +599,103 @@ async function handleRaidKick(interaction, requesterId, raidId) {
         await interaction.followUp({ content: 'Não foi possível expulsar o membro.', ephemeral: true });
     }
 }
+
+async function startRatingProcess(participants) {
+    for (const rater of participants) {
+        const othersToRate = participants.filter(p => p.id !== rater.id);
+        if (othersToRate.length === 0) continue;
+
+        pendingRatings.set(rater.id, othersToRate.map(p => p.id));
+
+        const selectOptions = othersToRate.map(p => ({
+            label: p.username,
+            value: p.id,
+            description: `Avalie o desempenho de ${p.username}.`
+        }));
+
+        const selectMenu = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId(`rating_select_${rater.id}`)
+                .setPlaceholder('Escolha um membro para avaliar')
+                .addOptions(selectOptions)
+        );
+
+        try {
+            await rater.send({
+                content: 'A raid terminou! Por favor, avalie a participação de seus colegas de equipe.',
+                components: [selectMenu]
+            });
+        } catch (e) {
+            console.log(`Não foi possível enviar DM de avaliação para ${rater.username}`);
+        }
+    }
+}
+
+async function handleRatingSelection(interaction, raterId) {
+    const ratedId = interaction.values[0];
+    const ratedUser = await client.users.fetch(ratedId);
+
+    const ratingButtons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`rate_up_${raterId}_${ratedId}`)
+            .setLabel('Positivo')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('👍'),
+        new ButtonBuilder()
+            .setCustomId(`rate_down_${raterId}_${ratedId}`)
+            .setLabel('Negativo')
+            .setStyle(ButtonStyle.Danger)
+            .setEmoji('👎')
+    );
+
+    await interaction.update({
+        content: `Como você avalia **${ratedUser.username}**?`,
+        components: [ratingButtons]
+    });
+}
+
+async function handleRating(interaction, raterId, ratedId, type) {
+    const raterPending = pendingRatings.get(raterId);
+    if (!raterPending || !raterPending.includes(ratedId)) {
+        return await interaction.update({ content: 'Você já avaliou este usuário ou a avaliação não é mais válida.', components: [] });
+    }
+
+    const stats = userStats.get(ratedId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
+    stats.totalRatings += 1;
+    if (type === 'up') {
+        stats.reputation += 1;
+    }
+    userStats.set(ratedId, stats);
+
+    const updatedPending = raterPending.filter(id => id !== ratedId);
+    if (updatedPending.length === 0) {
+        pendingRatings.delete(raterId);
+        await interaction.update({ content: 'Obrigado! Todas as suas avaliações foram registradas.', components: [] });
+    } else {
+        pendingRatings.set(raterId, updatedPending);
+        await interaction.update({ content: 'Sua avaliação foi registrada. Você ainda tem outros membros para avaliar.', components: [] });
+    }
+    
+    // Atualizar perfil do usuário avaliado
+    const profileInfo = userProfiles.get(ratedId);
+    if (profileInfo) {
+         try {
+            const profileChannel = await client.channels.fetch(profileInfo.channelId);
+            const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
+            const guild = profileChannel.guild;
+            const member = await guild.members.fetch(ratedId);
+            const items = userItems.get(ratedId) || { inventory: [], equippedBackground: 'default', equippedTitle: null };
+            
+            const newProfileImageBuffer = await generateProfileImage(member, stats, items);
+            const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
+            
+            await profileMessage.edit({ files: [newAttachment] });
+        } catch (updateError) {
+            console.error(`Falha ao editar a imagem de perfil para ${ratedId} após avaliação:`, updateError);
+        }
+    }
+}
+
 
 client.on(Events.MessageCreate, async message => {
   if (message.author.bot || !message.mentions.has(client.user.id)) return;
@@ -654,13 +772,13 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
             console.log(`Canal #${channel.name} criado para ${newMember.displayName}.`);
             
-            const stats = userStats.get(newMember.id) || { level: 1, xp: 0, coins: 100, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+            const stats = userStats.get(newMember.id) || { level: 1, xp: 0, coins: 100, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
             userStats.set(newMember.id, stats);
 
-            const items = userItems.get(newMember.id) || { inventory: [], equippedBackground: 'default' };
+            const items = userItems.get(newMember.id) || { inventory: [], equippedBackground: 'default', equippedTitle: null };
             userItems.set(newMember.id, items);
 
-            const profileImageBuffer = await generateProfileImage(newMember, stats, items.equippedBackground);
+            const profileImageBuffer = await generateProfileImage(newMember, stats, items);
             const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
 
             const profileMessage = await channel.send({

@@ -19,11 +19,14 @@ const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
     context.fillText(line, x, y);
 };
 
-export async function generateProfileImage(member, stats, equippedBackground = 'default') {
+export async function generateProfileImage(member, stats, items) {
     const width = 800;
-    const height = 450; // Aumentar a altura para caber a classe
+    const height = 500; 
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
+    
+    const equippedBackground = items?.equippedBackground || 'default';
+    const equippedTitle = items?.equippedTitle;
 
     // Fundo (Padrão ou Personalizado)
     if (equippedBackground !== 'default' && equippedBackground.startsWith('http')) {
@@ -64,7 +67,7 @@ export async function generateProfileImage(member, stats, equippedBackground = '
     const avatar = await loadImage(avatarURL);
     const avatarSize = 128;
     const avatarX = 50;
-    const avatarY = 50;
+    const avatarY = 40;
     ctx.save();
     ctx.beginPath();
     ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2, true);
@@ -76,7 +79,14 @@ export async function generateProfileImage(member, stats, equippedBackground = '
     // Nome de usuário
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 36px sans-serif';
-    ctx.fillText(member.displayName, avatarX + avatarSize + 25, avatarY + 50);
+    ctx.fillText(member.displayName, avatarX + avatarSize + 25, avatarY + 55);
+
+    // Título do usuário
+    if(equippedTitle) {
+        ctx.font = 'italic 20px sans-serif';
+        ctx.fillStyle = '#FFD700'; // Gold color for the title
+        ctx.fillText(equippedTitle, avatarX + avatarSize + 25, avatarY + 80);
+    }
 
     // Classe do usuário
     if (stats.class) {
@@ -84,7 +94,7 @@ export async function generateProfileImage(member, stats, equippedBackground = '
         if (userClass) {
             ctx.font = 'bold 24px sans-serif';
             ctx.fillStyle = userClass.color || '#D2AC47';
-            ctx.fillText(`${userClass.icon} ${userClass.name}`, avatarX + avatarSize + 25, avatarY + 90);
+            ctx.fillText(`${userClass.icon} ${userClass.name}`, avatarX + avatarSize + 25, avatarY + 115);
         }
     }
 
@@ -117,6 +127,10 @@ export async function generateProfileImage(member, stats, equippedBackground = '
 
     ctx.fillText('Raids Ajudadas', col2X, statsY + statsSpacing);
     ctx.fillText(String(stats.raidsHelped || 0), col2X + valueOffsetX, statsY + statsSpacing);
+    
+    ctx.fillText('Reputação', col2X, statsY + statsSpacing * 2);
+    ctx.fillText(`👍 ${stats.reputation || 0}`, col2X + valueOffsetX, statsY + statsSpacing * 2);
+
 
     // Coluna 3
     ctx.fillText('Expulsou', col3X, statsY);
@@ -129,7 +143,7 @@ export async function generateProfileImage(member, stats, equippedBackground = '
     ctx.font = '16px sans-serif';
     ctx.fillStyle = '#B9BBBE';
     const roles = member.roles.cache.filter(r => r.name !== '@everyone' && r.name.toLowerCase() !== 'limpo').map(r => r.name).join(', ');
-    wrapText(ctx, `Cargos: ${roles || 'Nenhum'}`, 50, height - 50, width - 100, 20);
+    wrapText(ctx, `Cargos: ${roles || 'Nenhum'}`, 50, height - 60, width - 100, 20);
 
     return canvas.toBuffer('image/png');
 }
