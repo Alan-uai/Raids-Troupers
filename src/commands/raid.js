@@ -90,11 +90,13 @@ export default {
       const row1 = new ActionRowBuilder()
         .addComponents(
           new ButtonBuilder()
-            .setLabel("🔗 Add no Roblox")
+            .setLabel("Add")
+            .setEmoji('👤')
             .setStyle(ButtonStyle.Link)
             .setURL(`https://www.roblox.com/users/profile?username=${encodeURIComponent(robloxUsername)}`),
           new ButtonBuilder()
-            .setLabel("Chamar Pessoal")
+            .setLabel("DM")
+            .setEmoji('✉️')
             .setStyle(ButtonStyle.Link)
             .setURL(`https://discord.com/users/${user.id}`)
         );
@@ -103,7 +105,7 @@ export default {
         .addComponents(
           new ButtonBuilder()
             .setCustomId(joinButtonId)
-            .setLabel("Juntar-se à Raid")
+            .setLabel("Entrar")
             .setStyle(ButtonStyle.Success)
             .setEmoji('🤝')
         );
