@@ -1,5 +1,8 @@
 import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } from 'discord.js';
 
+// Map para armazenar o ID da última mensagem de raid de cada usuário
+const userLastRaidMessage = new Map();
+
 export default {
   data: new SlashCommandBuilder()
     .setName('raid')
@@ -47,30 +50,27 @@ export default {
 
     // Delete existing raid announcement from this user (processo assíncrono em background)
     const deletePromise = (async () => {
-      try {
-        const messages = await channel.messages.fetch({ limit: 1 });
-        const userRaidMessage = messages.find(msg => 
-          msg.embeds.length > 0 && 
-          msg.embeds[0].footer && 
-          (msg.embeds[0].footer.text.includes(user.username) || msg.embeds[0].footer.text.includes(member.displayName))
-        );
-
-        if (userRaidMessage) {
-          try {
-            if (userRaidMessage.thread) {
-              await userRaidMessage.thread.delete().catch(() => {});
+      const lastMessageId = userLastRaidMessage.get(user.id);
+      if (lastMessageId) {
+        try {
+          const lastMessage = await channel.messages.fetch(lastMessageId).catch(() => null);
+          if (lastMessage) {
+            if (lastMessage.thread) {
+              await lastMessage.thread.delete().catch(() => {});
             }
-            await userRaidMessage.delete().catch(() => {});
-          } catch (deleteErr) {
-            console.log(`Erro ao deletar mensagem anterior: ${deleteErr.message}`);
+            await lastMessage.delete().catch(() => {});
           }
+          // Remover o ID antigo do mapa
+          userLastRaidMessage.delete(user.id);
+        } catch (deleteErr) {
+          console.log(`Erro ao deletar mensagem anterior: ${deleteErr.message}`);
+          // Limpar ID inválido do mapa
+          userLastRaidMessage.delete(user.id);
         }
-      } catch (fetchErr) {
-        console.log(`Erro ao buscar mensagem anterior: ${fetchErr.message}`);
       }
     })();
 
-    // Não aguardar a conclusão das deletações para prosseguir
+    // Não aguardar a conclusão da deleção para prosseguir
 
     const embed = new EmbedBuilder()
       .setTitle("📢 Novo Pedido de Ajuda em **__Raid__**!")
@@ -106,6 +106,9 @@ export default {
 
       // Update the message with buttons
       await sentMessage.edit({ embeds: [embed], components: [row] });
+
+      // Armazenar o ID da nova mensagem para este usuário
+      userLastRaidMessage.set(user.id, sentMessage.id);
 
       await interaction.editReply({
         content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`
