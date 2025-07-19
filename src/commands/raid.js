@@ -25,17 +25,18 @@ export default {
 
     const nivel = interaction.options.getString('nivel');
     const dificuldade = interaction.options.getString('dificuldade');
-    const tipoChat = interaction.options.getString('tipo-chat') ?? 'texto';
     const user = interaction.user;
 
     const robloxUsername = user.username;
 
-    const customId = `join_raid_${interaction.id}_${user.id}_${tipoChat}`;
+    // customId: action_requesterId_messageId_raidInfo...
+    const joinButtonId = `raid_join_${user.id}`;
 
     const embed = new EmbedBuilder()
       .setTitle("📢 Novo Pedido de Ajuda em Raid!")
       .setDescription(`Gostaria de uma ajuda para superar a Raid **${nivel}** na dificuldade **${dificuldade}**.\n\nFicarei grato!`)
       .setColor("#FF0000")
+      .addFields({ name: 'Membros na Equipe', value: `1/5`, inline: true })
       .setFooter({ text: `Solicitado por ${user.username}`, iconURL: user.displayAvatarURL() })
       .setTimestamp();
       
@@ -50,13 +51,13 @@ export default {
           .setStyle(ButtonStyle.Link)
           .setURL(`https://discord.com/users/${user.id}`),
         new ButtonBuilder()
-          .setCustomId(customId)
+          .setCustomId(joinButtonId)
           .setLabel("Juntar-se à Raid")
           .setStyle(ButtonStyle.Success)
           .setEmoji('🤝')
       );
 
-    const raidChannelId = '1395591154208084049';
+    const raidChannelId = '1395591154208084049'; 
     const channel = interaction.client.channels.cache.get(raidChannelId);
     
     if (channel) {
