@@ -134,8 +134,10 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
     const interactor = interaction.user;
     const isLeader = interactor.id === requesterId;
 
-    // Use the raidId (which is the original message ID) to fetch the message
-    const originalRaidMessage = await interaction.channel.messages.fetch(raidId).catch(() => null);
+    // Buscar a mensagem original no canal de raids
+    const raidChannelId = '1395591154208084049';
+    const raidChannel = await client.channels.fetch(raidChannelId);
+    const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
 
     if (!originalRaidMessage) {
         return interaction.followUp({ content: "Não foi possível encontrar a mensagem de anúncio da raid original.", flags: [64] });
@@ -244,9 +246,8 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
             if (!currentThread) return;
 
             await currentThread.members.add(raidRequester.id).catch(e => console.error(`Failed to add leader ${raidRequester.id} to thread:`, e));
-            await currentThread.send(`Bem-vindo, <@${raidRequester.id}>! Este é o tópico para organizar sua raid.`);
 
-            // Send the universal controls button
+            // Send the universal controls button junto com a mensagem de boas-vindas
             const controlsButton = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
@@ -255,7 +256,13 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
                         .setStyle(ButtonStyle.Primary)
                 );
 
-            await currentThread.send({ content: `**Controles da Raid:**\nUse o botão abaixo para acessar seus controles.`, components: [controlsButton] });
+            const welcomeMessage = await currentThread.send({ 
+                content: `Bem-vindo, <@${raidRequester.id}>! Este é o tópico para organizar sua raid.\n\n**Controles da Raid:**\nUse o botão abaixo para acessar seus controles.`, 
+                components: [controlsButton] 
+            });
+
+            // Fixar a mensagem de controles
+            await welcomeMessage.pin().catch(e => console.error("Error pinning controls message:", e));
         }
 
         const members = await currentThread.members.fetch();
@@ -293,6 +300,18 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
 async function handleControlsButton(interaction, requesterId, raidId) {
     const isLeader = interaction.user.id === requesterId;
 
+    // Buscar a mensagem original no canal de raids
+    const raidChannelId = '1395591154208084049';
+    const raidChannel = await client.channels.fetch(raidChannelId);
+    const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
+
+    if (!originalRaidMessage) {
+        return await interaction.reply({ 
+            content: 'Não foi possível encontrar a mensagem de anúncio da raid original.', 
+            ephemeral: true 
+        });
+    }
+
     if (isLeader) {
         // Leader controls
         const leaderControls = new ActionRowBuilder()
@@ -300,7 +319,7 @@ async function handleControlsButton(interaction, requesterId, raidId) {
                 new ButtonBuilder().setCustomId(`raid_start_${requesterId}_${raidId}`).setLabel('✅ Iniciar Raid').setStyle(ButtonStyle.Success),
                 new ButtonBuilder().setCustomId(`raid_kickmenu_${requesterId}_${raidId}`).setLabel('❌ Expulsar Membro').setStyle(ButtonStyle.Danger),
                 new ButtonBuilder().setCustomId(`raid_close_${requesterId}_${raidId}`).setLabel('🔒 Fechar Raid').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setLabel('Habilitar Chat de Voz').setStyle(ButtonStyle.Primary)
+                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setLabel('🔊 Habilitar Chat de Voz').setStyle(ButtonStyle.Primary)
             );
 
         await interaction.reply({ 
@@ -313,7 +332,7 @@ async function handleControlsButton(interaction, requesterId, raidId) {
         const memberControls = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder().setCustomId(`raid_leave_${requesterId}_${raidId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setLabel('Habilitar Chat de Voz').setStyle(ButtonStyle.Primary)
+                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setLabel('🔊 Habilitar Chat de Voz').setStyle(ButtonStyle.Primary)
             );
 
         await interaction.reply({ 
@@ -326,22 +345,32 @@ async function handleControlsButton(interaction, requesterId, raidId) {
 
 async function handleVoiceOptIn(interaction, requesterId, raidId) {
     if (!raidId) {
-        return interaction.reply({ content: 'Não foi possível encontrar os dados desta raid para ativar o chat de voz.', flags: [64] });
+        return interaction.reply({ content: 'Não foi possível encontrar os dados desta raid para ativar o chat de voz.', ephemeral: true });
+    }
+
+    // Verificar se a raid existe buscando a mensagem original
+    const raidChannelId = '1395591154208084049';
+    const raidChannel = await client.channels.fetch(raidChannelId);
+    const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
+
+    if (!originalRaidMessage) {
+        return interaction.reply({ content: 'Esta raid não parece estar mais ativa.', ephemeral: true });
+    }
+
+    // Garantir que o raidState existe
+    if (!raidStates.has(raidId)) {
+        raidStates.set(raidId, new Map());
     }
 
     const raidState = raidStates.get(raidId);
-    if (!raidState) {
-        return interaction.reply({ content: 'Esta raid não parece estar mais ativa.', flags: [64] });
-    }
-
     const userHasOptedIn = raidState.get(interaction.user.id) || false;
     raidState.set(interaction.user.id, !userHasOptedIn);
 
     const feedbackMessage = !userHasOptedIn
-        ? 'Você ativou a entrada automática no chat de voz quando a raid começar.'
-        : 'Você desativou a entrada automática no chat de voz.';
+        ? '🔊 Você ativou a entrada automática no chat de voz quando a raid começar.'
+        : '🔇 Você desativou a entrada automática no chat de voz.';
 
-    await interaction.reply({ content: feedbackMessage, flags: [64] });
+    await interaction.reply({ content: feedbackMessage, ephemeral: true });
 }
 
 async function handleRaidStart(interaction, originalRaidMessage, requesterId, raidId) {
