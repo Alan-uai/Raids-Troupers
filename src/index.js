@@ -440,10 +440,20 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
 
     if (helpers.length > 0) {
         await thread.send(`Obrigado a todos que ajudaram: ${helpers.map(m => `<@${m.id}>`).join(' ')}. Vocês são pessoas incríveis!`);
-        // Update stats for helpers
+        // Update stats and XP for helpers
+        const xpGained = 25;
+        const xpToLevelUp = 100;
+        
         helpers.forEach(helperMember => {
             const stats = userStats.get(helperMember.id) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
             stats.raidsHelped += 1;
+            stats.xp += xpGained;
+
+            if (stats.xp >= xpToLevelUp) {
+                stats.level += 1;
+                stats.xp -= xpToLevelUp; // Reset XP for the new level
+                thread.send(`🎉 Parabéns, <@${helperMember.id}>! Você subiu para o nível ${stats.level}!`);
+            }
             userStats.set(helperMember.id, stats);
         });
     }
