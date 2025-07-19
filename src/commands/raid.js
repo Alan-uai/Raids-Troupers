@@ -31,9 +31,39 @@ export default {
     const user = interaction.user;
 
     const robloxUsername = user.username;
+    const raidChannelId = '1395591154208084049'; 
+    const channel = interaction.client.channels.cache.get(raidChannelId);
 
-    // A raidId will be the interaction ID itself for uniqueness initially
-    const joinButtonId = `raid_join_${user.id}_${interaction.id}`;
+    if (!channel) {
+      console.error(`Canal com ID ${raidChannelId} não encontrado.`);
+      return await interaction.reply({
+        content: 'Não encontrei o canal para anunciar a raid. Avise um administrador!',
+        ephemeral: true
+      });
+    }
+
+    // Delete existing raid announcements from this user
+    try {
+      const messages = await channel.messages.fetch({ limit: 50 });
+      const userRaidMessages = messages.filter(msg => 
+        msg.embeds.length > 0 && 
+        msg.embeds[0].footer && 
+        msg.embeds[0].footer.text.includes(user.username)
+      );
+      
+      for (const msg of userRaidMessages.values()) {
+        try {
+          if (msg.thread) {
+            await msg.thread.delete();
+          }
+          await msg.delete();
+        } catch (deleteErr) {
+          console.log(`Não foi possível deletar mensagem anterior: ${deleteErr.message}`);
+        }
+      }
+    } catch (fetchErr) {
+      console.log(`Erro ao buscar mensagens anteriores: ${fetchErr.message}`);
+    }
 
     const embed = new EmbedBuilder()
       .setTitle("📢 Novo Pedido de Ajuda em Raid!")
@@ -43,44 +73,41 @@ export default {
       .setFooter({ text: `Solicitado por ${user.username}`, iconURL: user.displayAvatarURL() })
       .setTimestamp();
 
-    const row = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setLabel("🔗 Add no Roblox")
-          .setStyle(ButtonStyle.Link)
-          .setURL(`https://www.roblox.com/users/profile?username=${encodeURIComponent(robloxUsername)}`),
-        new ButtonBuilder()
-          .setLabel("Chamar Pessoal")
-          .setStyle(ButtonStyle.Link)
-          .setURL(`https://discord.com/users/${user.id}`),
-        new ButtonBuilder()
-          .setCustomId(joinButtonId)
-          .setLabel("Juntar-se à Raid")
-          .setStyle(ButtonStyle.Success)
-          .setEmoji('🤝')
-      );
+    // Create the message first, then update the button with the message ID
+    try {
+      const sentMessage = await channel.send({ embeds: [embed], components: [] });
+      
+      // Now create the buttons with the actual message ID
+      const joinButtonId = `raid_join_${user.id}_${sentMessage.id}`;
+      
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setLabel("🔗 Add no Roblox")
+            .setStyle(ButtonStyle.Link)
+            .setURL(`https://www.roblox.com/users/profile?username=${encodeURIComponent(robloxUsername)}`),
+          new ButtonBuilder()
+            .setLabel("Chamar Pessoal")
+            .setStyle(ButtonStyle.Link)
+            .setURL(`https://discord.com/users/${user.id}`),
+          new ButtonBuilder()
+            .setCustomId(joinButtonId)
+            .setLabel("Juntar-se à Raid")
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('🤝')
+        );
 
-    const raidChannelId = '1395591154208084049'; 
-    const channel = interaction.client.channels.cache.get(raidChannelId);
-
-    if (channel) {
-      try {
-        await channel.send({ embeds: [embed], components: [row] });
-        await interaction.reply({
-          content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`,
-          ephemeral: true
-        });
-      } catch (err) {
-        console.error("Erro ao enviar a mensagem para o canal:", err);
-        await interaction.reply({
-          content: 'Não consegui enviar o anúncio no canal de raids. Verifique minhas permissões!',
-          ephemeral: true
-        });
-      }
-    } else {
-      console.error(`Canal com ID ${raidChannelId} não encontrado.`);
+      // Update the message with buttons
+      await sentMessage.edit({ embeds: [embed], components: [row] });
+      
       await interaction.reply({
-        content: 'Não encontrei o canal para anunciar a raid. Avise um administrador!',
+        content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`,
+        ephemeral: true
+      });
+    } catch (err) {
+      console.error("Erro ao enviar a mensagem para o canal:", err);
+      await interaction.reply({
+        content: 'Não consegui enviar o anúncio no canal de raids. Verifique minhas permissões!',
         ephemeral: true
       });
     }

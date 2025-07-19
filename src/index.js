@@ -106,7 +106,9 @@ client.on(Events.InteractionCreate, async interaction => {
 
     if (action === 'raid') {
       try {
-        if (subAction === 'vc') { // vc_opt_in becomes vc_opt
+        if (subAction === 'controls') {
+          await handleControlsButton(interaction, requesterId, raidId);
+        } else if (subAction === 'vc') { // vc_opt_in becomes vc_opt
           await handleVoiceOptIn(interaction, requesterId, raidId);
         } else {
           await handleRaidButton(interaction, subAction, requesterId, raidId);
@@ -236,15 +238,16 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
             await currentThread.members.add(raidRequester.id).catch(e => console.error(`Failed to add leader ${raidRequester.id} to thread:`, e));
             await currentThread.send(`Bem-vindo, <@${raidRequester.id}>! Este é o tópico para organizar sua raid.`);
             
-            const leaderControls = new ActionRowBuilder()
+            // Send the universal controls button
+            const controlsButton = new ActionRowBuilder()
                 .addComponents(
-                    new ButtonBuilder().setCustomId(`raid_start_${requesterId}_${raidId}`).setLabel('✅ Iniciar Raid').setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId(`raid_kickmenu_${requesterId}_${raidId}`).setLabel('❌ Expulsar Membro').setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder().setCustomId(`raid_close_${requesterId}_${raidId}`).setLabel('🔒 Fechar Raid').setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setEmoji('🔉').setStyle(ButtonStyle.Primary)
+                    new ButtonBuilder()
+                        .setCustomId(`raid_controls_${requesterId}_${raidId}`)
+                        .setLabel('⚙️ Meus Controles')
+                        .setStyle(ButtonStyle.Primary)
                 );
             
-            await interaction.followUp({ content: `**Controles do Líder:**`, components: [leaderControls], flags: [64] });
+            await currentThread.send({ content: `**Controles da Raid:**\nUse o botão abaixo para acessar seus controles.`, components: [controlsButton] });
         }
 
         const members = await currentThread.members.fetch();
@@ -262,13 +265,6 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
         await currentThread.members.add(interactor.id).catch(e => console.error(`Failed to add member ${interactor.id} to thread:`, e));
         await currentThread.send(`${interactor} entrou na equipe da raid!`);
         currentMembers++;
-        
-        const memberControls = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder().setCustomId(`raid_leave_${requesterId}_${raidId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setEmoji('🔉').setStyle(ButtonStyle.Primary)
-            );
-        await interaction.followUp({ content: '**Controles de Membro:**', components: [memberControls], flags: [64] });
 
         raidEmbed.setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
@@ -283,6 +279,40 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
         }
         
         await originalRaidMessage.edit({ embeds: [raidEmbed], components: [originalRow] });
+    }
+}
+
+async function handleControlsButton(interaction, requesterId, raidId) {
+    const isLeader = interaction.user.id === requesterId;
+
+    if (isLeader) {
+        // Leader controls
+        const leaderControls = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder().setCustomId(`raid_start_${requesterId}_${raidId}`).setLabel('✅ Iniciar Raid').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId(`raid_kickmenu_${requesterId}_${raidId}`).setLabel('❌ Expulsar Membro').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId(`raid_close_${requesterId}_${raidId}`).setLabel('🔒 Fechar Raid').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setEmoji('🔉').setStyle(ButtonStyle.Primary)
+            );
+        
+        await interaction.reply({ 
+            content: '**Controles do Líder:**\nEscolha uma ação:', 
+            components: [leaderControls], 
+            ephemeral: true 
+        });
+    } else {
+        // Member controls
+        const memberControls = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder().setCustomId(`raid_leave_${requesterId}_${raidId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setEmoji('🔉').setStyle(ButtonStyle.Primary)
+            );
+        
+        await interaction.reply({ 
+            content: '**Controles de Membro:**\nEscolha uma ação:', 
+            components: [memberControls], 
+            ephemeral: true 
+        });
     }
 }
 
