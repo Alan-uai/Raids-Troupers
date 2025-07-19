@@ -2,23 +2,27 @@ import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import express from 'express';
+
+// Configuração do servidor HTTP
+const app = express();
+const port = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('Bot está online!'));
+app.listen(port, () => console.log(`HTTP server rodando na porta ${port}`));
 
 dotenv.config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 client.commands = new Collection();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Carrega os comandos da pasta ./commands
+const __dirname = path.dirname(import.meta.url);
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
 for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
-  const command = (await import(filePath)).default;
+  const commandModule = await import(filePath);
+  const command = commandModule.default;
   if ('data' in command && 'execute' in command) {
     client.commands.set(command.data.name, command);
   } else {
