@@ -30,7 +30,8 @@ export default {
     const dificuldade = interaction.options.getString('dificuldade');
     const user = interaction.user;
 
-    const robloxUsername = user.username;
+    const member = await interaction.guild.members.fetch(user.id);
+    const robloxUsername = member.displayName || user.username;
     const raidChannelId = '1395591154208084049'; 
     const channel = interaction.client.channels.cache.get(raidChannelId);
 
@@ -48,7 +49,7 @@ export default {
       const userRaidMessages = messages.filter(msg => 
         msg.embeds.length > 0 && 
         msg.embeds[0].footer && 
-        msg.embeds[0].footer.text.includes(user.username)
+        (msg.embeds[0].footer.text.includes(user.username) || msg.embeds[0].footer.text.includes(member.displayName))
       );
       
       for (const msg of userRaidMessages.values()) {
@@ -70,7 +71,7 @@ export default {
       .setDescription(`Gostaria de uma ajuda para superar a Raid **${nivel}** na dificuldade **${dificuldade}**.\n\nFicarei grato!`)
       .setColor("#FF0000")
       .addFields({ name: 'Membros na Equipe', value: `1/5`, inline: true })
-      .setFooter({ text: `Solicitado por ${user.username}`, iconURL: user.displayAvatarURL() })
+      .setFooter({ text: `Solicitado por ${member.displayName || user.username}`, iconURL: user.displayAvatarURL() })
       .setTimestamp();
 
     // Create the message first, then update the button with the message ID

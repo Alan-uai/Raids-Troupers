@@ -155,11 +155,16 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
              const members = await thread.members.fetch();
              const memberOptions = Array.from(members.values())
                 .filter(m => m.id !== requesterId && client.users.cache.get(m.id) && !client.users.cache.get(m.id).bot)
-                .map(member => ({
-                    label: client.users.cache.get(member.id).username,
-                    value: member.id,
-                    description: `Expulsar ${client.users.cache.get(member.id).username} da raid.`
-                }));
+                .map(member => {
+                    const user = client.users.cache.get(member.id);
+                    const guildMember = interaction.guild.members.cache.get(member.id);
+                    const displayName = guildMember?.displayName || user.username;
+                    return {
+                        label: displayName,
+                        value: member.id,
+                        description: `Expulsar ${displayName} da raid.`
+                    };
+                });
 
             if (memberOptions.length === 0) {
                 return await interaction.followUp({ content: 'Não há membros para expulsar.', flags: [64] });
@@ -225,8 +230,11 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
         if (!currentThread) {
              raidStates.set(raidId, new Map()); // Use raidId from the start
              
+             const requesterMember = await interaction.guild.members.fetch(raidRequester.id).catch(() => null);
+             const displayName = requesterMember?.displayName || raidRequester.username;
+             
              currentThread = await originalRaidMessage.startThread({
-                name: `Raid de ${raidRequester.username}`,
+                name: `Raid de ${displayName}`,
                 autoArchiveDuration: 1440,
             }).catch(e => {
                 console.error("Error creating thread:", e);
@@ -440,11 +448,17 @@ async function handleRaidKick(interaction, requesterId, raidId) {
         const kickedUser = await client.users.fetch(memberToKickId);
         
         await thread.members.remove(memberToKickId);
-        await interaction.update({ content: `${kickedUser.username} foi expulso da raid pelo líder.`, components: [] });
-        await thread.send(`O líder expulsou ${kickedUser}.`);
+        const kickedMember = await interaction.guild.members.fetch(memberToKickId).catch(() => null);
+        const kickedDisplayName = kickedMember?.displayName || kickedUser.username;
+        
+        await interaction.update({ content: `${kickedDisplayName} foi expulso da raid pelo líder.`, components: [] });
+        await thread.send(`O líder expulsou ${kickedDisplayName}.`);
         
         try {
-            await kickedUser.send(`Perdão 🥺💔! ${leader.username}, o líder da raid, tinha outros planos. Boa sorte na próxima 🙌!`);
+            const leaderMember = await interaction.guild.members.fetch(leader.id).catch(() => null);
+            const leaderDisplayName = leaderMember?.displayName || leader.username;
+            
+            await kickedUser.send(`Perdão 🥺💔! ${leaderDisplayName}, o líder da raid, tinha outros planos. Boa sorte na próxima 🙌!`);
         } catch (dmError) {
             console.error(`Não foi possível enviar DM para ${kickedUser.username}. Eles podem ter DMs desabilitadas.`);
             thread.send(`(Não foi possível notificar ${kickedUser} por DM.)`);
