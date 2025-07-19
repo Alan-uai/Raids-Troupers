@@ -34,7 +34,11 @@ export default {
         new ButtonBuilder()
           .setLabel("🔗 Add no Roblox")
           .setStyle(ButtonStyle.Link)
-          .setURL(`https://www.roblox.com/users/profile?username=${encodeURIComponent(robloxUsername)}`)
+          .setURL(`https://www.roblox.com/users/profile?username=${encodeURIComponent(robloxUsername)}`),
+        new ButtonBuilder()
+          .setLabel("💬 Falar no Discord")
+          .setStyle(ButtonStyle.Link)
+          .setURL(`https://discord.com/users/${user.id}`)
       );
 
     const raidChannelId = '1395591154208084049';
