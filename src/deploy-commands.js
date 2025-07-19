@@ -28,7 +28,13 @@ const commandFileNames = [
     'equipar.js',
     'iniciar_leilao.js',
     'dar_lance.js',
-    'missoes.js' // Adicionado novo comando
+    'missoes.js',
+    'cla_criar.js',
+    'cla_convidar.js',
+    'cla_aceitar.js',
+    'cla_sair.js',
+    'cla_info.js',
+    'cla_expulsar.js'
 ];
 
 for (const file of commandFileNames) {

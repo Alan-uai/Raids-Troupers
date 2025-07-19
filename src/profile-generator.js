@@ -19,7 +19,7 @@ const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
     context.fillText(line, x, y);
 };
 
-export async function generateProfileImage(member, stats, items) {
+export async function generateProfileImage(member, stats, items, clans) {
     const width = 800;
     const height = 500; 
     const canvas = createCanvas(width, height);
@@ -76,10 +76,31 @@ export async function generateProfileImage(member, stats, items) {
     ctx.drawImage(avatar, avatarX, avatarY, avatarSize, avatarSize);
     ctx.restore();
 
-    // Nome de usuário
+    // Nome de usuário e Tag do Clã
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 36px sans-serif';
-    ctx.fillText(member.displayName, avatarX + avatarSize + 25, avatarY + 55);
+    let displayName = member.displayName;
+    if (stats.clanId && clans) {
+        const clan = Array.from(clans.values()).find(c => c.id === stats.clanId);
+        if (clan) {
+            ctx.font = 'bold 32px sans-serif';
+            const clanTag = `[${clan.tag}]`;
+            const nameX = avatarX + avatarSize + 25;
+            const nameY = avatarY + 55;
+            
+            ctx.fillStyle = '#AAAAAA'; // Cor da Tag
+            const tagWidth = ctx.measureText(clanTag).width;
+            ctx.fillText(clanTag, nameX, nameY);
+
+            ctx.fillStyle = '#FFFFFF'; // Cor do Nome
+            ctx.fillText(member.displayName, nameX + tagWidth + 10, nameY);
+        } else {
+            ctx.font = 'bold 36px sans-serif';
+            ctx.fillText(member.displayName, avatarX + avatarSize + 25, avatarY + 55);
+        }
+    } else {
+        ctx.font = 'bold 36px sans-serif';
+        ctx.fillText(member.displayName, avatarX + avatarSize + 25, avatarY + 55);
+    }
 
     // Título do usuário
     if(equippedTitle) {

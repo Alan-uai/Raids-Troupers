@@ -22,6 +22,7 @@ import { REST, Routes } from 'discord.js';
 import { generateProfileImage } from './profile-generator.js';
 import { rareItems } from './rare-items.js';
 import { assignMissions, checkMissionCompletion } from './mission-system.js';
+import { clans } from './classes.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -42,12 +43,14 @@ const client = new Client({
 
 client.commands = new Collection();
 const raidStates = new Map();
-const userStats = new Map(); // Armazena { level, xp, coins, class, ... }
+const userStats = new Map(); // Armazena { level, xp, coins, class, clanId, ... }
 const userProfiles = new Map(); // Armazena { channelId, messageId } do perfil do usuário
 const userItems = new Map(); // Armazena { inventory: [], equippedBackground: 'default', equippedTitle: null }
 const activeAuctions = new Map(); // Armazena leilões ativos
 const pendingRatings = new Map(); // Armazena { userId: [userIdToRate1, userIdToRate2] }
 const userMissions = new Map(); // Armazena { userId: [{missionId, progress}] }
+const activeClans = new Map(); // Armazena { clanName.toLowerCase(): {id, name, tag, leader, members, createdAt} }
+const pendingInvites = new Map(); // Armazena { userId: Set<clanName.toLowerCase()> }
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -82,7 +85,7 @@ client.on(Events.InteractionCreate, async interaction => {
     
     try {
       // Passa os mapas de dados para os comandos que precisarem
-      await command.execute(interaction, { userStats, userProfiles, userItems, activeAuctions, userMissions, pendingRatings });
+      await command.execute(interaction, { userStats, userProfiles, userItems, activeAuctions, userMissions, pendingRatings, clans: activeClans, pendingInvites });
     } catch (error) {
       console.error(error);
       const replyOptions = { content: 'Erro ao executar o comando!', ephemeral: true };
@@ -467,7 +470,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
         participants.push(user);
 
         if (user.id !== requesterId) { // Leader doesn't get XP for their own raid
-            const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
+            const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
             const xpGained = 25;
             const coinsGained = 10;
             const xpToLevelUp = 100;
@@ -484,7 +487,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
             userStats.set(user.id, stats);
 
              // Check for mission completion
-            await checkMissionCompletion(user, 'RAID_HELPED', thread, { userStats, userMissions, client, userProfiles, userItems });
+            await checkMissionCompletion(user, 'RAID_HELPED', thread, { userStats, userMissions, client, userProfiles, userItems, clans: activeClans });
 
             const profileInfo = userProfiles.get(user.id);
             if (profileInfo?.channelId && profileInfo?.messageId) {
@@ -494,7 +497,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
                     const guildMember = await interaction.guild.members.fetch(user.id);
                     const items = userItems.get(user.id) || { inventory: [], equippedBackground: 'default', equippedTitle: null };
                     
-                    const newProfileImageBuffer = await generateProfileImage(guildMember, stats, items);
+                    const newProfileImageBuffer = await generateProfileImage(guildMember, stats, items, activeClans);
                     const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
                     
                     await profileMessage.edit({ files: [newAttachment] });
@@ -582,16 +585,16 @@ async function handleRaidKick(interaction, requesterId, raidId) {
         const raidState = raidStates.get(raidId);
         if(raidState) raidState.delete(memberToKickId);
 
-        const leaderStats = userStats.get(requesterId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
+        const leaderStats = userStats.get(requesterId) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
         leaderStats.kickedOthers += 1;
         userStats.set(requesterId, leaderStats);
 
-        const kickedStats = userStats.get(memberToKickId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
+        const kickedStats = userStats.get(memberToKickId) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
         kickedStats.wasKicked += 1;
         userStats.set(memberToKickId, kickedStats);
         
         // Check for mission completion
-        await checkMissionCompletion(interaction.user, 'KICK_MEMBER', thread, { userStats, userMissions, client, userProfiles, userItems });
+        await checkMissionCompletion(interaction.user, 'KICK_MEMBER', thread, { userStats, userMissions, client, userProfiles, userItems, clans: activeClans });
 
         const raidEmbed = EmbedBuilder.from(originalRaidMessage.embeds[0]);
         const membersField = raidEmbed.data.fields.find(f => f.name.includes('Membros na Equipe'));
@@ -673,7 +676,7 @@ async function handleRating(interaction, raterId, ratedId, type) {
         return await interaction.update({ content: 'Você já avaliou este usuário ou a avaliação não é mais válida.', components: [] });
     }
 
-    const stats = userStats.get(ratedId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
+    const stats = userStats.get(ratedId) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
     stats.totalRatings += 1;
     if (type === 'up') {
         stats.reputation += 1;
@@ -690,7 +693,7 @@ async function handleRating(interaction, raterId, ratedId, type) {
     }
     
     // Check for mission completion
-    await checkMissionCompletion(interaction.user, 'RATE_PLAYER', interaction.channel, { userStats, userMissions, client, userProfiles, userItems });
+    await checkMissionCompletion(interaction.user, 'RATE_PLAYER', interaction.channel, { userStats, userMissions, client, userProfiles, userItems, clans: activeClans });
 
     // Atualizar perfil do usuário avaliado
     const profileInfo = userProfiles.get(ratedId);
@@ -702,7 +705,7 @@ async function handleRating(interaction, raterId, ratedId, type) {
             const member = await guild.members.fetch(ratedId);
             const items = userItems.get(ratedId) || { inventory: [], equippedBackground: 'default', equippedTitle: null };
             
-            const newProfileImageBuffer = await generateProfileImage(member, stats, items);
+            const newProfileImageBuffer = await generateProfileImage(member, stats, items, activeClans);
             const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
             
             await profileMessage.edit({ files: [newAttachment] });
@@ -788,7 +791,7 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
             console.log(`Canal #${channel.name} criado para ${newMember.displayName}.`);
             
-            const stats = userStats.get(newMember.id) || { level: 1, xp: 0, coins: 100, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
+            const stats = userStats.get(newMember.id) || { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
             userStats.set(newMember.id, stats);
 
             const items = userItems.get(newMember.id) || { inventory: [], equippedBackground: 'default', equippedTitle: null };
@@ -797,7 +800,7 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
             // Atribui missões iniciais
             assignMissions(newMember.id, userMissions);
 
-            const profileImageBuffer = await generateProfileImage(newMember, stats, items);
+            const profileImageBuffer = await generateProfileImage(newMember, stats, items, activeClans);
             const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
 
             const profileMessage = await channel.send({

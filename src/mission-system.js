@@ -29,7 +29,7 @@ export function assignMissions(userId, userMissions) {
 
 // Função para verificar e atualizar o progresso da missão
 export async function checkMissionCompletion(user, missionType, channel, data) {
-    const { userMissions, userStats, client, userProfiles, userItems } = data;
+    const { userMissions, userStats, client, userProfiles, userItems, clans } = data;
     const userId = user.id;
 
     if (!userMissions.has(userId)) {
@@ -49,7 +49,7 @@ export async function checkMissionCompletion(user, missionType, channel, data) {
                 missionProgress.completed = true;
                 
                 // Aplicar recompensa
-                const stats = userStats.get(userId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
+                const stats = userStats.get(userId) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0 };
                 const reward = missionDetails.reward;
                 stats.xp += reward.xp;
                 stats.coins += reward.coins;
@@ -77,7 +77,7 @@ export async function checkMissionCompletion(user, missionType, channel, data) {
                         const member = await guild.members.fetch(userId);
                         const items = userItems.get(userId) || { inventory: [], equippedBackground: 'default', equippedTitle: null };
                         
-                        const newProfileImageBuffer = await generateProfileImage(member, stats, items);
+                        const newProfileImageBuffer = await generateProfileImage(member, stats, items, clans);
                         const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
                         
                         await profileMessage.edit({ files: [newAttachment] });
