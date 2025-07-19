@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { fileURLToPath } from 'node:url';
+import { OpenAI } from 'openai';
 
 // Configuração do servidor HTTP
 const app = express();
@@ -13,7 +14,18 @@ app.listen(port, () => console.log(`HTTP server rodando na porta ${port}`));
 
 dotenv.config();
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+// Inicialização da OpenAI
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Adiciona as intents necessárias para ler mensagens
+const client = new Client({ 
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ] 
+});
+
 client.commands = new Collection();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +48,7 @@ client.once(Events.ClientReady, () => {
   console.log(`✅ Bot online como ${client.user.tag}`);
 });
 
+// Listener para interações de comandos e botões
 client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
@@ -65,15 +78,13 @@ client.on(Events.InteractionCreate, async interaction => {
 
             const threadName = `Raid de ${raidRequester.username}`;
             
-            // Tenta encontrar um tópico existente para esta raid
             let thread = raidMessage.thread;
 
             if (!thread) {
-                // Se não houver tópico, cria um novo
                 if (raidMessage.channel.type === ChannelType.GuildText) {
                     thread = await raidMessage.startThread({
                         name: threadName,
-                        autoArchiveDuration: 60, // arquiva após 1h de inatividade
+                        autoArchiveDuration: 60,
                         reason: `Tópico para a raid de ${raidRequester.username}`,
                     });
 
@@ -82,11 +93,9 @@ client.on(Events.InteractionCreate, async interaction => {
                 }
             }
             
-            // Adiciona o novo membro ao tópico
             await thread.members.add(joiner.id);
             await thread.send(`${joiner} entrou na equipe da raid!`);
             
-            // Se o tipo for voz, envia uma mensagem sugerindo
             if(chatType === 'voz') {
                 await thread.send('Lembrete: Este é um chat de voz! Por favor, entrem em um canal de voz para coordenar.');
             }
@@ -100,5 +109,40 @@ client.on(Events.InteractionCreate, async interaction => {
     }
   }
 });
+
+// Listener para menções ao bot
+client.on(Events.MessageCreate, async message => {
+  // Ignora mensagens de outros bots e mensagens que não mencionam o cliente
+  if (message.author.bot || !message.mentions.has(client.user.id)) {
+    return;
+  }
+
+  // Remove a menção para obter a pergunta do usuário
+  const pergunta = message.content.replace(/<@!?\d+>/, '').trim();
+
+  // Se não houver pergunta após a menção, não faz nada
+  if (!pergunta) {
+    return;
+  }
+
+  try {
+    // Envia um indicador de "digitando..."
+    await message.channel.sendTyping();
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [{ role: 'user', content: pergunta }]
+    });
+
+    const resposta = completion.choices[0].message.content;
+
+    // Responde diretamente à mensagem do usuário
+    await message.reply(resposta.slice(0, 2000));
+  } catch (err) {
+    console.error("Erro ao responder menção:", err);
+    await message.reply('Desculpe, ocorreu um erro ao tentar responder.');
+  }
+});
+
 
 client.login(process.env.DISCORD_TOKEN);

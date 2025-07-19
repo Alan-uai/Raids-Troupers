@@ -9,10 +9,12 @@ dotenv.config();
 const commands = [];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// Ajuste no caminho para ler a partir de 'src/commands'
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
 for (const file of commandFiles) {
+  // O caminho para importação agora precisa ser construído corretamente
   const filePath = path.join(commandsPath, file);
   const command = (await import(filePath)).default;
   if ('data' in command && 'execute' in command) {
