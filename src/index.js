@@ -40,8 +40,9 @@ const client = new Client({
 
 client.commands = new Collection();
 const raidStates = new Map();
-const userStats = new Map(); // Armazena as estatísticas do usuário { level, xp, raidsCreated, raidsHelped, ... }
+const userStats = new Map(); // Armazena as estatísticas do usuário { level, xp, coins, raidsCreated, ... }
 const userProfiles = new Map(); // Armazena { channelId, messageId } do perfil do usuário
+const userItems = new Map(); // Armazena { inventory: [], equippedBackground: 'default' }
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,31 +63,7 @@ for (const file of commandFiles) {
 client.once(Events.ClientReady, async () => {
   console.log(`✅ Bot online como ${client.user.tag}`);
 
-  const commands = [];
-  for (const file of commandFiles) {
-    const filePath = path.join(commandsPath, file);
-    const command = (await import(filePath)).default;
-    if ('data' in command && 'execute' in command) {
-      commands.push(command.data.toJSON());
-    } else {
-      console.log(`[AVISO] O comando em ${filePath} está faltando a propriedade "data" ou "execute".`);
-    }
-  }
-
-  const rest = new REST().setToken(process.env.DISCORD_TOKEN);
-
-  try {
-    console.log(`🔁 Atualizando ${commands.length} comandos Slash (/).`);
-
-    const data = await rest.put(
-      Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-      { body: commands }
-    );
-
-    console.log(`✅ ${data.length} comandos Slash (/) registrados com sucesso.`);
-  } catch (error) {
-    console.error('Erro ao registrar comandos:', error);
-  }
+  // O deploy de comandos foi movido para um script separado para melhor organização
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -95,8 +72,8 @@ client.on(Events.InteractionCreate, async interaction => {
     if (!command) return;
 
     try {
-      // Pass the userStats map to the command executor
-      await command.execute(interaction, userStats);
+      // Passa os mapas de dados para os comandos que precisarem
+      await command.execute(interaction, { userStats, userProfiles, userItems });
     } catch (error) {
       console.error(error);
       const replyOptions = { content: 'Erro ao executar o comando!', ephemeral: true };
@@ -113,7 +90,7 @@ client.on(Events.InteractionCreate, async interaction => {
       try {
         if (subAction === 'controls') {
           await handleControlsButton(interaction, requesterId, raidId);
-        } else if (subAction === 'vc') { // vc_opt_in becomes vc_opt
+        } else if (subAction === 'vc') { 
           await handleVoiceOptIn(interaction, requesterId, raidId);
         } else {
           await handleRaidButton(interaction, subAction, requesterId, raidId);
@@ -139,7 +116,6 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
     const interactor = interaction.user;
     const isLeader = interactor.id === requesterId;
 
-    // Buscar a mensagem original no canal de raids
     const raidChannelId = '1395591154208084049';
     const raidChannel = await client.channels.fetch(raidChannelId);
     const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
@@ -236,7 +212,7 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
         let currentThread = thread;
 
         if (!currentThread) {
-             raidStates.set(raidId, new Map()); // Use raidId from the start
+             raidStates.set(raidId, new Map());
 
              const requesterMember = await interaction.guild.members.fetch(raidRequester.id).catch(() => null);
              const displayName = requesterMember?.displayName || raidRequester.username;
@@ -253,7 +229,6 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
 
             await currentThread.members.add(raidRequester.id).catch(e => console.error(`Failed to add leader ${raidRequester.id} to thread:`, e));
 
-            // Send the universal controls button junto com a mensagem de boas-vindas
             const controlsButton = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
@@ -267,7 +242,6 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
                 components: [controlsButton] 
             });
 
-            // Fixar a mensagem de controles
             await welcomeMessage.pin().catch(e => console.error("Error pinning controls message:", e));
         }
 
@@ -306,8 +280,6 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
 
 async function handleControlsButton(interaction, requesterId, raidId) {
     const isLeader = interaction.user.id === requesterId;
-
-    // Buscar a mensagem original no canal de raids
     const raidChannelId = '1395591154208084049';
     const raidChannel = await client.channels.fetch(raidChannelId);
     const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
@@ -320,7 +292,6 @@ async function handleControlsButton(interaction, requesterId, raidId) {
     }
 
     if (isLeader) {
-        // Leader controls
         const leaderControls = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder().setCustomId(`raid_start_${requesterId}_${raidId}`).setLabel('✅ Iniciar Raid').setStyle(ButtonStyle.Success),
@@ -335,7 +306,6 @@ async function handleControlsButton(interaction, requesterId, raidId) {
             ephemeral: true 
         });
     } else {
-        // Member controls
         const memberControls = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder().setCustomId(`raid_leave_${requesterId}_${raidId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary),
@@ -355,7 +325,6 @@ async function handleVoiceOptIn(interaction, requesterId, raidId) {
         return interaction.reply({ content: 'Não foi possível encontrar os dados desta raid para ativar o chat de voz.', ephemeral: true });
     }
 
-    // Verificar se a raid existe buscando a mensagem original
     const raidChannelId = '1395591154208084049';
     const raidChannel = await client.channels.fetch(raidChannelId);
     const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
@@ -364,7 +333,6 @@ async function handleVoiceOptIn(interaction, requesterId, raidId) {
         return interaction.reply({ content: 'Esta raid não parece estar mais ativa.', ephemeral: true });
     }
 
-    // Garantir que o raidState existe
     if (!raidStates.has(raidId)) {
         raidStates.set(raidId, new Map());
     }
@@ -388,9 +356,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
     let voiceOptInCount = 0;
     if (raidState) {
         for (const optedIn of raidState.values()) {
-            if (optedIn) {
-                voiceOptInCount++;
-            }
+            if (optedIn) voiceOptInCount++;
         }
     }
 
@@ -402,10 +368,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
             type: ChannelType.GuildVoice,
             userLimit: 5,
             parent: parentCategory,
-            permissionOverwrites: [{
-                id: interaction.guild.id,
-                deny: [PermissionsBitField.Flags.Connect],
-            }, ],
+            permissionOverwrites: [{ id: interaction.guild.id, deny: [PermissionsBitField.Flags.Connect] }],
         }).catch(e => console.error("Failed to create voice channel:", e));
     }
 
@@ -416,21 +379,15 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
     for (const member of members.values()) {
         const user = client.users.cache.get(member.id);
         if (!user || user.bot) continue;
-
-        if (user.id !== requesterId) {
-            helpers.push(member);
-        }
+        if (user.id !== requesterId) helpers.push(member);
 
         const guildMember = await interaction.guild.members.fetch(user.id).catch(() => null);
-
-        if (voiceChannel && raidState && raidState.get(user.id) && guildMember) {
+        if (voiceChannel && raidState?.get(user.id) && guildMember) {
             await guildMember.voice.setChannel(voiceChannel).catch(e => console.log(`Failed to move ${guildMember.displayName}: ${e.message}`));
         }
 
-        if(voiceChannel && (!raidState || !raidState.get(user.id))){
-             const joinVCButton = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setLabel('Juntar-se ao Chat de Voz').setStyle(ButtonStyle.Link).setURL(voiceChannel.url)
-            );
+        if(voiceChannel && !raidState?.get(user.id)){
+            const joinVCButton = new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel('Juntar-se ao Chat de Voz').setStyle(ButtonStyle.Link).setURL(voiceChannel.url));
             try {
                 await user.send({ content: `A raid começou e um chat de voz foi criado!`, components: [joinVCButton] });
             } catch (dmError) {
@@ -442,9 +399,8 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
     if (helpers.length > 0) {
         await thread.send(`Obrigado a todos que ajudaram: ${helpers.map(m => `<@${m.id}>`).join(' ')}. Vocês são pessoas incríveis!`);
         
-        // Update stats, XP, and profile images for helpers
         for (const helperMember of helpers) {
-            const stats = userStats.get(helperMember.id) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+            const stats = userStats.get(helperMember.id) || { level: 1, xp: 0, coins: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
             const xpGained = 25;
             const xpToLevelUp = 100;
             
@@ -454,26 +410,22 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
             if (stats.xp >= xpToLevelUp) {
                 stats.level += 1;
                 stats.xp -= xpToLevelUp;
-                // We'll notify in the thread for public recognition
                 await thread.send(`🎉 Parabéns, <@${helperMember.id}>! Você subiu para o nível ${stats.level}!`);
             }
             userStats.set(helperMember.id, stats);
 
-            // Now, update the profile image in their private channel
             const profileInfo = userProfiles.get(helperMember.id);
-            if (profileInfo && profileInfo.channelId && profileInfo.messageId) {
+            if (profileInfo?.channelId && profileInfo?.messageId) {
                 try {
                     const profileChannel = await client.channels.fetch(profileInfo.channelId);
                     const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
                     const member = await interaction.guild.members.fetch(helperMember.id);
+                    const items = userItems.get(helperMember.id) || { inventory: [], equippedBackground: 'default' };
                     
-                    const newProfileImageBuffer = await generateProfileImage(member, stats);
+                    const newProfileImageBuffer = await generateProfileImage(member, stats, items.equippedBackground);
                     const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
                     
-                    await profileMessage.edit({
-                        content: `Bem-vindo, ${member}! Este é o seu espaço de perfil pessoal.`,
-                        files: [newAttachment]
-                    });
+                    await profileMessage.edit({ files: [newAttachment] });
                 } catch (updateError) {
                     console.error(`Falha ao editar a imagem de perfil para ${helperMember.id}:`, updateError);
                 }
@@ -485,9 +437,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
         for (const member of members.values()) {
             const user = client.users.cache.get(member.id);
             if (user && !user.bot) {
-                await voiceChannel.permissionOverwrites.edit(user.id, {
-                    [PermissionsBitField.Flags.Connect]: true,
-                }).catch(() => {});
+                await voiceChannel.permissionOverwrites.edit(user.id, { [PermissionsBitField.Flags.Connect]: true }).catch(() => {});
             }
         }
     }
@@ -497,7 +447,6 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
     await thread.setArchived(true).catch(e => console.error("Error archiving thread:", e));
     raidStates.delete(raidId);
 }
-
 
 async function handleRaidKick(interaction, requesterId, raidId) {
     if (interaction.user.id !== requesterId) {
@@ -529,27 +478,22 @@ async function handleRaidKick(interaction, requesterId, raidId) {
         try {
             const leaderMember = await interaction.guild.members.fetch(leader.id).catch(() => null);
             const leaderDisplayName = leaderMember?.displayName || leader.username;
-
             await kickedUser.send(`Perdão 🥺💔! ${leaderDisplayName}, o líder da raid, tinha outros planos. Boa sorte na próxima 🙌!`);
         } catch (dmError) {
-            console.error(`Não foi possível enviar DM para ${kickedUser.username}. Eles podem ter DMs desabilitadas.`);
+            console.error(`Não foi possível enviar DM para ${kickedUser.username}.`);
             thread.send(`(Não foi possível notificar ${kickedUser} por DM.)`);
         }
 
         const raidState = raidStates.get(raidId);
-        if(raidState) {
-            raidState.delete(memberToKickId);
-        }
+        if(raidState) raidState.delete(memberToKickId);
 
-        // Update stats for kick
-        const leaderStats = userStats.get(requesterId) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+        const leaderStats = userStats.get(requesterId) || { level: 1, xp: 0, coins: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
         leaderStats.kickedOthers += 1;
         userStats.set(requesterId, leaderStats);
 
-        const kickedStats = userStats.get(memberToKickId) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+        const kickedStats = userStats.get(memberToKickId) || { level: 1, xp: 0, coins: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
         kickedStats.wasKicked += 1;
         userStats.set(memberToKickId, kickedStats);
-
 
         const raidEmbed = EmbedBuilder.from(originalRaidMessage.embeds[0]);
         const membersField = raidEmbed.data.fields.find(f => f.name.includes('Membros na Equipe'));
@@ -571,73 +515,38 @@ async function handleRaidKick(interaction, requesterId, raidId) {
     }
 }
 
-
 client.on(Events.MessageCreate, async message => {
-  if (message.author.bot || !message.mentions.has(client.user.id)) {
-    return;
-  }
-
+  if (message.author.bot || !message.mentions.has(client.user.id)) return;
   const pergunta = message.content.replace(/<@!?\d+>/g, '').trim();
-
-  if (!pergunta) {
-    return;
-  }
+  if (!pergunta) return;
 
   try {
-      const systemPrompt = `
-      Analise a frase do usuário e categorize-a em uma das três categorias: "pergunta", "pedido", "conversa".
-      - "pergunta": Para perguntas diretas que buscam uma informação específica (ex: "que horas são?", "quem descobriu o Brasil?").
-      - "pedido": Para solicitações de criação, informação detalhada ou ajuda (ex: "me dê uma referência", "fale sobre a segunda guerra", "crie uma imagem").
-      - "conversa": Para interações pessoais, saudações, desabafos ou comentários (ex: "e aí, como vai?", "estou triste", "você é uma IA?").
-      Responda apenas com a palavra da categoria, em minúsculas.
-    `;
+      const systemPrompt = `Analise a frase do usuário e categorize-a em "pergunta", "pedido", ou "conversa". Responda apenas com a palavra da categoria, em minúsculas.`;
+      const categoryResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ "model": "google/gemini-2.5-pro-exp-03-25", "messages": [{ "role": "system", "content": systemPrompt }, { "role": "user", "content": pergunta }] })
+      });
+      const categoryData = await categoryResponse.json();
+      const categoria = categoryData.choices[0].message.content.toLowerCase().trim();
 
-    const categoryResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        "model": "google/gemini-2.5-pro-exp-03-25",
-        "messages": [
-          { "role": "system", "content": systemPrompt },
-          { "role": "user", "content": pergunta }
-        ]
-      })
-    });
+      let feedbackMessage = "Digitando...";
+      if (categoria.includes('pergunta')) feedbackMessage = "Pensando...🤔💡";
+      else if (categoria.includes('pedido')) feedbackMessage = "Analisando seu pedido...🤔💡";
+      else if (categoria.includes('conversa')) feedbackMessage = "Digitando...";
 
-    const categoryData = await categoryResponse.json();
-    const categoria = categoryData.choices[0].message.content.toLowerCase().trim();
+      const feedbackMsg = await message.channel.send(feedbackMessage);
 
-    let feedbackMessage = "Digitando...";
-    if (categoria.includes('pergunta')) {
-        feedbackMessage = "Pensando...🤔💡";
-    } else if (categoria.includes('pedido')) {
-        feedbackMessage = "Pensando no seu caso...🤔💡";
-    } else if (categoria.includes('conversa')) {
-        feedbackMessage = "Digitando nessa bagaça...";
-    }
+      const mainResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ "model": "google/gemini-2.5-pro-exp-03-25", "messages": [{ "role": "user", "content": pergunta }] })
+      });
+      const mainData = await mainResponse.json();
+      const resposta = mainData.choices[0].message.content;
 
-    const feedbackMsg = await message.channel.send(feedbackMessage);
-
-    const mainResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        "model": "google/gemini-2.5-pro-exp-03-25",
-        "messages": [{ "role": "user", "content": pergunta }]
-      })
-    });
-
-    const mainData = await mainResponse.json();
-    const resposta = mainData.choices[0].message.content;
-
-    await feedbackMsg.delete();
-    await message.reply(resposta.slice(0, 2000));
+      await feedbackMsg.delete();
+      await message.reply(resposta.slice(0, 2000));
   } catch (err) {
     console.error("Erro ao responder menção:", err);
     await message.reply('Desculpe, ocorreu um erro ao tentar responder.');
@@ -660,7 +569,6 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
     if (!oldHasRole && newHasRole) {
         console.log(`Usuário ${newMember.displayName} recebeu a role '${roleName}'. Criando canal e perfil.`);
-
         const guild = newMember.guild;
         const category = guild.channels.cache.get(categoryId);
 
@@ -675,26 +583,20 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
                 type: ChannelType.GuildText,
                 parent: category,
                 permissionOverwrites: [
-                    {
-                        id: guild.id, // @everyone
-                        deny: [PermissionsBitField.Flags.ViewChannel],
-                    },
-                    {
-                        id: newMember.id,
-                        allow: [PermissionsBitField.Flags.ViewChannel],
-                        deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageMessages]
-                    },
+                    { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                    { id: newMember.id, allow: [PermissionsBitField.Flags.ViewChannel], deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageMessages] },
                 ],
             });
 
             console.log(`Canal #${channel.name} criado para ${newMember.displayName}.`);
             
-            // Get user stats or create default if not exists
-            const stats = userStats.get(newMember.id) || { level: 1, xp: 0, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
+            const stats = userStats.get(newMember.id) || { level: 1, xp: 0, coins: 100, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0 };
             userStats.set(newMember.id, stats);
 
-            // Gerar a imagem do perfil
-            const profileImageBuffer = await generateProfileImage(newMember, stats);
+            const items = userItems.get(newMember.id) || { inventory: [], equippedBackground: 'default' };
+            userItems.set(newMember.id, items);
+
+            const profileImageBuffer = await generateProfileImage(newMember, stats, items.equippedBackground);
             const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
 
             const profileMessage = await channel.send({
@@ -702,7 +604,6 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
                 files: [attachment]
             });
             
-            // Store the profile channel and message IDs for future updates
             userProfiles.set(newMember.id, {
                 channelId: channel.id,
                 messageId: profileMessage.id
@@ -715,5 +616,3 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
-
-    

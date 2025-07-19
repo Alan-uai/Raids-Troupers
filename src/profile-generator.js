@@ -1,6 +1,5 @@
 import { createCanvas, loadImage } from 'canvas';
 
-// Função para desenhar texto com quebra de linha
 const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
     const words = text.split(' ');
     let line = '';
@@ -19,29 +18,42 @@ const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
     context.fillText(line, x, y);
 };
 
-
-export async function generateProfileImage(member, stats) {
+export async function generateProfileImage(member, stats, equippedBackground = 'default') {
     const width = 800;
     const height = 400;
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // Fundo Gradiente
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, '#23272A');
-    gradient.addColorStop(1, '#2C2F33');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
+    // Fundo (Padrão ou Personalizado)
+    if (equippedBackground !== 'default' && equippedBackground.startsWith('http')) {
+        try {
+            const background = await loadImage(equippedBackground);
+            ctx.drawImage(background, 0, 0, width, height);
+        } catch (e) {
+            console.error("Falha ao carregar background personalizado, usando padrão.", e);
+            const gradient = ctx.createLinearGradient(0, 0, width, height);
+            gradient.addColorStop(0, '#23272A');
+            gradient.addColorStop(1, '#2C2F33');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+        }
+    } else {
+        const gradient = ctx.createLinearGradient(0, 0, width, height);
+        gradient.addColorStop(0, '#23272A');
+        gradient.addColorStop(1, '#2C2F33');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+    }
     
-    // Card de fundo
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    // Card de fundo translúcido para melhor legibilidade
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(20, 20);
-    ctx.lineTo(width - 20, 20);
-    ctx.lineTo(width - 20, height - 20);
-    ctx.lineTo(20, height - 20);
+    ctx.moveTo(15, 15);
+    ctx.lineTo(width - 15, 15);
+    ctx.lineTo(width - 15, height - 15);
+    ctx.lineTo(15, height - 15);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
@@ -52,7 +64,6 @@ export async function generateProfileImage(member, stats) {
     const avatarSize = 128;
     const avatarX = 50;
     const avatarY = 50;
-
     ctx.save();
     ctx.beginPath();
     ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2, true);
@@ -64,47 +75,48 @@ export async function generateProfileImage(member, stats) {
     // Nome de usuário
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 36px sans-serif';
-    const username = member.displayName;
-    ctx.fillText(username, avatarX + avatarSize + 25, avatarY + 50);
+    ctx.fillText(member.displayName, avatarX + avatarSize + 25, avatarY + 50);
 
     // Roles do usuário
-    ctx.font = '18px sans-serif';
+    ctx.font = '16px sans-serif';
     ctx.fillStyle = '#B9BBBE';
-    const roles = member.roles.cache
-        .filter(role => role.name !== '@everyone')
-        .map(role => role.name)
-        .join(', ');
-    wrapText(ctx, `Roles: ${roles || 'Nenhuma'}`, avatarX + avatarSize + 25, avatarY + 90, 450, 22);
+    const roles = member.roles.cache.filter(r => r.name !== '@everyone').map(r => r.name).join(', ');
+    wrapText(ctx, `Roles: ${roles || 'Nenhuma'}`, avatarX + avatarSize + 25, avatarY + 85, 450, 20);
 
     // --- Seção de Estatísticas ---
     const statsX = 50;
     const statsY = 220;
-    const statsSpacing = 40;
+    const statsSpacing = 35;
+    const col2X = 320;
+    const col3X = 570;
 
-    ctx.font = 'bold 22px sans-serif';
+    ctx.font = 'bold 20px sans-serif';
     ctx.fillStyle = '#FFFFFF';
 
-    // Level & XP
+    // Coluna 1
     ctx.fillText('Nível', statsX, statsY);
     ctx.fillText(String(stats.level || 1), statsX + 150, statsY);
 
     ctx.fillText('XP', statsX, statsY + statsSpacing);
     ctx.fillText(`${stats.xp || 0} / 100`, statsX + 150, statsY + statsSpacing);
+    
+    ctx.fillText('Moedas (TC)', statsX, statsY + statsSpacing * 2);
+    ctx.fillText(String(stats.coins || 0), statsX + 150, statsY + statsSpacing * 2);
 
-    // Raids
-    const statsX2 = 400;
-    ctx.fillText('Raids Criadas', statsX2, statsY);
-    ctx.fillText(String(stats.raidsCreated || 0), statsX2 + 200, statsY);
 
-    ctx.fillText('Raids Ajudadas', statsX2, statsY + statsSpacing);
-    ctx.fillText(String(stats.raidsHelped || 0), statsX2 + 200, statsY + statsSpacing);
+    // Coluna 2
+    ctx.fillText('Raids Criadas', col2X, statsY);
+    ctx.fillText(String(stats.raidsCreated || 0), col2X + 180, statsY);
 
-    // Reputação
-    ctx.fillText('Expulsou', statsX, statsY + statsSpacing * 2.5);
-    ctx.fillText(String(stats.kickedOthers || 0), statsX + 150, statsY + statsSpacing * 2.5);
+    ctx.fillText('Raids Ajudadas', col2X, statsY + statsSpacing);
+    ctx.fillText(String(stats.raidsHelped || 0), col2X + 180, statsY + statsSpacing);
 
-    ctx.fillText('Foi Expulso', statsX2, statsY + statsSpacing * 2.5);
-    ctx.fillText(String(stats.wasKicked || 0), statsX2 + 200, statsY + statsSpacing * 2.5);
+    // Coluna 3
+    ctx.fillText('Expulsou', col3X, statsY);
+    ctx.fillText(String(stats.kickedOthers || 0), col3X + 150, statsY);
+
+    ctx.fillText('Foi Expulso', col3X, statsY + statsSpacing);
+    ctx.fillText(String(stats.wasKicked || 0), col3X + 150, statsY + statsSpacing);
 
     return canvas.toBuffer('image/png');
 }
