@@ -10,6 +10,7 @@ import {
   EmbedBuilder,
   ChannelType,
   PermissionsBitField,
+  InteractionResponseFlags,
 } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
@@ -59,7 +60,6 @@ for (const file of commandFiles) {
 client.once(Events.ClientReady, async () => {
   console.log(`✅ Bot online como ${client.user.tag}`);
 
-  // Deploy commands logic
   const commands = [];
   for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
@@ -96,28 +96,27 @@ client.on(Events.InteractionCreate, async interaction => {
       await command.execute(interaction);
     } catch (error) {
       console.error(error);
+      const replyOptions = { content: 'Erro ao executar o comando!', flags: [InteractionResponseFlags.Ephemeral] };
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: 'Erro ao executar o comando!', ephemeral: true });
+        await interaction.followUp(replyOptions);
       } else {
-        await interaction.reply({ content: 'Erro ao executar o comando!', ephemeral: true });
+        await interaction.reply(replyOptions);
       }
     }
   } else if (interaction.isButton()) {
-    const [action, subAction, ...args] = interaction.customId.split('_');
-    const requesterId = args[0];
-    const raidId = args[1]; 
+    const [action, subAction, requesterId, raidId] = interaction.customId.split('_');
 
     if (action === 'raid') {
       try {
-        if(subAction === 'vc_opt_in') {
-            await handleVoiceOptIn(interaction, requesterId, raidId);
+        if (subAction === 'vc') { // vc_opt_in becomes vc_opt
+          await handleVoiceOptIn(interaction, requesterId, raidId);
         } else {
-            await handleRaidButton(interaction, subAction, requesterId, raidId);
+          await handleRaidButton(interaction, subAction, requesterId, raidId);
         }
       } catch (error) {
         console.error("Erro ao processar botão da raid:", error);
         if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'Ocorreu um erro ao processar sua ação.', ephemeral: true }).catch(() => {});
+            await interaction.reply({ content: 'Ocorreu um erro ao processar sua ação.', flags: [InteractionResponseFlags.Ephemeral] }).catch(() => {});
         }
       }
     }
@@ -130,27 +129,29 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 async function handleRaidButton(interaction, subAction, requesterId, raidId) {
+    await interaction.deferUpdate();
+
     const interactor = interaction.user;
     const isLeader = interactor.id === requesterId;
 
-    const originalRaidMessage = await interaction.channel.messages.fetch(interaction.message.id).catch(() => null);
+    // Use the raidId (which is the original message ID) to fetch the message
+    const originalRaidMessage = await interaction.channel.messages.fetch(raidId).catch(() => null);
 
     if (!originalRaidMessage) {
-        return interaction.reply({ content: "Não foi possível encontrar a mensagem de anúncio da raid original.", ephemeral: true });
+        return interaction.followUp({ content: "Não foi possível encontrar a mensagem de anúncio da raid original.", flags: [InteractionResponseFlags.Ephemeral] });
     }
     
     const thread = originalRaidMessage.thread;
-    const raidEmbed = originalRaidMessage.embeds[0];
+    const raidEmbed = EmbedBuilder.from(originalRaidMessage.embeds[0]);
     const raidRequester = await client.users.fetch(requesterId);
     
     if (isLeader && thread && interaction.channelId === thread.id) {
         if (subAction === 'start') {
-            await interaction.deferUpdate();
             await handleRaidStart(interaction, originalRaidMessage, requesterId, raidId);
             return;
         }
 
-        if (subAction === 'kick_menu') {
+        if (subAction === 'kickmenu') {
              const members = await thread.members.fetch();
              const memberOptions = Array.from(members.values())
                 .filter(m => m.id !== requesterId && client.users.cache.get(m.id) && !client.users.cache.get(m.id).bot)
@@ -161,7 +162,7 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
                 }));
 
             if (memberOptions.length === 0) {
-                return await interaction.reply({ content: 'Não há membros para expulsar.', ephemeral: true });
+                return await interaction.followUp({ content: 'Não há membros para expulsar.', flags: [InteractionResponseFlags.Ephemeral] });
             }
 
             const selectMenu = new ActionRowBuilder().addComponents(
@@ -170,11 +171,10 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
                     .setPlaceholder('Selecione um membro para expulsar')
                     .addOptions(memberOptions)
             );
-            return await interaction.reply({ content: 'Quem você gostaria de expulsar?', components: [selectMenu], ephemeral: true });
+            return await interaction.followUp({ content: 'Quem você gostaria de expulsar?', components: [selectMenu], flags: [InteractionResponseFlags.Ephemeral] });
         }
         
         if (subAction === 'close') {
-            await interaction.deferUpdate();
             raidStates.delete(raidId);
             const members = await thread.members.fetch();
             const membersToMention = Array.from(members.values()).filter(m => !client.users.cache.get(m.id)?.bot).map(m => `<@${m.id}>`).join(' ');
@@ -193,10 +193,9 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
     
     if (subAction === 'leave' && thread && interaction.channelId === thread.id) {
         if (isLeader) {
-            return await interaction.reply({ content: 'O líder não pode sair da própria raid, apenas fechá-la.', ephemeral: true });
+            return await interaction.followUp({ content: 'O líder não pode sair da própria raid, apenas fechá-la.', flags: [InteractionResponseFlags.Ephemeral] });
         }
         
-        await interaction.deferUpdate();
         await thread.send(`${interactor} saiu da equipe da raid.`);
         await thread.members.remove(interactor.id);
         
@@ -205,29 +204,27 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
             raidState.delete(interactor.id);
         }
         
-        const membersField = raidEmbed.fields.find(f => f.name === 'Membros na Equipe');
+        const membersField = raidEmbed.data.fields.find(f => f.name === 'Membros na Equipe');
         let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
         currentMembers = Math.max(1, currentMembers - 1);
         
-        const newEmbed = EmbedBuilder.from(raidEmbed).setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
+        raidEmbed.setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
         const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
         if (joinButton) {
             joinButton.setDisabled(false).setLabel('Juntar-se à Raid');
         }
-        await originalRaidMessage.edit({ embeds: [newEmbed], components: [originalRow] });
+        await originalRaidMessage.edit({ embeds: [raidEmbed], components: [originalRow] });
         
         return;
     }
 
     if (subAction === 'join') {
-        await interaction.deferUpdate();
-
         let currentThread = thread;
-        let newRaidId = raidId;
-
+        
         if (!currentThread) {
-             newRaidId = uuidv4();
+             raidStates.set(raidId, new Map()); // Use raidId from the start
+             
              currentThread = await originalRaidMessage.startThread({
                 name: `Raid de ${raidRequester.username}`,
                 autoArchiveDuration: 1440,
@@ -238,48 +235,44 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
 
             if (!currentThread) return;
 
-            raidStates.set(newRaidId, new Map());
-
             await currentThread.members.add(raidRequester.id).catch(e => console.error(`Failed to add leader ${raidRequester.id} to thread:`, e));
             await currentThread.send(`Bem-vindo, <@${raidRequester.id}>! Este é o tópico para organizar sua raid.`);
             
             const leaderControls = new ActionRowBuilder()
                 .addComponents(
-                    new ButtonBuilder().setCustomId(`raid_start_${requesterId}_${newRaidId}`).setLabel('✅ Iniciar Raid').setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId(`raid_kick_menu_${requesterId}_${newRaidId}`).setLabel('❌ Expulsar Membro').setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder().setCustomId(`raid_close_${requesterId}_${newRaidId}`).setLabel('🔒 Fechar Raid').setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder().setCustomId(`raid_vc_opt_in_${requesterId}_${newRaidId}`).setEmoji('🔉').setStyle(ButtonStyle.Primary)
+                    new ButtonBuilder().setCustomId(`raid_start_${requesterId}_${raidId}`).setLabel('✅ Iniciar Raid').setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId(`raid_kickmenu_${requesterId}_${raidId}`).setLabel('❌ Expulsar Membro').setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder().setCustomId(`raid_close_${requesterId}_${raidId}`).setLabel('🔒 Fechar Raid').setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setEmoji('🔉').setStyle(ButtonStyle.Primary)
                 );
             
-            await interaction.followUp({ content: `**Controles do Líder:**`, components: [leaderControls], ephemeral: true });
+            await interaction.followUp({ content: `**Controles do Líder:**`, components: [leaderControls], flags: [InteractionResponseFlags.Ephemeral] });
         }
 
         const members = await currentThread.members.fetch();
         if (members.has(interactor.id)) {
-            return await interaction.followUp({ content: 'Você já está nesta raid!', ephemeral: true });
+            return await interaction.followUp({ content: 'Você já está nesta raid!', flags: [InteractionResponseFlags.Ephemeral] });
         }
         
-        const membersField = raidEmbed.fields.find(f => f.name === 'Membros na Equipe');
+        const membersField = raidEmbed.data.fields.find(f => f.name === 'Membros na Equipe');
         let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
         
         if (currentMembers >= 5) {
-            return await interaction.followUp({ content: 'Esta raid já está cheia!', ephemeral: true });
+            return await interaction.followUp({ content: 'Esta raid já está cheia!', flags: [InteractionResponseFlags.Ephemeral] });
         }
 
         await currentThread.members.add(interactor.id).catch(e => console.error(`Failed to add member ${interactor.id} to thread:`, e));
         await currentThread.send(`${interactor} entrou na equipe da raid!`);
         currentMembers++;
-
-        const activeRaidId = Array.from(raidStates.keys()).find(k => k === newRaidId) || newRaidId;
-
+        
         const memberControls = new ActionRowBuilder()
             .addComponents(
-                new ButtonBuilder().setCustomId(`raid_leave_${requesterId}_${activeRaidId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId(`raid_vc_opt_in_${requesterId}_${activeRaidId}`).setEmoji('🔉').setStyle(ButtonStyle.Primary)
+                new ButtonBuilder().setCustomId(`raid_leave_${requesterId}_${raidId}`).setLabel('👋 Sair da Raid').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setEmoji('🔉').setStyle(ButtonStyle.Primary)
             );
-        await interaction.followUp({ content: '**Controles de Membro:**', components: [memberControls], ephemeral: true });
+        await interaction.followUp({ content: '**Controles de Membro:**', components: [memberControls], flags: [InteractionResponseFlags.Ephemeral] });
 
-        const newEmbed = EmbedBuilder.from(raidEmbed).setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
+        raidEmbed.setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
         const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
         
@@ -291,18 +284,18 @@ async function handleRaidButton(interaction, subAction, requesterId, raidId) {
             }
         }
         
-        await originalRaidMessage.edit({ embeds: [newEmbed], components: [originalRow] });
+        await originalRaidMessage.edit({ embeds: [raidEmbed], components: [originalRow] });
     }
 }
 
 async function handleVoiceOptIn(interaction, requesterId, raidId) {
     if (!raidId) {
-        return interaction.reply({ content: 'Não foi possível encontrar os dados desta raid para ativar o chat de voz.', ephemeral: true });
+        return interaction.reply({ content: 'Não foi possível encontrar os dados desta raid para ativar o chat de voz.', flags: [InteractionResponseFlags.Ephemeral] });
     }
 
     const raidState = raidStates.get(raidId);
     if (!raidState) {
-        return interaction.reply({ content: 'Esta raid não parece estar mais ativa.', ephemeral: true });
+        return interaction.reply({ content: 'Esta raid não parece estar mais ativa.', flags: [InteractionResponseFlags.Ephemeral] });
     }
 
     const userHasOptedIn = raidState.get(interaction.user.id) || false;
@@ -312,7 +305,7 @@ async function handleVoiceOptIn(interaction, requesterId, raidId) {
         ? 'Você ativou a entrada automática no chat de voz quando a raid começar.'
         : 'Você desativou a entrada automática no chat de voz.';
     
-    await interaction.reply({ content: feedbackMessage, ephemeral: true });
+    await interaction.reply({ content: feedbackMessage, flags: [InteractionResponseFlags.Ephemeral] });
 }
 
 async function handleRaidStart(interaction, originalRaidMessage, requesterId, raidId) {
@@ -358,15 +351,16 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
 
         const guildMember = await interaction.guild.members.fetch(user.id).catch(() => null);
 
-        if (voiceChannel && raidState && raidState.get(user.id)) {
-             if (guildMember && guildMember.voice.channel) {
-                await guildMember.voice.setChannel(voiceChannel).catch(e => console.log(`Failed to move ${guildMember.displayName}: ${e.message}`));
-            }
-        } else if (voiceChannel) {
+        if (voiceChannel && raidState && raidState.get(user.id) && guildMember) {
+            await guildMember.voice.setChannel(voiceChannel).catch(e => console.log(`Failed to move ${guildMember.displayName}: ${e.message}`));
+        }
+        
+        if(voiceChannel && (!raidState || !raidState.get(user.id))){
              const joinVCButton = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setLabel('Juntar-se ao Chat de Voz').setStyle(ButtonStyle.Link).setURL(voiceChannel.url)
             );
             try {
+                // We can't update ephemeral messages, so we send a new one
                 await user.send({ content: `A raid começou e um chat de voz foi criado!`, components: [joinVCButton] });
             } catch (dmError) {
                 console.log(`Could not DM user ${user.id}`);
@@ -398,14 +392,17 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
 
 async function handleRaidKick(interaction, requesterId, raidId) {
     if (interaction.user.id !== requesterId) {
-        return await interaction.reply({ content: 'Apenas o líder da raid pode executar esta ação.', ephemeral: true });
+        return await interaction.reply({ content: 'Apenas o líder da raid pode executar esta ação.', flags: [InteractionResponseFlags.Ephemeral] });
     }
     const memberToKickId = interaction.values[0];
     
-    const originalRaidMessage = await interaction.channel.messages.fetch(interaction.message.reference.messageId).catch(() => null);
+    // We need to fetch the original message from the original channel, not the thread.
+    const raidChannelId = '1395591154208084049'; 
+    const raidChannel = await client.channels.fetch(raidChannelId);
+    const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
 
     if (!originalRaidMessage || !originalRaidMessage.thread) {
-        return await interaction.reply({ content: 'Não foi possível encontrar a raid ou o tópico associado.', ephemeral: true });
+        return await interaction.reply({ content: 'Não foi possível encontrar a raid ou o tópico associado.', flags: [InteractionResponseFlags.Ephemeral] });
     }
 
     const thread = originalRaidMessage.thread;
@@ -430,22 +427,22 @@ async function handleRaidKick(interaction, requesterId, raidId) {
             raidState.delete(memberToKickId);
         }
 
-        const raidEmbed = originalRaidMessage.embeds[0];
-        const membersField = raidEmbed.fields.find(f => f.name === 'Membros na Equipe');
+        const raidEmbed = EmbedBuilder.from(originalRaidMessage.embeds[0]);
+        const membersField = raidEmbed.data.fields.find(f => f.name === 'Membros na Equipe');
         let [currentMembers, maxMembers] = membersField.value.split('/').map(Number);
         currentMembers = Math.max(1, currentMembers - 1);
         
-        const newEmbed = EmbedBuilder.from(raidEmbed).setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
+        raidEmbed.setFields({ name: 'Membros na Equipe', value: `${currentMembers}/${maxMembers}`, inline: true });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);
         const joinButton = originalRow.components.find(c => c.data.custom_id?.startsWith('raid_join'));
         if (joinButton) {
             joinButton.setDisabled(false).setLabel('Juntar-se à Raid');
         }
-        await originalRaidMessage.edit({ embeds: [newEmbed], components: [originalRow] });
+        await originalRaidMessage.edit({ embeds: [raidEmbed], components: [originalRow] });
 
     } catch(err) {
         console.error("Erro ao expulsar membro:", err);
-        await interaction.followUp({ content: 'Não foi possível expulsar o membro.', ephemeral: true });
+        await interaction.followUp({ content: 'Não foi possível expulsar o membro.', flags: [InteractionResponseFlags.Ephemeral] });
     }
 }
 

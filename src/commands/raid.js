@@ -26,18 +26,14 @@ export default {
         )),
 
   async execute(interaction) {
-    await interaction.reply({
-      content: "Pensando no seu caso...🤔💡",
-      ephemeral: true
-    });
-
     const nivel = interaction.options.getString('nivel');
     const dificuldade = interaction.options.getString('dificuldade');
     const user = interaction.user;
 
     const robloxUsername = user.username;
 
-    const joinButtonId = `raid_join_${user.id}`;
+    // A raidId will be the interaction ID itself for uniqueness initially
+    const joinButtonId = `raid_join_${user.id}_${interaction.id}`;
 
     const embed = new EmbedBuilder()
       .setTitle("📢 Novo Pedido de Ajuda em Raid!")
@@ -64,25 +60,28 @@ export default {
           .setEmoji('🤝')
       );
 
-    const raidChannelId = '1395591154208084049';
+    const raidChannelId = '1395591154208084049'; 
     const channel = interaction.client.channels.cache.get(raidChannelId);
 
     if (channel) {
       try {
         await channel.send({ embeds: [embed], components: [row] });
-        await interaction.editReply({
-          content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`
+        await interaction.reply({
+          content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`,
+          ephemeral: true
         });
       } catch (err) {
         console.error("Erro ao enviar a mensagem para o canal:", err);
-        await interaction.editReply({
-          content: 'Não consegui enviar o anúncio no canal de raids. Verifique minhas permissões!'
+        await interaction.reply({
+          content: 'Não consegui enviar o anúncio no canal de raids. Verifique minhas permissões!',
+          ephemeral: true
         });
       }
     } else {
       console.error(`Canal com ID ${raidChannelId} não encontrado.`);
-      await interaction.editReply({
-        content: 'Não encontrei o canal para anunciar a raid. Avise um administrador!'
+      await interaction.reply({
+        content: 'Não encontrei o canal para anunciar a raid. Avise um administrador!',
+        ephemeral: true
       });
     }
   }
