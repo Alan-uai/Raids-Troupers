@@ -10,8 +10,8 @@ export default {
       option.setName('dificuldade').setDescription('Dificuldade').setRequired(true))
     .addStringOption(option =>
         option.setName('tipo-chat')
-            .setDescription('Escolha o tipo de canal de discussão para a raid')
-            .setRequired(true)
+            .setDescription('Escolha o tipo de canal de discussão para a raid (padrão: Texto)')
+            .setRequired(false) // Tornou-se opcional
             .addChoices(
                 { name: 'Texto', value: 'texto' },
                 { name: 'Voz', value: 'voz' }
@@ -25,7 +25,8 @@ export default {
 
     const nivel = interaction.options.getString('nivel');
     const dificuldade = interaction.options.getString('dificuldade');
-    const tipoChat = interaction.options.getString('tipo-chat');
+    // Pega o tipo de chat ou define 'texto' como padrão
+    const tipoChat = interaction.options.getString('tipo-chat') ?? 'texto';
     const user = interaction.user;
 
     const robloxUsername = user.username;
@@ -64,22 +65,20 @@ export default {
     if (channel) {
       try {
         await channel.send({ embeds: [embed], components: [row] });
-        await interaction.followUp({
-          content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`,
-          ephemeral: true
+        // Edita a resposta inicial em vez de usar followUp
+        await interaction.editReply({
+          content: `Mandei pros Hunters, vai lá ver <#${raidChannelId}> 😏`
         });
       } catch (err) {
         console.error("Erro ao enviar a mensagem para o canal:", err);
-        await interaction.followUp({
-          content: 'Não consegui enviar o anúncio no canal de raids. Verifique minhas permissões!',
-          ephemeral: true
+        await interaction.editReply({
+          content: 'Não consegui enviar o anúncio no canal de raids. Verifique minhas permissões!'
         });
       }
     } else {
       console.error(`Canal com ID ${raidChannelId} não encontrado.`);
-      await interaction.followUp({
-        content: 'Não encontrei o canal para anunciar a raid. Avise um administrador!',
-        ephemeral: true
+      await interaction.editReply({
+        content: 'Não encontrei o canal para anunciar a raid. Avise um administrador!'
       });
     }
   }
