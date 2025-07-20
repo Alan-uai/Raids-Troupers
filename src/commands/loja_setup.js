@@ -1,5 +1,5 @@
 
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField, StringSelectMenuBuilder } from 'discord.js';
 import { shopItems } from '../shop-items.js';
 import { getTranslator } from '../i18n.js';
 
@@ -22,28 +22,31 @@ async function updateShopMessage(client, t) {
     shopItems.forEach(item => {
         embed.addFields({
             name: `${t(`item_${item.id}_name`)} - ${item.price} TC`,
-            value: `*${t(`item_${item.id}_description`)}*`,
+            value: `\`\`\`${t(`item_${item.id}_description`)}\`\`\``,
             inline: false,
         });
     });
-
-    const rows = [];
-    let currentRow = new ActionRowBuilder();
-
-    shopItems.forEach((item, index) => {
-        currentRow.addComponents(
-            new ButtonBuilder()
-                .setCustomId(`buy_${item.id}`)
-                .setLabel(t('buy_button_label', { itemName: t(`item_${item.id}_name`) }))
-                .setStyle(ButtonStyle.Success)
-                .setEmoji('🛒')
+    
+    const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId('shop_select_item')
+        .setPlaceholder(t('shop_select_placeholder'))
+        .addOptions(
+            shopItems.map(item => ({
+                label: t(`item_${item.id}_name`),
+                description: t('shop_select_item_desc', { price: item.price }),
+                value: item.id,
+            }))
         );
 
-        if (currentRow.components.length === 5 || index === shopItems.length - 1) {
-            rows.push(currentRow);
-            currentRow = new ActionRowBuilder();
-        }
-    });
+    const buyButton = new ButtonBuilder()
+        .setCustomId('shop_buy_button')
+        .setLabel(t('shop_buy_button_label'))
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('🛒');
+
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+    const buttonRow = new ActionRowRowBuilder().addComponents(buyButton);
+
 
     try {
         const messages = await shopChannel.messages.fetch({ limit: 10 });
@@ -51,9 +54,9 @@ async function updateShopMessage(client, t) {
 
         if (botMessage) {
             shopMessageId = botMessage.id;
-            await botMessage.edit({ embeds: [embed], components: rows });
+            await botMessage.edit({ embeds: [embed], components: [row, buttonRow] });
         } else {
-            const newMessage = await shopChannel.send({ embeds: [embed], components: rows });
+            const newMessage = await shopChannel.send({ embeds: [embed], components: [row, buttonRow] });
             shopMessageId = newMessage.id;
         }
     } catch (error) {

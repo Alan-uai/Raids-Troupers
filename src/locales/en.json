@@ -119,6 +119,8 @@
     "buy_interaction_success": "✅ You successfully bought **{itemName}**! Your new balance is {balance} TC.",
     "buy_interaction_fail_coins": "💰 You don't have enough Troup Coins to buy **{itemName}**.",
     "buy_interaction_fail_owned": "🤔 You already own **{itemName}**.",
+    "buy_profile_not_found": "❌ Your profile was not found. Please use the `/perfil` command first to create your profile before buying items.",
+    "buy_no_item_selected": "❌ Please select an item from the menu before clicking the buy button.",
 
     "bid_no_active_auction": "❌ There are no active auctions at the moment.",
     "bid_auction_ended": "❌ This auction has already ended!",
@@ -151,12 +153,16 @@
     "inventory_footer": "Use /equipar <item_id> to use an item.",
     
     "shop_title": "🛒 Troupers Store",
-    "shop_description": "Click the buttons below to purchase items for your profile!",
+    "shop_description": "Select an item from the menu and click the button to purchase!",
     "shop_ephemeral_description": "Here are the items available for purchase.",
     "shop_ephemeral_footer": "Use the /comprar <ID> command to get an item.",
     "shop_channel_not_found": "Shop channel not found. Please contact an administrator.",
     "shop_updating_message": "Updating shop message...",
     "shop_updated": "The shop message has been updated in <#{channelId}>.",
+    "shop_select_placeholder": "Select an item to buy",
+    "shop_select_item_desc": "Price: {price} TC",
+    "shop_buy_button_label": "Buy Selected Item",
+    "shop_item_selected": "✅ Item selected. Now click the 'Buy' button to complete the purchase.",
 
     "missions_none_active": "You don't have any active missions at the moment.",
     "missions_embed_title": "📜 {username}'s Missions",
@@ -236,5 +242,10 @@
     "auction_ended_desc": "The auction for **{itemName}** has finished.",
     "auction_no_bids": "No bids were made.",
     "auction_winner_footer": "The item has been added to the winner's inventory.",
-    "auction_winner_dm": "Congratulations! You won the auction for **{itemName}** with a bid of {bid} TC. The item is now in your inventory! Use /equipar to use it."
+    "auction_winner_dm": "Congratulations! You won the auction for **{itemName}** with a bid of {bid} TC. The item is now in your inventory! Use /equipar to use it.",
+
+    "profile_show": "Here is your current profile:",
+    "profile_creation_error_category": "Error: The profile category channel was not found. Please contact an administrator.",
+    "profile_creation_success": "✅ Your profile and private channel have been successfully created! You can see it here: <#{channelId}>",
+    "profile_creation_error_generic": "An unexpected error occurred while creating your profile."
 }

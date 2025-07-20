@@ -119,6 +119,8 @@
     "buy_interaction_success": "✅ Você comprou **{itemName}** com sucesso! Seu novo saldo é de {balance} TC.",
     "buy_interaction_fail_coins": "💰 Você não tem Troup Coins suficientes para comprar **{itemName}**.",
     "buy_interaction_fail_owned": "🤔 Você já possui o item **{itemName}**.",
+    "buy_profile_not_found": "❌ Seu perfil não foi encontrado. Por favor, use o comando `/perfil` primeiro para criar seu perfil antes de comprar itens.",
+    "buy_no_item_selected": "❌ Por favor, selecione um item no menu antes de clicar no botão comprar.",
 
     "bid_no_active_auction": "❌ Não há nenhum leilão ativo no momento.",
     "bid_auction_ended": "❌ Este leilão já terminou!",
@@ -151,12 +153,16 @@
     "inventory_footer": "Use /equipar <item_id> para usar um item.",
     
     "shop_title": "🛒 Loja Troupers",
-    "shop_description": "Clique nos botões abaixo para adquirir itens para seu perfil!",
+    "shop_description": "Selecione um item no menu e clique no botão para adquirir!",
     "shop_ephemeral_description": "Estes são os itens disponíveis para compra.",
     "shop_ephemeral_footer": "Use o comando /comprar <ID> para adquirir um item.",
     "shop_channel_not_found": "Canal da loja não encontrado. Por favor, contate um administrador.",
     "shop_updating_message": "Atualizando a mensagem da loja...",
     "shop_updated": "A mensagem da loja foi atualizada em <#{channelId}>.",
+    "shop_select_placeholder": "Selecione um item para comprar",
+    "shop_select_item_desc": "Preço: {price} TC",
+    "shop_buy_button_label": "Comprar Item Selecionado",
+    "shop_item_selected": "✅ Item selecionado. Agora clique no botão 'Comprar' para finalizar a compra.",
 
     "missions_none_active": "Você não tem nenhuma missão ativa no momento.",
     "missions_embed_title": "📜 Missões de {username}",
@@ -236,5 +242,10 @@
     "auction_ended_desc": "O leilão para **{itemName}** terminou.",
     "auction_no_bids": "Nenhum lance foi feito.",
     "auction_winner_footer": "O item foi adicionado ao inventário do vencedor.",
-    "auction_winner_dm": "Parabéns! Você venceu o leilão para **{itemName}** com um lance de {bid} TC. O item já está no seu inventário! Use /equipar para usá-lo."
+    "auction_winner_dm": "Parabéns! Você venceu o leilão para **{itemName}** com um lance de {bid} TC. O item já está no seu inventário! Use /equipar para usá-lo.",
+
+    "profile_show": "Aqui está o seu perfil atual:",
+    "profile_creation_error_category": "Erro: A categoria de perfis não foi encontrada. Por favor, contate um administrador.",
+    "profile_creation_success": "✅ Seu perfil e canal privado foram criados com sucesso! Você pode vê-lo aqui: <#{channelId}>",
+    "profile_creation_error_generic": "Ocorreu um erro inesperado ao criar seu perfil."
 }

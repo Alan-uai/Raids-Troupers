@@ -52,6 +52,7 @@ const pendingRatings = new Map();
 const userMissions = new Map();
 const clans = new Map();
 const pendingInvites = new Map();
+const userShopSelection = new Map();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,7 +88,7 @@ client.on(Events.InteractionCreate, async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
 
-    if (!userMissions.has(interaction.user.id)) {
+    if (!userMissions.has(interaction.user.id) && userProfiles.has(interaction.user.id)) {
         assignMissions(interaction.user.id, userMissions);
     }
     
@@ -118,18 +119,21 @@ client.on(Events.InteractionCreate, async interaction => {
     } else if (action === 'rate') {
         const [type, raterId, ratedId] = args;
         await handleRating(interaction, raterId, ratedId, type, t);
-    } else if (action === 'buy') {
-        await handleBuyButton(interaction, args[0], t);
+    } else if (interaction.customId === 'shop_buy_button') {
+        await handleBuyButton(interaction, t);
     }
 
   } else if (interaction.isStringSelectMenu()) {
-      const [action, subAction, ...args] = interaction.customId.split('_');
-      if (action === 'raid' && subAction === 'kick') {
+      const [action, ...args] = interaction.customId.split('_');
+      if (action === 'raid' && args[0] === 'kick') {
           const [requesterId, raidId] = args;
           await handleRaidKick(interaction, requesterId, raidId, t);
-      } else if (action === 'rating' && subAction === 'select') {
+      } else if (action === 'rating' && args[0] === 'select') {
           const [raterId] = args;
           await handleRatingSelection(interaction, raterId, t);
+      } else if (action === 'shop' && args[0] === 'select' && args[1] === 'item') {
+          userShopSelection.set(interaction.user.id, interaction.values[0]);
+          await interaction.reply({ content: t('shop_item_selected'), ephemeral: true });
       }
   }
 });
@@ -389,7 +393,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
         if (voiceChannel && raidState?.get(user.id) && guildMember?.voice.channelId !== voiceChannel.id) {
             await guildMember.voice.setChannel(voiceChannel).catch(e => console.log(`Failed to move ${guildMember.displayName}: ${e.message}`));
         } else if (voiceChannel && !raidState?.get(user.id)) {
-            const joinVCButton = new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel(userT('join_voice_chat_button')).setStyle(ButtonStyle.Link).setURL(voiceChannel.url));
+            const joinVCButton = new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(voiceChannel.url));
             try { await user.send({ content: userT('raid_started_vc_created'), components: [joinVCButton] }); } catch (dmError) { console.log(`Could not DM user ${user.id}`); }
         }
     }
@@ -568,18 +572,27 @@ async function handleRating(interaction, raterId, ratedId, type, t) {
     }
 }
 
-async function handleBuyButton(interaction, itemId, t) {
+async function handleBuyButton(interaction, t) {
     const userId = interaction.user.id;
-    const itemToBuy = shopItems.find(item => item.id === itemId);
+    
+    if (!userProfiles.has(userId)) {
+        return await interaction.reply({ content: t('buy_profile_not_found'), ephemeral: true });
+    }
+    
+    const itemId = userShopSelection.get(userId);
+    if (!itemId) {
+        return await interaction.reply({ content: t('buy_no_item_selected'), ephemeral: true });
+    }
 
+    const itemToBuy = shopItems.find(item => item.id === itemId);
     if (!itemToBuy) {
-        return; // Should not happen if buttons are generated from shopItems
+        return; 
     }
     
     await interaction.deferReply({ ephemeral: true });
 
     const stats = userStats.get(userId);
-    const items = userItems.get(userId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
+    const items = userItems.get(userId);
 
     if (items.inventory.includes(itemId)) {
       return await interaction.editReply({ content: t('buy_interaction_fail_owned', { itemName: t(`item_${itemToBuy.id}_name`) }) });
@@ -594,6 +607,8 @@ async function handleBuyButton(interaction, itemId, t) {
 
     userStats.set(userId, stats);
     userItems.set(userId, items);
+    
+    userShopSelection.delete(userId);
     
     await interaction.editReply({ content: t('buy_interaction_success', { itemName: t(`item_${itemToBuy.id}_name`), balance: stats.coins }) });
 }
@@ -662,6 +677,8 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
             return;
         }
 
+        if (userProfiles.has(newMember.id)) return;
+
         try {
             const userLocale = newMember.user.locale || 'pt-BR';
             const t = await getTranslator(newMember.id, userStats, userLocale);
@@ -678,11 +695,10 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
             console.log(`Channel #${channel.name} created for ${newMember.displayName}.`);
             
-            const stats = userStats.get(newMember.id) || { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale };
-            stats.locale = userLocale;
+            const stats = { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale };
             userStats.set(newMember.id, stats);
 
-            const items = userItems.get(newMember.id) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
+            const items = { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
             userItems.set(newMember.id, items);
 
             assignMissions(newMember.id, userMissions);
