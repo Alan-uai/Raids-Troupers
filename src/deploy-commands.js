@@ -1,3 +1,4 @@
+
 // src/deploy-commands.js
 
 // Este script é usado para registrar/atualizar os slash commands
@@ -17,22 +18,22 @@ const __dirname = path.dirname(__filename);
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-// Apenas importa a propriedade 'data' para evitar carregar dependências pesadas
+// Itera sobre cada arquivo de comando para carregar seus dados
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
     try {
-        // Carrega o módulo dinamicamente
+        // Usa import() dinâmico para carregar o módulo
         const commandModule = await import(filePath);
         const command = commandModule.default;
         
-        // Verifica se a propriedade 'data' existe antes de adicioná-la
+        // Verifica se o comando tem as propriedades 'data' e 'execute' necessárias
         if (command && 'data' in command) {
             commands.push(command.data.toJSON());
         } else {
             console.log(`[AVISO] O comando em ${filePath} está faltando a propriedade "data" ou está malformado.`);
         }
     } catch (error) {
-        console.error(`Erro ao carregar os dados do comando de ${filePath}:`, error);
+        console.error(`[ERRO] Falha ao carregar o comando em ${filePath}:`, error);
     }
 }
 
@@ -45,10 +46,11 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
         // Verifica se há comandos para registrar
         if (commands.length === 0) {
-            console.log('Nenhum comando encontrado para registrar.');
+            console.log('Nenhum comando válido encontrado para registrar.');
             return;
         }
 
+        // O método 'put' é usado para atualizar completamente todos os comandos no servidor
         const data = await rest.put(
             Routes.applicationCommands(process.env.CLIENT_ID),
             { body: commands },
