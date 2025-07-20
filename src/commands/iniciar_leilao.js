@@ -23,7 +23,7 @@ export default {
     const t = await getTranslator(interaction.user.id, userStats); 
     const itemId = interaction.options.getString('item_id');
     const durationMinutes = interaction.options.getInteger('duracao_minutos');
-    const auctionChannelId = '1396200543665651752'; 
+    const auctionChannelId = '1396200543665651752'; // TODO: Substituir pelo ID do canal #leiloes
 
     const itemToAuction = rareItems.find(item => item.id === itemId);
 

@@ -197,17 +197,17 @@ async function handleRaidButton(interaction, subAction, args, t) {
     const interactor = interaction.user;
     const [requesterId, raidId] = args;
     const isLeader = interactor.id === requesterId;
-
-    await interaction.deferUpdate().catch(console.error);
     
-    const raidChannelId = '1395591154208084049';
+    const raidChannelId = '1395591154208084049'; // TODO: Substituir pelo ID do canal #annun-raids
     const raidChannel = await client.channels.fetch(raidChannelId);
     const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
 
     if (!originalRaidMessage) {
-        return interaction.followUp({ content: t('raid_original_message_not_found'), ephemeral: true });
+        await interaction.reply({ content: t('raid_original_message_not_found'), ephemeral: true });
+        return;
     }
-
+    
+    await interaction.deferUpdate().catch(console.error);
     const thread = originalRaidMessage.thread;
     const raidEmbed = EmbedBuilder.from(originalRaidMessage.embeds[0]);
     const raidRequester = await client.users.fetch(requesterId);
@@ -316,7 +316,7 @@ async function handleControlsButton(interaction, requesterId, raidId, t) {
 async function handleVoiceOptIn(interaction, raidId, t) {
     if (!raidId) return interaction.reply({ content: t('vc_raid_data_not_found'), ephemeral: true });
 
-    const raidChannelId = '1395591154208084049';
+    const raidChannelId = '1395591154208084049'; // TODO: Substituir pelo ID do canal #annun-raids
     const raidChannel = await client.channels.fetch(raidChannelId);
     const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
     if (!originalRaidMessage) return interaction.reply({ content: t('vc_raid_not_active'), ephemeral: true });
@@ -421,7 +421,7 @@ async function handleRaidKick(interaction, requesterId, raidId, t) {
     }
     const memberToKickId = interaction.values[0];
 
-    const raidChannelId = '1395591154208084049'; 
+    const raidChannelId = '1395591154208084049'; // TODO: Substituir pelo ID do canal #annun-raids
     const raidChannel = await client.channels.fetch(raidChannelId);
     const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
 
@@ -619,7 +619,7 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
 
 client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     const roleName = 'limpo';
-    const categoryId = '1395589412661887068'; 
+    const categoryId = '1395589412661887068'; // TODO: Substituir pelo ID da categoria #perfis
 
     const oldHasRole = oldMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
     const newHasRole = newMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
