@@ -2,17 +2,20 @@ import { SlashCommandBuilder, AttachmentBuilder } from 'discord.js';
 import { shopItems } from '../shop-items.js';
 import { rareItems } from '../rare-items.js';
 import { generateProfileImage } from '../profile-generator.js';
-
+import { getTranslator } from '../i18n.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('equipar')
     .setDescription('Equipe um item do seu inventário.')
+    .setDescriptionLocalizations({ "en-US": "Equip an item from your inventory." })
     .addStringOption(option =>
       option.setName('item_id')
         .setDescription('O ID do item que você deseja equipar.')
+        .setDescriptionLocalizations({ "en-US": "The ID of the item you want to equip." })
         .setRequired(true)),
-  async execute(interaction, { userStats, userItems, userProfiles }) {
+  async execute(interaction, { userStats, userItems, userProfiles, clans }) {
+    const t = await getTranslator(interaction.user.id, userStats);
     await interaction.deferReply({ ephemeral: true });
 
     const itemId = interaction.options.getString('item_id');
@@ -21,37 +24,37 @@ export default {
     const items = userItems.get(userId);
 
     if (!items || !items.inventory.includes(itemId)) {
-      return await interaction.editReply({ content: '❌ Você não possui este item.', ephemeral: true });
+      return await interaction.editReply({ content: t('equip_not_owned'), ephemeral: true });
     }
     
     const allItems = [...shopItems, ...rareItems];
     const itemToEquip = allItems.find(item => item.id === itemId);
 
     if (!itemToEquip) {
-        return await interaction.editReply({ content: '❌ Esse item não parece mais existir.', ephemeral: true });
+        return await interaction.editReply({ content: t('equip_item_not_exist'), ephemeral: true });
     }
 
-    // Lógica para equipar diferentes tipos de item
+    let replyMessage = '';
+
     if (itemToEquip.type === 'background') {
         items.equippedBackground = itemToEquip.url;
-        await interaction.editReply({ content: `✅ Você equipou o fundo **${itemToEquip.name}**! Seu perfil foi atualizado.`, ephemeral: true });
+        replyMessage = t('equip_background_success', { itemName: t(`item_${itemToEquip.id}_name`) });
     } else if (itemToEquip.type === 'title') {
-        items.equippedTitle = itemToEquip.name;
-         await interaction.editReply({ content: `✅ Você equipou o título **${itemToEquip.name}**! Seu perfil foi atualizado.`, ephemeral: true });
+        items.equippedTitle = itemToEquip.id; // Store ID, not name
+        replyMessage = t('equip_title_success', { itemName: t(`item_${itemToEquip.id}_name`) });
     } else {
-        return await interaction.editReply({ content: '❌ Este tipo de item não pode ser equipado diretamente.', ephemeral: true });
+        return await interaction.editReply({ content: t('equip_cannot_equip_type'), ephemeral: true });
     }
 
     userItems.set(userId, items);
     
-    // Atualizar a imagem do perfil
     const profileInfo = userProfiles.get(userId);
     if (profileInfo?.channelId && profileInfo?.messageId) {
         try {
             const stats = userStats.get(userId);
             const member = await interaction.guild.members.fetch(userId);
 
-            const newProfileImageBuffer = await generateProfileImage(member, stats, items);
+            const newProfileImageBuffer = await generateProfileImage(member, stats, items, clans, t);
             const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
 
             const profileChannel = await interaction.client.channels.fetch(profileInfo.channelId);
@@ -60,9 +63,10 @@ export default {
             await profileMessage.edit({ files: [newAttachment] });
 
         } catch (updateError) {
-            console.error(`Falha ao editar a imagem de perfil para ${userId}:`, updateError);
-            // A mensagem de resposta já foi enviada, então apenas logamos o erro.
+            console.error(`Failed to update profile image for ${userId}:`, updateError);
         }
     }
+    
+    await interaction.editReply({ content: replyMessage, ephemeral: true });
   },
 };

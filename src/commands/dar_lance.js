@@ -1,36 +1,39 @@
-// src/commands/dar_lance.js
 import { SlashCommandBuilder } from 'discord.js';
+import { getTranslator } from '../i18n.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('dar_lance')
     .setDescription('Faça um lance no leilão ativo.')
+    .setDescriptionLocalizations({ "en-US": "Place a bid in the active auction." })
     .addIntegerOption(option =>
       option.setName('valor')
         .setDescription('A quantidade de Troup Coins que você deseja ofertar.')
+        .setDescriptionLocalizations({ "en-US": "The amount of Troup Coins you want to bid." })
         .setRequired(true)),
   async execute(interaction, { activeAuctions, userStats }) {
+    const t = await getTranslator(interaction.user.id, userStats);
     const bidAmount = interaction.options.getInteger('valor');
     const userId = interaction.user.id;
 
     const auction = activeAuctions.get('current_auction');
 
     if (!auction) {
-      return await interaction.reply({ content: '❌ Não há nenhum leilão ativo no momento.', ephemeral: true });
+      return await interaction.reply({ content: t('bid_no_active_auction'), ephemeral: true });
     }
 
     if (new Date() > auction.endTime) {
-      return await interaction.reply({ content: '❌ Este leilão já terminou!', ephemeral: true });
+      return await interaction.reply({ content: t('bid_auction_ended'), ephemeral: true });
     }
     
     const item = auction.item;
     if (bidAmount < item.min_bid) {
-        return await interaction.reply({ content: `❌ Seu lance precisa ser de no mínimo ${item.min_bid} Troup Coins.`, ephemeral: true });
+        return await interaction.reply({ content: t('bid_too_low', { min_bid: item.min_bid }), ephemeral: true });
     }
 
     const stats = userStats.get(userId);
     if (!stats || stats.coins < bidAmount) {
-      return await interaction.reply({ content: `💰 Você não tem Troup Coins suficientes para fazer esse lance.`, ephemeral: true });
+      return await interaction.reply({ content: t('bid_not_enough_coins'), ephemeral: true });
     }
 
     const currentBids = auction.bids;
@@ -38,12 +41,11 @@ export default {
     const highestBid = highestBidEntry ? highestBidEntry[1] : 0;
     
     if (bidAmount <= highestBid) {
-        return await interaction.reply({ content: `❌ Você precisa fazer um lance maior que o lance atual de ${highestBid} TC.`, ephemeral: true });
+        return await interaction.reply({ content: t('bid_must_be_higher', { highestBid }), ephemeral: true });
     }
 
-    // Armazena o lance do usuário
     currentBids.set(userId, bidAmount);
     
-    await interaction.reply({ content: `✅ Seu lance de **${bidAmount} TC** para **${item.name}** foi registrado com sucesso! Você será notificado se for o vencedor.`, ephemeral: true });
+    await interaction.reply({ content: t('bid_success', { bidAmount, itemName: t(`item_${item.id}_name`) }), ephemeral: true });
   },
 };

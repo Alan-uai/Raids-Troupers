@@ -1,57 +1,62 @@
-// src/commands/cla_convidar.js
 import { SlashCommandBuilder } from 'discord.js';
+import { getTranslator } from '../i18n.js';
 
 export default {
     data: new SlashCommandBuilder()
         .setName('cla_convidar')
         .setDescription('Convida um jogador para o seu clã.')
+        .setDescriptionLocalizations({
+            "en-US": "Invites a player to your clan."
+        })
         .addUserOption(option =>
             option.setName('usuario')
                 .setDescription('O jogador que você deseja convidar.')
+                .setDescriptionLocalizations({ "en-US": "The player you want to invite." })
                 .setRequired(true)),
     async execute(interaction, { userStats, clans, pendingInvites }) {
+        const t = await getTranslator(interaction.user.id, userStats);
+        
         const leaderId = interaction.user.id;
         const memberToInvite = interaction.options.getUser('usuario');
 
         if (memberToInvite.bot) {
-            return await interaction.reply({ content: '❌ Você não pode convidar bots para um clã.', ephemeral: true });
+            return await interaction.reply({ content: t('clan_invite_no_bots'), ephemeral: true });
         }
 
         if (memberToInvite.id === leaderId) {
-            return await interaction.reply({ content: '❌ Você não pode convidar a si mesmo.', ephemeral: true });
+            return await interaction.reply({ content: t('clan_invite_self'), ephemeral: true });
         }
 
         const leaderStats = userStats.get(leaderId);
         if (!leaderStats || !leaderStats.clanId) {
-            return await interaction.reply({ content: '❌ Você não está em um clã para poder convidar.', ephemeral: true });
+            return await interaction.reply({ content: t('clan_invite_not_in_clan'), ephemeral: true });
         }
 
         const clan = Array.from(clans.values()).find(c => c.id === leaderStats.clanId);
         if (!clan || clan.leader !== leaderId) {
-            return await interaction.reply({ content: '❌ Apenas o líder do clã pode convidar novos membros.', ephemeral: true });
+            return await interaction.reply({ content: t('clan_invite_not_leader'), ephemeral: true });
         }
 
         const memberStats = userStats.get(memberToInvite.id);
         if (memberStats && memberStats.clanId) {
-            return await interaction.reply({ content: `❌ ${memberToInvite.username} já faz parte de um clã.`, ephemeral: true });
+            return await interaction.reply({ content: t('clan_invite_already_in_clan', { username: memberToInvite.username }), ephemeral: true });
         }
 
-        // Adiciona o convite pendente
         const userInvites = pendingInvites.get(memberToInvite.id) || new Set();
         userInvites.add(clan.name.toLowerCase());
         pendingInvites.set(memberToInvite.id, userInvites);
 
-        await interaction.reply({ content: `✅ Convite enviado para **${memberToInvite.username}** para se juntar ao clã **${clan.name}**.`, ephemeral: true });
+        await interaction.reply({ content: t('clan_invite_sent', { username: memberToInvite.username, clanName: clan.name }), ephemeral: true });
 
-        // Enviar DM para o usuário convidado
         try {
+            const memberT = await getTranslator(memberToInvite.id, userStats);
             await memberToInvite.send(
-                `⚔️ Você foi convidado por **${interaction.user.username}** para se juntar ao clã **${clan.name}**!\n` +
-                `Use o comando \`/cla_aceitar nome_do_cla:${clan.name}\` para aceitar.`
+                memberT('clan_invite_dm_notification', { username: interaction.user.username, clanName: clan.name }) +
+                memberT('clan_invite_dm_instructions', { clanName: clan.name })
             );
         } catch (e) {
-            console.log(`Não foi possível enviar DM de convite para ${memberToInvite.username}.`);
-            await interaction.followUp({ content: `⚠️ Não foi possível notificar ${memberToInvite.username} por DM, mas o convite está ativo.`, ephemeral: true });
+            console.log(`Could not send invite DM to ${memberToInvite.username}.`);
+            await interaction.followUp({ content: t('clan_invite_dm_fail', { username: memberToInvite.username }), ephemeral: true });
         }
     },
 };
