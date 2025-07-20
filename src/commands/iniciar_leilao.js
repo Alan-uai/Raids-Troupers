@@ -6,16 +6,16 @@ export default {
   data: new SlashCommandBuilder()
     .setName('iniciar_leilao')
     .setDescription('[Admin] Inicia um leilão para um item raro.')
-    .setDescriptionLocalizations({ "[en-US]": "[Admin] Starts an auction for a rare item." })
+    .setDescriptionLocalizations({ "en-US": "[Admin] Starts an auction for a rare item." })
     .addStringOption(option =>
       option.setName('item_id')
         .setDescription('O ID do item raro para leiloar.')
-        .setDescriptionLocalizations({ "[en-US]": "The ID of the rare item to auction." })
+        .setDescriptionLocalizations({ "en-US": "The ID of the rare item to auction." })
         .setRequired(true))
     .addIntegerOption(option =>
         option.setName('duracao_minutos')
             .setDescription('A duração do leilão em minutos.')
-            .setDescriptionLocalizations({ "[en-US]": "The duration of the auction in minutes." })
+            .setDescriptionLocalizations({ "en-US": "The duration of the auction in minutes." })
             .setRequired(true))
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
   async execute(interaction, { activeAuctions, userStats }) {
