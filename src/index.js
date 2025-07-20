@@ -1,3 +1,4 @@
+
 import {
   Client,
   GatewayIntentBits,
@@ -22,7 +23,7 @@ import { shopItems } from './shop-items.js';
 import { rareItems } from './rare-items.js';
 import { assignMissions, checkMissionCompletion } from './mission-system.js';
 import { getTranslator } from './i18n.js';
-import loja from './commands/loja.js';
+import lojaSetup from './commands/loja_setup.js';
 
 dotenv.config();
 
@@ -76,7 +77,7 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
   setInterval(checkAuctionEnd, 15000);
   const t = await getTranslator(null, null, 'pt-BR');
-  loja.updateShopMessage({ client, guild: { id: c.guilds.cache.first()?.id } }, t);
+  lojaSetup.updateShopMessage(client, t);
 });
 
 client.on(Events.InteractionCreate, async interaction => {

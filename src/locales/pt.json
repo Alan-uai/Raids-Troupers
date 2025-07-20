@@ -1,3 +1,4 @@
+
 {
     "command_error": "Erro ao executar o comando!",
     "unknown_user": "Usuário Desconhecido",
@@ -151,7 +152,10 @@
     
     "shop_title": "🛒 Loja Troupers",
     "shop_description": "Clique nos botões abaixo para adquirir itens para seu perfil!",
+    "shop_ephemeral_description": "Estes são os itens disponíveis para compra.",
+    "shop_ephemeral_footer": "Use o comando /comprar <ID> para adquirir um item.",
     "shop_channel_not_found": "Canal da loja não encontrado. Por favor, contate um administrador.",
+    "shop_updating_message": "Atualizando a mensagem da loja...",
     "shop_updated": "A mensagem da loja foi atualizada em <#{channelId}>.",
 
     "missions_none_active": "Você não tem nenhuma missão ativa no momento.",
