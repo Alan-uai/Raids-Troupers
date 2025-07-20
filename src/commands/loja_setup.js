@@ -45,7 +45,7 @@ async function updateShopMessage(client, t) {
         .setEmoji('🛒');
 
     const row = new ActionRowBuilder().addComponents(selectMenu);
-    const buttonRow = new ActionRowRowBuilder().addComponents(buyButton);
+    const buttonRow = new ActionRowBuilder().addComponents(buyButton);
 
 
     try {
