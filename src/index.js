@@ -19,8 +19,7 @@ import path from 'node:path';
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { generateProfileImage } from './profile-generator.js';
-import { shopItems } from './shop-items.js';
-import { rareItems } from './rare-items.js';
+import { allItems } from './items.js';
 import { missions as missionPool } from './missions.js';
 import { assignMissions, checkMissionCompletion } from './mission-system.js';
 import { getTranslator } from './i18n.js';
@@ -90,7 +89,8 @@ client.on(Events.InteractionCreate, async interaction => {
     if (!command) return;
 
     if (!userMissions.has(interaction.user.id) && userProfiles.has(interaction.user.id)) {
-        assignMissions(interaction.user.id, userMissions);
+        const stats = userStats.get(interaction.user.id);
+        assignMissions(interaction.user.id, userMissions, stats);
     }
     
     try {
@@ -129,6 +129,9 @@ client.on(Events.InteractionCreate, async interaction => {
         } else if (subAction === 'autocollect') {
             await handleAutoCollectToggle(interaction, userId);
         }
+    } else if (action === 'equip' && args[0] === 'item') {
+        const [_, userId] = args;
+        await handleEquipButton(interaction, userId, t);
     }
 
   } else if (interaction.isStringSelectMenu()) {
@@ -142,6 +145,13 @@ client.on(Events.InteractionCreate, async interaction => {
       } else if (action === 'shop' && args[0] === 'select' && args[1] === 'item') {
           userShopSelection.set(interaction.user.id, interaction.values[0]);
           await interaction.reply({ content: t('shop_item_selected'), ephemeral: true });
+      } else if (action === 'equip' && args[0] === 'select') {
+          const [_, userId] = args;
+          if (interaction.user.id !== userId) {
+            return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
+          }
+          const itemId = interaction.values[0];
+          await handleEquipSelection(interaction, userId, itemId, t);
       }
   }
 });
@@ -160,11 +170,12 @@ async function checkAuctionEnd() {
     const auctionMessage = await auctionChannel.messages.fetch(auction.messageId).catch(() => null);
     
     const t = await getTranslator(null, null, 'pt-BR');
+    const item = allItems.find(i => i.id === auction.item.id);
 
     const finalEmbed = new EmbedBuilder()
         .setColor('#808080')
         .setTitle(`🌟 ${t('auction_ended_title')} 🌟`)
-        .setDescription(t('auction_ended_desc', { itemName: t(`item_${auction.item.id}_name`) }));
+        .setDescription(t('auction_ended_desc', { itemName: t(`item_${item.id}_name`) }));
 
     const bids = auction.bids;
     if (bids.size === 0) {
@@ -186,7 +197,7 @@ async function checkAuctionEnd() {
     }
 
     const items = userItems.get(winnerId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
-    items.inventory.push(auction.item.id);
+    items.inventory.push(item.id);
     userItems.set(winnerId, items);
 
     finalEmbed.addFields(
@@ -199,7 +210,7 @@ async function checkAuctionEnd() {
     if (auctionMessage) await auctionMessage.edit({ embeds: [finalEmbed], components: [] });
 
     try {
-        await winnerUser.send({ content: winnerT('auction_winner_dm', { itemName: winnerT(`item_${auction.item.id}_name`), bid: winningBid }) });
+        await winnerUser.send({ content: winnerT('auction_winner_dm', { itemName: winnerT(`item_${item.id}_name`), bid: winningBid }) });
     } catch (e) {
         console.log(`Could not send DM to auction winner ${winnerUser.username}`);
     }
@@ -374,12 +385,12 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
         if (user.id !== requesterId) {
             const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR', autoCollectMissions: false };
             const xpGained = 25, coinsGained = 10;
-            const xpToLevelUp = 100 * stats.level;
             
             stats.raidsHelped += 1;
             stats.xp += xpGained;
             stats.coins += coinsGained;
 
+            const xpToLevelUp = 100 * stats.level;
             let leveledUp = false;
             while (stats.xp >= xpToLevelUp) {
                 stats.level += 1;
@@ -390,7 +401,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
                  try {
                     await user.send({ content: userT('level_up_notification', { level: stats.level }) });
                 } catch(e) {
-                    await thread.send({ content: userT('level_up_notification', { userId: user.id, level: stats.level }) });
+                    await thread.send({ content: userT('level_up_notification_public', { userId: user.id, level: stats.level }) });
                 }
             }
             userStats.set(user.id, stats);
@@ -568,7 +579,7 @@ async function handleRating(interaction, raterId, ratedId, type, t) {
             const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
             const guild = profileChannel.guild;
             const member = await guild.members.fetch(ratedId);
-            const items = userItems.get(ratedId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
+            const items = userItems.get(ratedId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default', equippedBorder: null };
             
             const newProfileImageBuffer = await generateProfileImage(member, stats, items, clans, ratedT);
             const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
@@ -592,7 +603,7 @@ async function handleBuyButton(interaction, t) {
         return await interaction.reply({ content: t('buy_no_item_selected'), ephemeral: true });
     }
 
-    const itemToBuy = shopItems.find(item => item.id === itemId);
+    const itemToBuy = allItems.find(item => item.id === itemId);
     if (!itemToBuy) {
         return; 
     }
@@ -626,43 +637,29 @@ async function handleMissionCollect(interaction, userId, missionId) {
         return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
     }
 
+    await interaction.deferUpdate();
+
     const t = await getTranslator(userId, userStats);
     const activeMissions = userMissions.get(userId);
     const missionProgress = activeMissions?.find(m => m.id === missionId);
     const missionDetails = missionPool.find(m => m.id === missionId);
 
     if (!missionProgress || !missionDetails) {
-        return await interaction.reply({ content: t('missions_collect_error_not_found'), ephemeral: true });
+        return await interaction.followUp({ content: t('missions_collect_error_not_found'), ephemeral: true });
     }
 
     if (missionProgress.progress < missionDetails.goal) {
-        return await interaction.reply({ content: t('missions_collect_error_not_complete'), ephemeral: true });
+        return await interaction.followUp({ content: t('missions_collect_error_not_complete'), ephemeral: true });
     }
 
     if (missionProgress.collected) {
-        return await interaction.reply({ content: t('missions_collect_error_already_collected'), ephemeral: true });
+        return await interaction.followUp({ content: t('missions_collect_error_already_collected'), ephemeral: true });
     }
 
-    missionProgress.collected = true;
     const stats = userStats.get(userId);
-    const reward = missionDetails.reward;
-    stats.xp += reward.xp;
-    stats.coins += reward.coins;
-    
-    // Potentially assign a new mission here
-    // For now, just mark as collected.
-    
-    userStats.set(userId, stats);
-    userMissions.set(userId, activeMissions);
-    
-    await interaction.update({
-        content: t('missions_collect_success', { xp: reward.xp, coins: reward.coins }),
-        components: []
-    });
-
-    // We can update the main profile image here if we want to show the new coin/xp total immediately
+    const data = { userStats, userMissions, userItems, client, userProfiles, clans };
+    await collectReward(user, missionDetails, missionProgress, data, interaction);
 }
-
 
 async function handleAutoCollectToggle(interaction, userId) {
     if (interaction.user.id !== userId) {
@@ -680,6 +677,93 @@ async function handleAutoCollectToggle(interaction, userId) {
     }
 }
 
+async function handleEquipButton(interaction, userId, t) {
+    if (interaction.user.id !== userId) {
+        return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
+    }
+
+    const userItemsData = userItems.get(userId);
+    const inventory = userItemsData?.inventory || [];
+
+    if (inventory.length === 0) {
+        return await interaction.reply({ content: t('inventory_empty'), ephemeral: true });
+    }
+
+    const equippableItems = inventory
+        .map(id => allItems.find(item => item.id === id))
+        .filter(item => item && ['background', 'title', 'avatar_border'].includes(item.type));
+
+    if (equippableItems.length === 0) {
+        return await interaction.reply({ content: t('equip_no_equippable_items'), ephemeral: true });
+    }
+
+    const options = equippableItems.map(item => ({
+        label: t(`item_${item.id}_name`),
+        description: t(`item_type_${item.type}`),
+        value: item.id
+    }));
+
+    const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId(`equip_select_${userId}`)
+        .setPlaceholder(t('equip_select_placeholder'))
+        .addOptions(options);
+
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+
+    await interaction.reply({ content: t('equip_select_prompt'), components: [row], ephemeral: true });
+}
+
+async function handleEquipSelection(interaction, userId, itemId, t) {
+    await interaction.deferUpdate();
+    
+    const items = userItems.get(userId);
+    if (!items || !items.inventory.includes(itemId)) {
+      return await interaction.followUp({ content: t('equip_not_owned'), ephemeral: true });
+    }
+    
+    const itemToEquip = allItems.find(item => item.id === itemId);
+    if (!itemToEquip) {
+        return await interaction.followUp({ content: t('equip_item_not_exist'), ephemeral: true });
+    }
+
+    let replyMessage = '';
+
+    if (itemToEquip.type === 'background') {
+        items.equippedBackground = itemToEquip.url;
+        replyMessage = t('equip_background_success', { itemName: t(`item_${itemToEquip.id}_name`) });
+    } else if (itemToEquip.type === 'title') {
+        items.equippedTitle = itemToEquip.id;
+        replyMessage = t('equip_title_success', { itemName: t(`item_${itemToEquip.id}_name`) });
+    } else if (itemToEquip.type === 'avatar_border') {
+        items.equippedBorder = itemToEquip.url;
+        replyMessage = t('equip_border_success', { itemName: t(`item_${itemToEquip.id}_name`) });
+    } else {
+        return await interaction.followUp({ content: t('equip_cannot_equip_type'), ephemeral: true });
+    }
+
+    userItems.set(userId, items);
+    
+    const profileInfo = userProfiles.get(userId);
+    if (profileInfo?.channelId && profileInfo?.messageId) {
+        try {
+            const stats = userStats.get(userId);
+            const member = await interaction.guild.members.fetch(userId);
+
+            const newProfileImageBuffer = await generateProfileImage(member, stats, items, clans, t);
+            const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
+
+            const profileChannel = await interaction.client.channels.fetch(profileInfo.channelId);
+            const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
+            
+            await profileMessage.edit({ files: [newAttachment] });
+
+        } catch (updateError) {
+            console.error(`Failed to update profile image for ${userId}:`, updateError);
+        }
+    }
+    
+    await interaction.followUp({ content: replyMessage, ephemeral: true });
+}
 
 client.on(Events.MessageCreate, async message => {
   if (message.author.bot || !message.mentions.has(client.user.id)) return;
@@ -766,10 +850,10 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
             const stats = { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, autoCollectMissions: false };
             userStats.set(newMember.id, stats);
 
-            const items = { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
+            const items = { inventory: [], equippedBackground: 'default', equippedTitle: 'default', equippedBorder: null };
             userItems.set(newMember.id, items);
 
-            assignMissions(newMember.id, userMissions);
+            assignMissions(newMember.id, userMissions, stats);
 
             const profileImageBuffer = await generateProfileImage(newMember, stats, items, clans, t);
             const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
@@ -802,9 +886,13 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
             for (const missionProgress of activeMissions) {
                 const missionDetails = missionPool.find(m => m.id === missionProgress.id);
                 if (missionDetails) {
+                    const rewardText = missionDetails.reward.item
+                        ? `Item: ${t(`item_${missionDetails.reward.item}_name`)}`
+                        : `${missionDetails.reward.xp} XP & ${missionDetails.reward.coins} TC`;
+                    
                     const missionEmbed = new EmbedBuilder()
                         .setTitle(t(`mission_${missionDetails.id}_description`))
-                        .setDescription(`**${t('progress')}:** ${missionProgress.progress} / ${missionDetails.goal}\n**${t('reward')}:** ${missionDetails.reward.xp} XP & ${missionDetails.reward.coins} TC`)
+                        .setDescription(`**${t('progress')}:** ${missionProgress.progress} / ${missionDetails.goal}\n**${t('reward')}:** ${rewardText}`)
                         .setColor('#3498DB')
                         .setFooter({text: `ID: ${missionDetails.id}`});
 
@@ -822,6 +910,22 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
                 }
             }
             userMissions.set(newMember.id, activeMissions);
+            
+            // 2. Tópico de Marcos (Milestones) - Estrutura Inicial
+            const milestoneThread = await channel.threads.create({
+                name: t('milestones_thread_title'),
+                autoArchiveDuration: 10080,
+                reason: t('milestones_thread_reason', { username: newMember.displayName }),
+            });
+            await milestoneThread.send({ content: t('milestones_thread_description') });
+
+            // 3. Tópico de Loja Exclusiva - Estrutura Inicial
+            const exclusiveShopThread = await channel.threads.create({
+                name: t('exclusive_shop_thread_title'),
+                autoArchiveDuration: 10080,
+                reason: t('exclusive_shop_thread_reason', { username: newMember.displayName }),
+            });
+            await exclusiveShopThread.send({ content: t('exclusive_shop_thread_description') });
 
         } catch (error) {
             console.error(`Failed to create channel or profile for ${newMember.displayName}:`, error);
@@ -830,3 +934,5 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
+    

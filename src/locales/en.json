@@ -51,11 +51,25 @@
     "item_fundo_lendario_dragao_name": "Legendary Background: Dragon's Lair",
     "item_borda_avatar_fogo_name": "Avatar Border: Eternal Flames",
     "item_titulo_pioneiro_name": "Title: Troop Pioneer",
+    "item_espada_comum_name": "Common Sword",
+    "item_escudo_madeira_name": "Wooden Shield",
+    "item_pocao_fraca_name": "Weak Potion",
+    "item_anel_simples_name": "Simple Ring",
+    "item_botas_couro_name": "Leather Boots",
 
     "item_fundo_neon_description": "A vibrant animated background of a city at night.",
     "item_fundo_floresta_description": "An enchanted forest with mystical lights.",
     "item_fundo_espaco_description": "Travel through the cosmos with this galactic view.",
+    "item_espada_comum_description": "A basic but reliable sword.",
+    "item_escudo_madeira_description": "Offers minimal protection.",
+    "item_pocao_fraca_description": "Recovers a small amount of health.",
+    "item_anel_simples_description": "A simple ring with no special properties.",
+    "item_botas_couro_description": "Standard issue leather boots.",
 
+    "item_type_background": "Type: Background",
+    "item_type_title": "Type: Title",
+    "item_type_avatar_border": "Type: Avatar Border",
+    
     "mission_create_raid_1_description": "Create 1 Raid",
     "mission_help_raid_3_description": "Help in 3 Raids",
     "mission_kick_member_1_description": "Kick 1 member from a raid",
@@ -133,7 +147,14 @@
     "equip_item_not_exist": "❌ This item no longer seems to exist.",
     "equip_background_success": "✅ You have equipped the **{itemName}** background! Your profile has been updated.",
     "equip_title_success": "✅ You have equipped the **{itemName}** title! Your profile has been updated.",
+    "equip_border_success": "✅ You have equipped the **{itemName}** border! Your profile has been updated.",
     "equip_cannot_equip_type": "❌ This type of item cannot be equipped directly.",
+    "equip_item_button": "Equip Item",
+    "equip_no_equippable_items": "❌ You don't have any equippable items in your inventory.",
+    "equip_select_placeholder": "Select an item to equip",
+    "equip_select_prompt": "Choose an item from your inventory to equip:",
+    
+    "select_milestone_button": "Select Milestones",
     
     "auction_admin_item_not_found": "❌ This rare item does not exist.",
     "auction_admin_already_active": "❌ There is already an active auction.",
@@ -150,7 +171,7 @@
 
     "inventory_empty": "🎒 Your inventory is empty.",
     "inventory_title": "Inventory of {username}",
-    "inventory_footer": "Use /equipar <item_id> to use an item.",
+    "inventory_footer": "Use the Equip button on your profile to use an item.",
     
     "shop_title": "🛒 Troupers Store",
     "shop_description": "Select an item from the menu and click the button to purchase!",
@@ -168,6 +189,7 @@
     "missions_embed_title": "📜 {username}'s Missions",
     "missions_embed_description": "Complete these tasks to earn rewards!",
     "mission_completed_notification": "🏅 Mission Completed! You finished \"{description}\" and earned {xp} XP and {coins} TC!",
+    "mission_reward_item_notification": "🏅 Mission Completed! You finished \"{description}\" and received the item: **{itemName}**!",
     "level_up_from_mission": "🎉 Congratulations! You've leveled up to level {level} by completing a mission!",
     "missions_thread_title": "Missions",
     "missions_thread_reason": "Private thread for {username}'s missions.",
@@ -177,10 +199,20 @@
     "missions_autocollect_status_on": "ON",
     "missions_autocollect_status_off": "OFF",
     "missions_collect_button": "Collect",
+    "missions_collected_button": "Collected",
     "missions_collect_error_not_found": "❌ Could not find this mission.",
     "missions_collect_error_not_complete": "❌ This mission is not yet complete.",
     "missions_collect_error_already_collected": "❌ You have already collected the reward for this mission.",
     "missions_collect_success": "✅ Reward collected! You received {xp} XP and {coins} TC.",
+    "missions_collect_success_item": "✅ Reward collected! You received the item: **{itemName}**!",
+
+    "milestones_thread_title": "Milestones",
+    "milestones_thread_reason": "Private thread for {username}'s milestones.",
+    "milestones_thread_description": "This is where your achievements and milestones will be tracked.",
+
+    "exclusive_shop_thread_title": "Exclusive Shop",
+    "exclusive_shop_thread_reason": "Private thread for {username}'s exclusive shop.",
+    "exclusive_shop_thread_description": "Based on your achievements, special items may appear here.",
     
     "raid_channel_not_found": "I couldn't find the channel to announce the raid. Please notify an administrator!",
     "raid_embed_title": "📢 New Call for Help in **__Raid__**!",
@@ -224,7 +256,8 @@
     "vc_opt_in_disabled": "🔇 You have disabled automatic entry into the voice chat.",
 
     "raid_started_by_leader": "Attention team! The raid has been started by the leader!",
-    "level_up_notification": "🎉 Congratulations, <@{userId}>! You have leveled up to level {level}!",
+    "level_up_notification": "🎉 Congratulations! You have leveled up to level {level}!",
+    "level_up_notification_public": "🎉 Congratulations, <@{userId}>! You have leveled up to level {level}!",
     "raid_thanks_to_helpers": "Thank you to everyone who helped: {helpers}. You are amazing people!",
     "raid_voice_channel_name": "{username}'s Raid",
     "raid_started_vc_created": "The raid has started and a voice chat has been created!",
@@ -256,8 +289,10 @@
     "auction_winner_footer": "The item has been added to the winner's inventory.",
     "auction_winner_dm": "Congratulations! You won the auction for **{itemName}** with a bid of {bid} TC. The item is now in your inventory! Use /equipar to use it.",
 
-    "profile_show": "Here is your current profile:",
+    "profile_show": "Here is the user's current profile:",
     "profile_creation_error_category": "Error: The profile category channel was not found. Please contact an administrator.",
     "profile_creation_success": "✅ Your profile and private channel have been successfully created! You can see it here: <#{channelId}>",
     "profile_creation_error_generic": "An unexpected error occurred while creating your profile."
 }
+
+    

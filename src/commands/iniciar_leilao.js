@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } from 'discord.js';
-import { rareItems } from '../rare-items.js';
+import { allItems } from '../items.js';
 import { getTranslator } from '../i18n.js';
 
 export default {
@@ -24,7 +24,7 @@ export default {
     const durationMinutes = interaction.options.getInteger('duracao_minutos');
     const auctionChannelId = '1396406304276217906';
 
-    const itemToAuction = rareItems.find(item => item.id === itemId);
+    const itemToAuction = allItems.find(item => item.id === itemId && item.source === 'auction');
 
     if (!itemToAuction) {
       return await interaction.reply({ content: t('auction_admin_item_not_found'), ephemeral: true });
@@ -80,3 +80,5 @@ export default {
     }
   },
 };
+
+    

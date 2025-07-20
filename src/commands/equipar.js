@@ -1,6 +1,5 @@
 import { AttachmentBuilder } from 'discord.js';
-import { shopItems } from '../shop-items.js';
-import { rareItems } from '../rare-items.js';
+import { allItems } from '../items.js';
 import { generateProfileImage } from '../profile-generator.js';
 import { getTranslator } from '../i18n.js';
 import { data } from './equipar.data.js';
@@ -20,7 +19,6 @@ export default {
       return await interaction.editReply({ content: t('equip_not_owned'), ephemeral: true });
     }
     
-    const allItems = [...shopItems, ...rareItems];
     const itemToEquip = allItems.find(item => item.id === itemId);
 
     if (!itemToEquip) {
@@ -30,11 +28,14 @@ export default {
     let replyMessage = '';
 
     if (itemToEquip.type === 'background') {
-        items.equippedBackground = itemToBuy.url;
+        items.equippedBackground = itemToEquip.url;
         replyMessage = t('equip_background_success', { itemName: t(`item_${itemToEquip.id}_name`) });
     } else if (itemToEquip.type === 'title') {
-        items.equippedTitle = itemToEquip.id; // Store ID, not name
+        items.equippedTitle = itemToEquip.id;
         replyMessage = t('equip_title_success', { itemName: t(`item_${itemToEquip.id}_name`) });
+    } else if (itemToEquip.type === 'avatar_border') {
+        items.equippedBorder = itemToEquip.url;
+        replyMessage = t('equip_border_success', { itemName: t(`item_${itemToEquip.id}_name`) });
     } else {
         return await interaction.editReply({ content: t('equip_cannot_equip_type'), ephemeral: true });
     }
@@ -63,3 +64,5 @@ export default {
     await interaction.editReply({ content: replyMessage, ephemeral: true });
   },
 };
+
+    

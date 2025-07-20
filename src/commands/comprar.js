@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { shopItems } from '../shop-items.js';
+import { allItems } from '../items.js';
 import { getTranslator } from '../i18n.js';
 
 export default {
@@ -17,7 +17,7 @@ export default {
     const itemId = interaction.options.getString('item_id');
     const userId = interaction.user.id;
 
-    const itemToBuy = shopItems.find(item => item.id === itemId);
+    const itemToBuy = allItems.find(item => item.id === itemId && item.source === 'shop');
 
     if (!itemToBuy) {
       return await interaction.reply({ content: t('buy_item_not_exist'), ephemeral: true });
@@ -26,11 +26,15 @@ export default {
     const stats = userStats.get(userId);
     const items = userItems.get(userId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
 
+    if (!stats || !items) {
+        return await interaction.reply({ content: t('buy_profile_not_found'), ephemeral: true });
+    }
+
     if (items.inventory.includes(itemId)) {
       return await interaction.reply({ content: t('buy_already_own'), ephemeral: true });
     }
 
-    if (!stats || stats.coins < itemToBuy.price) {
+    if (stats.coins < itemToBuy.price) {
       return await interaction.reply({ content: t('buy_not_enough_coins', { price: itemToBuy.price }), ephemeral: true });
     }
 
@@ -50,3 +54,5 @@ export default {
     await interaction.reply({ embeds: [embed], ephemeral: true });
   },
 };
+
+    

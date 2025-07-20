@@ -1,6 +1,6 @@
 import { createCanvas, loadImage } from 'canvas';
 import { classes } from './classes.js';
-import { rareItems } from './rare-items.js';
+import { allItems } from './items.js';
 
 const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
     const words = text.split(' ');
@@ -28,39 +28,28 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     
     const equippedBackground = items?.equippedBackground || 'default';
     const equippedTitleId = items?.equippedTitle;
+    const equippedBorderUrl = items?.equippedBorder;
 
+    // Fundo
     if (equippedBackground !== 'default' && equippedBackground.startsWith('http')) {
         try {
             const background = await loadImage(equippedBackground);
             ctx.drawImage(background, 0, 0, width, height);
         } catch (e) {
             console.error("Failed to load custom background, using default.", e);
-            const gradient = ctx.createLinearGradient(0, 0, width, height);
-            gradient.addColorStop(0, '#23272A');
-            gradient.addColorStop(1, '#2C2F33');
-            ctx.fillStyle = gradient;
+            ctx.fillStyle = '#2C2F33';
             ctx.fillRect(0, 0, width, height);
         }
     } else {
-        const gradient = ctx.createLinearGradient(0, 0, width, height);
-        gradient.addColorStop(0, '#23272A');
-        gradient.addColorStop(1, '#2C2F33');
-        ctx.fillStyle = gradient;
+        ctx.fillStyle = '#2C2F33';
         ctx.fillRect(0, 0, width, height);
     }
     
+    // Overlay semi-transparente para legibilidade
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(15, 15);
-    ctx.lineTo(width - 15, 15);
-    ctx.lineTo(width - 15, height - 15);
-    ctx.lineTo(15, height - 15);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
+    ctx.fillRect(15, 15, width - 30, height - 30);
+    
+    // Avatar e Borda
     const avatarURL = member.user.displayAvatarURL({ extension: 'png', size: 256 });
     const avatar = await loadImage(avatarURL);
     const avatarSize = 128;
@@ -74,6 +63,18 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     ctx.drawImage(avatar, avatarX, avatarY, avatarSize, avatarSize);
     ctx.restore();
 
+    // Carrega e desenha a borda se equipada
+    if (equippedBorderUrl) {
+        try {
+            const border = await loadImage(equippedBorderUrl);
+            ctx.drawImage(border, avatarX - 16, avatarY - 16, avatarSize + 32, avatarSize + 32); // Ajuste o posicionamento e tamanho conforme necessário
+        } catch (e) {
+            console.error("Failed to load avatar border.", e);
+        }
+    }
+
+
+    // Nome de usuário e Tag do Clã
     ctx.fillStyle = '#FFFFFF';
     if (stats.clanId && clans) {
         const clan = Array.from(clans.values()).find(c => c.id === stats.clanId);
@@ -98,8 +99,9 @@ export async function generateProfileImage(member, stats, items, clans, t) {
         ctx.fillText(member.displayName, avatarX + avatarSize + 25, avatarY + 55);
     }
 
+    // Título
     if(equippedTitleId) {
-        const titleItem = rareItems.find(i => i.id === equippedTitleId);
+        const titleItem = allItems.find(i => i.id === equippedTitleId);
         if (titleItem) {
             ctx.font = 'italic 20px sans-serif';
             ctx.fillStyle = '#FFD700'; // Gold color for the title
@@ -107,6 +109,7 @@ export async function generateProfileImage(member, stats, items, clans, t) {
         }
     }
 
+    // Classe
     if (stats.class) {
         const userClass = classes.find(c => c.id === stats.class);
         if (userClass) {
@@ -116,6 +119,7 @@ export async function generateProfileImage(member, stats, items, clans, t) {
         }
     }
 
+    // Estatísticas
     const statsY = 220;
     const statsX = 50;
     const col2X = 320;
@@ -129,8 +133,9 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     ctx.fillText(t('level'), statsX, statsY);
     ctx.fillText(String(stats.level || 1), statsX + valueOffsetX, statsY);
     
+    const xpToLevelUp = 100 * (stats.level || 1);
     ctx.fillText(t('xp'), statsX, statsY + statsSpacing);
-    ctx.fillText(`${stats.xp || 0} / 100`, statsX + valueOffsetX, statsY + statsSpacing);
+    ctx.fillText(`${stats.xp || 0} / ${xpToLevelUp}`, statsX + valueOffsetX, statsY + statsSpacing);
     
     ctx.fillText(t('troup_coins'), statsX, statsY + statsSpacing * 2);
     ctx.fillText(String(stats.coins || 0), statsX + valueOffsetX, statsY + statsSpacing * 2);
@@ -150,10 +155,16 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     ctx.fillText(t('was_kicked'), col3X, statsY + statsSpacing);
     ctx.fillText(String(stats.wasKicked || 0), col3X + valueOffsetX, statsY + statsSpacing);
     
+    // Cargos
     ctx.font = '16px sans-serif';
     ctx.fillStyle = '#B9BBBE';
-    const roles = member.roles.cache.filter(r => r.name !== '@everyone').map(r => r.name).join(', ');
+    const roles = member.roles.cache
+        .filter(r => r.name !== '@everyone')
+        .map(r => r.name)
+        .join(', ');
     wrapText(ctx, `${t('roles')}: ${roles || t('no_roles')}`, 50, height - 60, width - 100, 20);
 
     return canvas.toBuffer('image/png');
 }
+
+    

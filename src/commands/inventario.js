@@ -1,7 +1,5 @@
-
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { shopItems } from '../shop-items.js';
-import { rareItems } from '../rare-items.js';
+import { allItems } from '../items.js';
 import { getTranslator } from '../i18n.js';
 
 export default {
@@ -20,9 +18,8 @@ export default {
 
     const equippedBackgroundUrl = items.equippedBackground;
     const equippedTitleId = items.equippedTitle;
+    const equippedBorderUrl = items.equippedBorder;
 
-    const allItems = [...shopItems, ...rareItems];
-    
     const inventoryList = items.inventory.map(itemId => {
         const itemDetails = allItems.find(item => item.id === itemId);
         if (!itemDetails) return `**${t('unknown_item')}** (ID: \`${itemId}\`)`;
@@ -34,7 +31,10 @@ export default {
             equippedIndicator = `✅ ${t('equipped_background')}`;
         } else if (itemDetails.type === 'title' && equippedTitleId === itemDetails.id) {
             equippedIndicator = `✅ ${t('equipped_title')}`;
+        } else if (itemDetails.type === 'avatar_border' && equippedBorderUrl === itemDetails.url) {
+            equippedIndicator = `✅ ${t('equipped_border')}`;
         }
+
 
         return `**${name}** (ID: \`${itemId}\`) ${equippedIndicator}`;
     }).join('\n');
@@ -48,3 +48,5 @@ export default {
     await interaction.reply({ embeds: [embed], ephemeral: true });
   },
 };
+
+    

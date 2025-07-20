@@ -51,10 +51,24 @@
     "item_fundo_lendario_dragao_name": "Fundo Lendário: Covil do Dragão",
     "item_borda_avatar_fogo_name": "Borda de Avatar: Chamas Eternas",
     "item_titulo_pioneiro_name": "Título: Pioneiro da Tropa",
-    
+    "item_espada_comum_name": "Espada Comum",
+    "item_escudo_madeira_name": "Escudo de Madeira",
+    "item_pocao_fraca_name": "Poção Fraca",
+    "item_anel_simples_name": "Anel Simples",
+    "item_botas_couro_name": "Botas de Couro",
+
     "item_fundo_neon_description": "Um fundo animado e vibrante de uma cidade à noite.",
     "item_fundo_floresta_description": "Uma floresta encantada com luzes místicas.",
     "item_fundo_espaco_description": "Viaje pelo cosmos com esta visão galáctica.",
+    "item_espada_comum_description": "Uma espada básica, porém confiável.",
+    "item_escudo_madeira_description": "Oferece proteção mínima.",
+    "item_pocao_fraca_description": "Recupera uma pequena quantidade de vida.",
+    "item_anel_simples_description": "Um anel simples, sem propriedades especiais.",
+    "item_botas_couro_description": "Botas de couro padrão.",
+
+    "item_type_background": "Tipo: Fundo de Perfil",
+    "item_type_title": "Tipo: Título",
+    "item_type_avatar_border": "Tipo: Borda de Avatar",
     
     "mission_create_raid_1_description": "Crie 1 Raid",
     "mission_help_raid_3_description": "Ajude em 3 Raids",
@@ -133,7 +147,14 @@
     "equip_item_not_exist": "❌ Esse item não parece mais existir.",
     "equip_background_success": "✅ Você equipou o fundo **{itemName}**! Seu perfil foi atualizado.",
     "equip_title_success": "✅ Você equipou o título **{itemName}**! Seu perfil foi atualizado.",
+    "equip_border_success": "✅ Você equipou a borda **{itemName}**! Seu perfil foi atualizado.",
     "equip_cannot_equip_type": "❌ Este tipo de item não pode ser equipado diretamente.",
+    "equip_item_button": "Equipar Item",
+    "equip_no_equippable_items": "❌ Você não possui itens equipáveis no seu inventário.",
+    "equip_select_placeholder": "Selecione um item para equipar",
+    "equip_select_prompt": "Escolha um item do seu inventário para equipar:",
+
+    "select_milestone_button": "Selecionar Marcos",
     
     "auction_admin_item_not_found": "❌ Esse item raro não existe.",
     "auction_admin_already_active": "❌ Já existe um leilão ativo.",
@@ -150,7 +171,7 @@
 
     "inventory_empty": "🎒 Seu inventário está vazio.",
     "inventory_title": "Inventário de {username}",
-    "inventory_footer": "Use /equipar <item_id> para usar um item.",
+    "inventory_footer": "Use o botão Equipar no seu perfil para usar um item.",
     
     "shop_title": "🛒 Loja Troupers",
     "shop_description": "Selecione um item no menu e clique no botão para adquirir!",
@@ -168,6 +189,7 @@
     "missions_embed_title": "📜 Missões de {username}",
     "missions_embed_description": "Complete essas tarefas para ganhar recompensas!",
     "mission_completed_notification": "🏅 Missão Concluída! Você completou \"{description}\" e ganhou {xp} XP e {coins} TC!",
+    "mission_reward_item_notification": "🏅 Missão Concluída! Você completou \"{description}\" e recebeu o item: **{itemName}**!",
     "level_up_from_mission": "🎉 Parabéns! Você subiu para o nível {level} ao completar uma missão!",
     "missions_thread_title": "Missões",
     "missions_thread_reason": "Tópico privado para as missões de {username}.",
@@ -177,10 +199,20 @@
     "missions_autocollect_status_on": "LIGADO",
     "missions_autocollect_status_off": "DESLIGADO",
     "missions_collect_button": "Coletar",
+    "missions_collected_button": "Coletado",
     "missions_collect_error_not_found": "❌ Não foi possível encontrar esta missão.",
     "missions_collect_error_not_complete": "❌ Esta missão ainda não está completa.",
     "missions_collect_error_already_collected": "❌ Você já coletou a recompensa desta missão.",
     "missions_collect_success": "✅ Recompensa coletada! Você recebeu {xp} XP e {coins} TC.",
+    "missions_collect_success_item": "✅ Recompensa coletada! Você recebeu o item: **{itemName}**!",
+
+    "milestones_thread_title": "Marcos",
+    "milestones_thread_reason": "Tópico privado para os marcos de {username}.",
+    "milestones_thread_description": "Este é o lugar onde suas conquistas e marcos serão rastreados.",
+
+    "exclusive_shop_thread_title": "Loja Exclusiva",
+    "exclusive_shop_thread_reason": "Tópico privado para a loja exclusiva de {username}.",
+    "exclusive_shop_thread_description": "Com base em suas conquistas, itens especiais podem aparecer aqui.",
     
     "raid_channel_not_found": "Não encontrei o canal para anunciar a raid. Avise um administrador!",
     "raid_embed_title": "📢 Novo Pedido de Ajuda em **__Raid__**!",
@@ -224,7 +256,8 @@
     "vc_opt_in_disabled": "🔇 Você desativou a entrada automática no chat de voz.",
 
     "raid_started_by_leader": "Atenção, equipe! A raid foi iniciada pelo líder!",
-    "level_up_notification": "🎉 Parabéns, <@{userId}>! Você subiu para o nível {level}!",
+    "level_up_notification": "🎉 Parabéns! Você subiu para o nível {level}!",
+    "level_up_notification_public": "🎉 Parabéns, <@{userId}>! Você subiu para o nível {level}!",
     "raid_thanks_to_helpers": "Obrigado a todos que ajudaram: {helpers}. Vocês são pessoas incríveis!",
     "raid_voice_channel_name": "Raid de {username}",
     "raid_started_vc_created": "A raid começou e um chat de voz foi criado!",
@@ -256,8 +289,10 @@
     "auction_winner_footer": "O item foi adicionado ao inventário do vencedor.",
     "auction_winner_dm": "Parabéns! Você venceu o leilão para **{itemName}** com um lance de {bid} TC. O item já está no seu inventário! Use /equipar para usá-lo.",
 
-    "profile_show": "Aqui está o seu perfil atual:",
+    "profile_show": "Aqui está o perfil do usuário:",
     "profile_creation_error_category": "Erro: A categoria de perfis não foi encontrada. Por favor, contate um administrador.",
     "profile_creation_success": "✅ Seu perfil e canal privado foram criados com sucesso! Você pode vê-lo aqui: <#{channelId}>",
     "profile_creation_error_generic": "Ocorreu um erro inesperado ao criar seu perfil."
 }
+
+    

@@ -1,6 +1,5 @@
-
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField, StringSelectMenuBuilder } from 'discord.js';
-import { shopItems } from '../shop-items.js';
+import { allItems } from '../items.js';
 import { getTranslator } from '../i18n.js';
 
 const SHOP_CHANNEL_ID = '1396416240263630868';
@@ -12,6 +11,8 @@ async function updateShopMessage(client, t) {
         console.error('Shop channel not found or is not a text channel.');
         return;
     }
+
+    const shopItems = allItems.filter(item => item.source === 'shop');
 
     const embed = new EmbedBuilder()
       .setColor('#FFA500')
@@ -78,3 +79,5 @@ export default {
   },
   updateShopMessage, 
 };
+
+    

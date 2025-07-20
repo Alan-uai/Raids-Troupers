@@ -1,6 +1,5 @@
-
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { shopItems } from '../shop-items.js';
+import { allItems } from '../items.js';
 import { getTranslator } from '../i18n.js';
 
 export default {
@@ -10,6 +9,7 @@ export default {
     .setDescriptionLocalizations({ "en-US": "Shows the available items in the shop." }),
   async execute(interaction, { userStats }) {
     const t = await getTranslator(interaction.user.id, userStats);
+    const shopItems = allItems.filter(item => item.source === 'shop');
 
     const embed = new EmbedBuilder()
       .setColor('#FFA500')
@@ -29,3 +29,5 @@ export default {
     await interaction.reply({ embeds: [embed], ephemeral: true });
   },
 };
+
+    
