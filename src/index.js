@@ -57,14 +57,14 @@ const userShopSelection = new Map();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js') && !file.endsWith('.data.js'));
 
 for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
   try {
     const commandModule = await import(filePath);
     const command = commandModule.default;
-    if ('data' in command && 'execute' in command) {
+    if (command && 'data' in command && 'execute' in command) {
         client.commands.set(command.data.name, command);
     } else {
         console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
@@ -705,11 +705,9 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
             const profileImageBuffer = await generateProfileImage(newMember, stats, items, clans, t);
             const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
-
-            const profileMessage = await channel.send({
-                content: t('welcome_new_user', { user: newMember }),
-                files: [attachment]
-            });
+            
+            await channel.send({ content: t('welcome_new_user', { user: newMember }) });
+            const profileMessage = await channel.send({ files: [attachment] });
             
             userProfiles.set(newMember.id, {
                 channelId: channel.id,

@@ -7,23 +7,36 @@ import { data } from './perfil.data.js';
 export default {
     data: data,
     async execute(interaction, { userStats, userProfiles, userItems, clans, userMissions }) {
-        const userId = interaction.user.id;
-        const member = interaction.member;
-        const t = await getTranslator(userId, userStats);
+        const targetUser = interaction.options.getUser('usuario') || interaction.user;
+        const member = await interaction.guild.members.fetch(targetUser.id);
+        const t = await getTranslator(interaction.user.id, userStats);
         
         await interaction.deferReply({ ephemeral: true });
 
-        // Se o perfil já existe, apenas mostre a imagem para o usuário.
-        if (userProfiles.has(userId)) {
-            const stats = userStats.get(userId);
-            const items = userItems.get(userId);
-            const profileImageBuffer = await generateProfileImage(member, stats, items, clans, t);
-            const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
-            
-            return await interaction.editReply({ content: t('profile_show'), files: [attachment], ephemeral: true });
+        const profileInfo = userProfiles.get(targetUser.id);
+
+        // Se o perfil já existe, apenas atualiza e mostra a imagem.
+        if (profileInfo) {
+            try {
+                const stats = userStats.get(targetUser.id);
+                const items = userItems.get(targetUser.id);
+                const profileImageBuffer = await generateProfileImage(member, stats, items, clans, t);
+                const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
+                
+                const profileChannel = await interaction.client.channels.fetch(profileInfo.channelId);
+                const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
+
+                await profileMessage.edit({ files: [attachment] });
+                
+                return await interaction.editReply({ content: t('profile_show'), files: [attachment], ephemeral: true });
+
+            } catch (error) {
+                console.error(`Failed to update profile for ${member.displayName}:`, error);
+                // Se a mensagem antiga não for encontrada, podemos prosseguir para criar uma nova.
+            }
         }
 
-        // Se o perfil NÃO existe, crie tudo.
+        // Se o perfil NÃO existe ou a atualização falhou, crie tudo.
         const categoryId = '1395589412661887068';
         const guild = interaction.guild;
         const category = guild.channels.cache.get(categoryId);
@@ -34,7 +47,7 @@ export default {
         }
 
         try {
-            const userLocale = member.user.locale || 'pt-BR';
+            const userLocale = targetUser.locale || 'pt-BR';
 
             const channel = await guild.channels.create({
                 name: member.displayName,
@@ -56,11 +69,9 @@ export default {
 
             const profileImageBuffer = await generateProfileImage(member, stats, items, clans, t);
             const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
-
-            const profileMessage = await channel.send({
-                content: t('welcome_new_user', { user: member }),
-                files: [attachment]
-            });
+            
+            await channel.send({ content: t('welcome_new_user', { user: member }) });
+            const profileMessage = await channel.send({ files: [attachment] });
             
             userProfiles.set(member.id, {
                 channelId: channel.id,

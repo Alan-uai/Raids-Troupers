@@ -152,7 +152,7 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     
     ctx.font = '16px sans-serif';
     ctx.fillStyle = '#B9BBBE';
-    const roles = member.roles.cache.filter(r => r.name !== '@everyone' && r.name.toLowerCase() !== 'limpo').map(r => r.name).join(', ');
+    const roles = member.roles.cache.filter(r => r.name !== '@everyone').map(r => r.name).join(', ');
     wrapText(ctx, `${t('roles')}: ${roles || t('no_roles')}`, 50, height - 60, width - 100, 20);
 
     return canvas.toBuffer('image/png');
