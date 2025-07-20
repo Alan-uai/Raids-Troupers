@@ -22,7 +22,6 @@ import { REST, Routes } from 'discord.js';
 import { generateProfileImage } from './profile-generator.js';
 import { rareItems } from './rare-items.js';
 import { assignMissions, checkMissionCompletion } from './mission-system.js';
-import { clans } from './classes.js';
 
 const app = express();
 const port = process.env.PORT || 3000;
