@@ -3,7 +3,7 @@ import { getTranslator } from '../i18n.js';
 
 export default {
     data: new SlashCommandBuilder()
-        .setName('cla_expulsar')
+        .setName('clan_expulsar')
         .setDescription('Expulsa um membro do seu clã.')
         .setDescriptionLocalizations({
             "en-US": "Kicks a member from your clan."

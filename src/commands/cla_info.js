@@ -3,7 +3,7 @@ import { getTranslator } from '../i18n.js';
 
 export default {
     data: new SlashCommandBuilder()
-        .setName('cla_info')
+        .setName('clan_info')
         .setDescription('Mostra informações sobre um clã.')
         .setDescriptionLocalizations({ "en-US": "Shows information about a clan." })
         .addStringOption(option =>

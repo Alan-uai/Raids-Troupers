@@ -1,18 +1,11 @@
-import { SlashCommandBuilder, AttachmentBuilder } from 'discord.js';
+import { AttachmentBuilder } from 'discord.js';
 import { classes } from '../classes.js';
 import { generateProfileImage } from '../profile-generator.js';
 import { getTranslator } from '../i18n.js';
+import { data } from './escolher_classe.data.js';
 
 export default {
-  data: new SlashCommandBuilder()
-    .setName('escolher_classe')
-    .setDescription('Escolha sua especialização de combate.')
-    .setDescriptionLocalizations({ "en-US": "Choose your combat specialization." })
-    .addStringOption(option =>
-      option.setName('id_da_classe')
-        .setDescription('O ID da classe que você deseja seguir.')
-        .setDescriptionLocalizations({ "en-US": "The ID of the class you want to follow." })
-        .setRequired(true)),
+  data: data,
   async execute(interaction, { userStats, userItems, userProfiles, clans }) {
     const t = await getTranslator(interaction.user.id, userStats);
     await interaction.deferReply({ ephemeral: true });

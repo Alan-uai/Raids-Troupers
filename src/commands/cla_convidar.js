@@ -3,7 +3,7 @@ import { getTranslator } from '../i18n.js';
 
 export default {
     data: new SlashCommandBuilder()
-        .setName('cla_convidar')
+        .setName('clan_convidar')
         .setDescription('Convida um jogador para o seu clã.')
         .setDescriptionLocalizations({
             "en-US": "Invites a player to your clan."

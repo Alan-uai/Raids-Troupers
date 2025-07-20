@@ -1,14 +1,11 @@
-
-import { SlashCommandBuilder, AttachmentBuilder, ChannelType, PermissionsBitField } from 'discord.js';
+import { AttachmentBuilder, ChannelType, PermissionsBitField } from 'discord.js';
 import { generateProfileImage } from '../profile-generator.js';
 import { getTranslator } from '../i18n.js';
 import { assignMissions } from '../mission-system.js';
+import { data } from './perfil.data.js';
 
 export default {
-    data: new SlashCommandBuilder()
-        .setName('perfil')
-        .setDescription('Mostra seu perfil ou cria um se ele não existir.')
-        .setDescriptionLocalizations({ "en-US": "Shows your profile or creates one if it doesn't exist." }),
+    data: data,
     async execute(interaction, { userStats, userProfiles, userItems, clans, userMissions }) {
         const userId = interaction.user.id;
         const member = interaction.member;

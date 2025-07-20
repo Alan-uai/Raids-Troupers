@@ -3,7 +3,7 @@ import { getTranslator } from '../i18n.js';
 
 export default {
     data: new SlashCommandBuilder()
-        .setName('cla_sair')
+        .setName('clan_sair')
         .setDescription('Sai do seu clã atual.')
         .setDescriptionLocalizations({
             "en-US": "Leaves your current clan."

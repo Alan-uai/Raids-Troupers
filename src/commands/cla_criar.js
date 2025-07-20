@@ -4,7 +4,7 @@ import { getTranslator } from '../i18n.js';
 
 export default {
     data: new SlashCommandBuilder()
-        .setName('cla_criar')
+        .setName('clan_criar')
         .setDescription('Cria um novo clã.')
         .setDescriptionLocalizations({
             "en-US": "Creates a new clan."

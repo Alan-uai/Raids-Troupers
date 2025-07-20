@@ -1,4 +1,3 @@
-
 // src/deploy-commands.js
 
 // Este script é usado para registrar/atualizar os slash commands
@@ -16,27 +15,37 @@ const commands = [];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-// Itera sobre cada arquivo de comando para carregar seus dados
+// Read only .js files that are not .data.js files
+const commandFiles = fs.readdirSync(commandsPath).filter(file => 
+    file.endsWith('.js') && !file.endsWith('.data.js')
+);
+
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
+    const dataFilePath = path.join(commandsPath, file.replace('.js', '.data.js'));
+    let commandData = null;
+
     try {
-        // Usa import() dinâmico para carregar o módulo
-        const commandModule = await import(filePath);
-        const command = commandModule.default;
-        
-        // Verifica se o comando tem as propriedades 'data' e 'execute' necessárias
-        if (command && 'data' in command) {
-            commands.push(command.data.toJSON());
+        // Try to load from .data.js first if it exists
+        if (fs.existsSync(dataFilePath)) {
+            const dataModule = await import(dataFilePath);
+            commandData = dataModule.data;
         } else {
-            console.log(`[AVISO] O comando em ${filePath} está faltando a propriedade "data" ou está malformado.`);
+            // Otherwise, load from the main .js file
+            const commandModule = await import(filePath);
+            commandData = commandModule.data || (commandModule.default && commandModule.default.data);
+        }
+        
+        if (commandData) {
+            commands.push(commandData.toJSON());
+        } else {
+            console.log(`[AVISO] O arquivo de comando em ${filePath} está faltando a propriedade "data" ou está malformado.`);
         }
     } catch (error) {
-        console.error(`[ERRO] Falha ao carregar o comando em ${filePath}:`, error);
+        console.error(`[ERRO] Falha ao carregar os dados do comando de ${filePath}:`, error);
     }
 }
-
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
@@ -44,13 +53,11 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
         console.log(`🔁 Atualizando ${commands.length} comandos Slash (/).`);
 
-        // Verifica se há comandos para registrar
         if (commands.length === 0) {
             console.log('Nenhum comando válido encontrado para registrar.');
             return;
         }
 
-        // O método 'put' é usado para atualizar completamente todos os comandos no servidor
         const data = await rest.put(
             Routes.applicationCommands(process.env.CLIENT_ID),
             { body: commands },

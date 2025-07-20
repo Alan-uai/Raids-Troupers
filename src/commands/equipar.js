@@ -1,19 +1,12 @@
-import { SlashCommandBuilder, AttachmentBuilder } from 'discord.js';
+import { AttachmentBuilder } from 'discord.js';
 import { shopItems } from '../shop-items.js';
 import { rareItems } from '../rare-items.js';
 import { generateProfileImage } from '../profile-generator.js';
 import { getTranslator } from '../i18n.js';
+import { data } from './equipar.data.js';
 
 export default {
-  data: new SlashCommandBuilder()
-    .setName('equipar')
-    .setDescription('Equipe um item do seu inventário.')
-    .setDescriptionLocalizations({ "en-US": "Equip an item from your inventory." })
-    .addStringOption(option =>
-      option.setName('item_id')
-        .setDescription('O ID do item que você deseja equipar.')
-        .setDescriptionLocalizations({ "en-US": "The ID of the item you want to equip." })
-        .setRequired(true)),
+  data: data,
   async execute(interaction, { userStats, userItems, userProfiles, clans }) {
     const t = await getTranslator(interaction.user.id, userStats);
     await interaction.deferReply({ ephemeral: true });
@@ -37,7 +30,7 @@ export default {
     let replyMessage = '';
 
     if (itemToEquip.type === 'background') {
-        items.equippedBackground = itemToEquip.url;
+        items.equippedBackground = itemToBuy.url;
         replyMessage = t('equip_background_success', { itemName: t(`item_${itemToEquip.id}_name`) });
     } else if (itemToEquip.type === 'title') {
         items.equippedTitle = itemToEquip.id; // Store ID, not name
