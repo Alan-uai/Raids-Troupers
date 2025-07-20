@@ -11,6 +11,8 @@ import {
   ChannelType,
   PermissionsBitField,
   AttachmentBuilder,
+  REST,
+  Routes
 } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
@@ -56,6 +58,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+const commands = [];
 
 for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
@@ -64,6 +67,7 @@ for (const file of commandFiles) {
     const command = commandModule.default;
     if ('data' in command && 'execute' in command) {
         client.commands.set(command.data.name, command);
+        commands.push(command.data.toJSON());
     } else {
         console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
     }
@@ -72,8 +76,21 @@ for (const file of commandFiles) {
   }
 }
 
-client.once(Events.ClientReady, async () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
+client.once(Events.ClientReady, async (c) => {
+  console.log(`✅ Logged in as ${c.user.tag}`);
+  
+  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+  try {
+    console.log(`🔁 Started refreshing ${commands.length} application (/) commands.`);
+    const data = await rest.put(
+      Routes.applicationCommands(c.user.id),
+      { body: commands },
+    );
+    console.log(`✅ Successfully reloaded ${data.length} application (/) commands.`);
+  } catch (error) {
+    console.error(error);
+  }
+
   setInterval(checkAuctionEnd, 15000); 
 });
 
@@ -103,7 +120,12 @@ client.on(Events.InteractionCreate, async interaction => {
     const [action, subAction, ...args] = interaction.customId.split('_');
 
     if (action === 'raid') {
-        await handleRaidButton(interaction, subAction, args, t);
+        if (subAction === 'controls') {
+            const [requesterId, raidId] = args;
+            await handleControlsButton(interaction, requesterId, raidId, t);
+        } else {
+            await handleRaidButton(interaction, subAction, args, t);
+        }
     } else if (action === 'auction' && subAction === 'bid') {
         await interaction.reply({ content: t('auction_bid_button_reply'), ephemeral: true });
     } else if (action === 'rate') {
@@ -290,8 +312,7 @@ async function handleControlsButton(interaction, requesterId, raidId, t) {
     if (interaction.user.id !== requesterId) {
         // Member controls
         const memberControls = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`raid_leave_${requesterId}_${raidId}`).setLabel(t('leave_raid_button')).setStyle(ButtonStyle.Primary).setEmoji('👋'),
-            new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setLabel(t('create_voice_chat_button')).setStyle(ButtonStyle.Primary).setEmoji('🔊')
+            new ButtonBuilder().setCustomId(`raid_leave_${requesterId}_${raidId}`).setLabel(t('leave_raid_button')).setStyle(ButtonStyle.Danger).setEmoji('👋'),
         );
         await interaction.reply({ content: t('member_controls_title'), components: [memberControls], ephemeral: true });
     } else {
@@ -299,8 +320,7 @@ async function handleControlsButton(interaction, requesterId, raidId, t) {
         const leaderControls = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`raid_start_${requesterId}_${raidId}`).setLabel(t('start_raid_button')).setStyle(ButtonStyle.Success).setEmoji('✅'),
             new ButtonBuilder().setCustomId(`raid_kickmenu_${requesterId}_${raidId}`).setLabel(t('kick_member_button')).setStyle(ButtonStyle.Danger).setEmoji('❌'),
-            new ButtonBuilder().setCustomId(`raid_close_${requesterId}_${raidId}`).setLabel(t('close_raid_button')).setStyle(ButtonStyle.Secondary).setEmoji('🔒'),
-            new ButtonBuilder().setCustomId(`raid_vc_opt_${requesterId}_${raidId}`).setLabel(t('create_voice_chat_button')).setStyle(ButtonStyle.Primary).setEmoji('🔊')
+            new ButtonBuilder().setCustomId(`raid_close_${requesterId}_${raidId}`).setLabel(t('close_raid_button')).setStyle(ButtonStyle.Secondary).setEmoji('🔒')
         );
         await interaction.reply({ content: t('leader_controls_title'), components: [leaderControls], ephemeral: true });
     }
@@ -355,19 +375,28 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
 
         if (user.id !== requesterId) {
             const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR' };
-            const xpGained = 25, coinsGained = 10, xpToLevelUp = 100;
+            const xpGained = 25, coinsGained = 10;
+            const xpToLevelUp = 100 * stats.level;
             
             stats.raidsHelped += 1;
             stats.xp += xpGained;
             stats.coins += coinsGained;
 
-            if (stats.xp >= xpToLevelUp) {
+            let leveledUp = false;
+            while (stats.xp >= xpToLevelUp) {
                 stats.level += 1;
                 stats.xp -= xpToLevelUp;
-                await thread.send(userT('level_up_notification', { userId: user.id, level: stats.level }));
+                leveledUp = true;
+            }
+            if(leveledUp) {
+                 try {
+                    await user.send({ content: userT('level_up_notification', { level: stats.level }) });
+                } catch(e) {
+                    await thread.send({ content: userT('level_up_notification', { userId: user.id, level: stats.level }) });
+                }
             }
             userStats.set(user.id, stats);
-            await checkMissionCompletion(user, 'RAID_HELPED', thread, { userStats, userMissions, client, userProfiles, userItems, clans });
+            await checkMissionCompletion(user, 'RAID_HELPED', { userStats, userMissions, client, userProfiles, userItems, clans });
         }
 
         const guildMember = await interaction.guild.members.fetch(user.id).catch(() => null);
@@ -442,7 +471,7 @@ async function handleRaidKick(interaction, requesterId, raidId, t) {
         const kickedStats = userStats.get(memberToKickId);
         if(kickedStats) kickedStats.wasKicked = (kickedStats.wasKicked || 0) + 1;
         
-        await checkMissionCompletion(interaction.user, 'KICK_MEMBER', thread, { userStats, userMissions, client, userProfiles, userItems, clans });
+        await checkMissionCompletion(interaction.user, 'KICK_MEMBER', { userStats, userMissions, client, userProfiles, userItems, clans });
 
         const raidEmbed = EmbedBuilder.from(originalRaidMessage.embeds[0]);
         const membersField = raidEmbed.data.fields.find(f => f.name.includes(t('team_members')));
@@ -532,7 +561,7 @@ async function handleRating(interaction, raterId, ratedId, type, t) {
         await interaction.update({ content: t('rating_thanks_next'), components: [selectMenu] });
     }
     
-    await checkMissionCompletion(interaction.user, 'RATE_PLAYER', interaction.channel, { userStats, userMissions, client, userProfiles, userItems, clans });
+    await checkMissionCompletion(interaction.user, 'RATE_PLAYER', { userStats, userMissions, client, userProfiles, userItems, clans });
 
     const profileInfo = userProfiles.get(ratedId);
     if (profileInfo) {

@@ -147,8 +147,8 @@
     "missions_none_active": "You don't have any active missions at the moment.",
     "missions_embed_title": "📜 {username}'s Missions",
     "missions_embed_description": "Complete these tasks to earn rewards!",
-    "mission_completed_notification": "🏅 Mission Completed, <@{userId}>! You completed \"{description}\" and earned {xp} XP and {coins} TC!",
-    "level_up_from_mission": "🎉 Congratulations, <@{userId}>! You leveled up to level {level} by completing a mission!",
+    "mission_completed_notification": "🏅 Mission Completed! You finished \"{description}\" and earned {xp} XP and {coins} TC!",
+    "level_up_from_mission": "🎉 Congratulations! You've leveled up to level {level} by completing a mission!",
 
     "raid_channel_not_found": "I couldn't find the channel to announce the raid. Please notify an administrator!",
     "raid_embed_title": "📢 New Call for Help in **__Raid__**!",
@@ -174,7 +174,6 @@
     "raid_thread_welcome": "Welcome, <@{userId}>! This is the thread to organize your raid.\n\n**Raid Controls:**\nUse the button below to access your controls.",
     "my_controls_button": "⚙️ My Controls",
     "leave_raid_button": "👋 Leave Raid",
-    "create_voice_chat_button": "🔊 Create Voice Chat",
     "member_controls_title": "**Member Controls:**\nChoose an action:",
     "leader_controls_title": "**Leader Controls:**\nChoose an action:",
     "start_raid_button": "✅ Start Raid",

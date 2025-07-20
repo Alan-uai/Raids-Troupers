@@ -17,7 +17,7 @@ export function assignMissions(userId, userMissions) {
     console.log(`Assigned initial missions to ${userId}`);
 }
 
-export async function checkMissionCompletion(user, missionType, channel, data) {
+export async function checkMissionCompletion(user, missionType, data) {
     const { userMissions, userStats, client, userProfiles, userItems, clans } = data;
     const userId = user.id;
 
@@ -45,17 +45,29 @@ export async function checkMissionCompletion(user, missionType, channel, data) {
                 stats.coins += reward.coins;
                 profileNeedsUpdate = true;
                 
-                const xpToLevelUp = 100;
-                if (stats.xp >= xpToLevelUp) {
+                const xpToLevelUp = 100 * stats.level;
+                let leveledUp = false;
+                while (stats.xp >= xpToLevelUp) {
                     stats.level += 1;
                     stats.xp -= xpToLevelUp;
-                    await channel.send(t('level_up_from_mission', { userId, level: stats.level }));
+                    leveledUp = true;
+                }
+                if(leveledUp) {
+                    try {
+                       await user.send({ content: t('level_up_from_mission', { level: stats.level }) });
+                    } catch(e) {
+                       console.log(`Could not DM user ${user.id} about level up.`);
+                    }
                 }
                 
                 userStats.set(userId, stats);
                 
                 const missionDescription = t(`mission_${missionDetails.id}_description`);
-                await channel.send(t('mission_completed_notification', { userId, description: missionDescription, xp: reward.xp, coins: reward.coins }));
+                 try {
+                    await user.send({ content: t('mission_completed_notification', { description: missionDescription, xp: reward.xp, coins: reward.coins }) });
+                 } catch(e) {
+                    console.log(`Could not DM user ${user.id} about mission completion.`);
+                 }
             }
         }
     }
@@ -66,7 +78,7 @@ export async function checkMissionCompletion(user, missionType, channel, data) {
             try {
                 const profileChannel = await client.channels.fetch(profileInfo.channelId);
                 const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
-                const member = await channel.guild.members.fetch(userId);
+                const member = await profileChannel.guild.members.fetch(userId);
                 const items = userItems.get(userId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
                 
                 const newProfileImageBuffer = await generateProfileImage(member, userStats.get(userId), items, clans, t);

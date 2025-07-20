@@ -111,7 +111,7 @@ export default {
       stats.raidsCreated += 1;
       userStats.set(user.id, stats);
       
-      await checkMissionCompletion(interaction.user, 'RAID_CREATED', interaction.channel, { userStats, userMissions, client: interaction.client, userProfiles, userItems, clans });
+      await checkMissionCompletion(interaction.user, 'RAID_CREATED', { userStats, userMissions, client: interaction.client, userProfiles, userItems, clans });
 
       await interaction.editReply({
         content: t('raid_reply_success', { channelId: raidChannelId })
