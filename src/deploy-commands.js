@@ -18,25 +18,42 @@ const commandsPath = path.join(__dirname, 'commands');
 
 // Read only .js files that are not .data.js files
 const commandFiles = fs.readdirSync(commandsPath).filter(file => 
-    file.endsWith('.js') && !file.endsWith('.data.js')
+    file.endsWith('.js') && !file.endsWith('.data.js') && !file.startsWith('clan_')
 );
+
+const clanCommandFiles = fs.readdirSync(commandsPath).filter(file => 
+    file.endsWith('.js') && file.startsWith('clan_')
+);
+
+// Manually add the new clan commands
+commandFiles.push('clan_aceitar.js');
+commandFiles.push('clan_convidar.js');
+commandFiles.push('clan_criar.js');
+commandFiles.push('clan_expulsar.js');
+commandFiles.push('clan_info.js');
+commandFiles.push('clan_sair.js');
+commandFiles.push('clan_convocar.js');
+commandFiles.push('clan_dissolver.js');
 
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
-    const dataFilePath = path.join(commandsPath, file.replace('.js', '.data.js'));
-    let commandData = null;
+    
+    // Check if the file is a real command or a .data.js file that might be misnamed
+    if (file.endsWith('.data.js')) {
+        console.log(`[AVISO] Ignorando arquivo de dados: ${file}`);
+        continue;
+    }
 
     try {
-        // Try to load from .data.js first if it exists
-        if (fs.existsSync(dataFilePath)) {
-            const dataModule = await import(dataFilePath);
-            commandData = dataModule.data;
-        } else {
-            // Otherwise, load from the main .js file
-            const commandModule = await import(filePath);
-            commandData = commandModule.data || (commandModule.default && commandModule.default.data);
+        const commandModule = await import(filePath);
+        // Commands defined with 'export default'
+        let commandData = commandModule.default?.data;
+
+        // If not found, check for commands defined with 'export const data'
+        if (!commandData && commandModule.data) {
+             commandData = commandModule.data;
         }
-        
+       
         if (commandData) {
             commands.push(commandData.toJSON());
         } else {
@@ -46,6 +63,7 @@ for (const file of commandFiles) {
         console.error(`[ERRO] Falha ao carregar os dados do comando de ${filePath}:`, error);
     }
 }
+
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 

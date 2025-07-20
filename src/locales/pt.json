@@ -80,6 +80,9 @@
     "mission_create_raid_5_description": "Crie 5 Raids",
     "mission_help_raid_10_description": "Ajude em 10 Raids",
     
+    "clan_command_not_in_clan": "❌ Você não está em um clã para usar este comando.",
+    "clan_command_not_leader": "❌ Apenas o líder do clã pode usar este comando.",
+    "clan_command_clan_not_found": "❌ Seu clã anterior não foi encontrado. Seu status foi corrigido.",
     "clan_accept_no_invite": "❌ Você não foi convidado para este clã ou o convite expirou.",
     "clan_accept_already_in_clan": "❌ Você já está em um clã. Saia do seu clã atual para poder entrar em outro.",
     "clan_accept_clan_disbanded": "❌ Este clã não existe mais.",
@@ -122,8 +125,18 @@
 
     "clan_leave_not_in_clan": "❌ Você não está em um clã.",
     "clan_leave_clan_disbanded": "❌ O clã em que você estava não parece mais existir. Seu status foi corrigido.",
-    "clan_leave_leader_cannot_leave": "❌ O líder não pode sair do clã. Você deve passar a liderança ou dissolver o clã (funcionalidade futura).",
+    "clan_leave_leader_cannot_leave": "❌ O líder não pode sair do clã. Você deve dissolver o clã ou transferir a liderança.",
     "clan_leave_success": "✅ Você saiu do clã **{clanName}**.",
+    
+    "clan_summon_no_channel": "❌ Seu clã não possui um canal privado para enviar convocações.",
+    "clan_summon_success": "✅ Convocação enviada para o canal do seu clã em <#{channelId}>.",
+    "clan_summon_error": "❌ Ocorreu um erro ao tentar enviar a convocação.",
+    "clan_summon_embed_title": "📢 Convocação do Clã!",
+    "clan_summon_embed_author": "Anúncio de {username}",
+
+    "clan_disband_success": "✅ O clã **{clanName}** foi dissolvido com sucesso.",
+    "clan_disband_error": "❌ Ocorreu um erro ao tentar dissolver o clã.",
+    "clan_disband_dm": "O clã **{clanName}** foi dissolvido pelo líder.",
     
     "classes_level_too_low": "⚔️ Você precisa atingir o nível 5 para escolher uma classe.",
     "classes_already_chosen": "🛡️ Você já é um {className}! No momento, não é possível trocar de classe.",
@@ -299,7 +312,10 @@
     "auction_winner_footer": "O item foi adicionado ao inventário do vencedor.",
     "auction_winner_dm": "Parabéns! Você venceu o leilão para **{itemName}** com um lance de {bid} TC. O item já está no seu inventário! Use /equipar para usá-lo.",
 
-    "profile_show": "Aqui está o perfil do usuário:",
+    "profile_show": "Este é o perfil do usuário. Você pode vê-lo em <#{channelId}>.",
+    "profile_show_error": "Ocorreu um erro ao exibir/atualizar o perfil.",
+    "profile_user_not_found": "Não foi possível encontrar esse usuário no servidor.",
+    "profile_create_not_self": "Você só pode ver o perfil de outras pessoas. Não é possível criar um perfil para elas.",
     "profile_creation_error_category": "Erro: A categoria de perfis não foi encontrada. Por favor, contate um administrador.",
     "profile_creation_success": "✅ Seu perfil e canal privado foram criados com sucesso! Você pode vê-lo aqui: <#{channelId}>",
     "profile_creation_error_generic": "Ocorreu um erro inesperado ao criar seu perfil.",
@@ -319,5 +335,4 @@
     "update_announcement_outro": "Explorem os novos comandos e funcionalidades! Esperamos que gostem da nova experiência.",
     "update_announcement_success": "✅ Anúncio de atualização postado com sucesso em <#{channelId}>."
 }
-
     

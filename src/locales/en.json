@@ -80,6 +80,9 @@
     "mission_create_raid_5_description": "Create 5 Raids",
     "mission_help_raid_10_description": "Help in 10 Raids",
 
+    "clan_command_not_in_clan": "❌ You are not in a clan to use this command.",
+    "clan_command_not_leader": "❌ Only the clan leader can use this command.",
+    "clan_command_clan_not_found": "❌ Your previous clan could not be found. Your status has been corrected.",
     "clan_accept_no_invite": "❌ You were not invited to this clan or the invitation has expired.",
     "clan_accept_already_in_clan": "❌ You are already in a clan. Leave your current clan to join another one.",
     "clan_accept_clan_disbanded": "❌ This clan no longer exists.",
@@ -122,9 +125,19 @@
 
     "clan_leave_not_in_clan": "❌ You are not in a clan.",
     "clan_leave_clan_disbanded": "❌ The clan you were in no longer seems to exist. Your status has been corrected.",
-    "clan_leave_leader_cannot_leave": "❌ The leader cannot leave the clan. You must transfer leadership or dissolve the clan (future feature).",
+    "clan_leave_leader_cannot_leave": "❌ The leader cannot leave the clan. You must dissolve the clan or transfer leadership.",
     "clan_leave_success": "✅ You have left the **{clanName}** clan.",
     
+    "clan_summon_no_channel": "❌ Your clan does not have a private channel to send announcements to.",
+    "clan_summon_success": "✅ Announcement sent to your clan channel <#{channelId}>.",
+    "clan_summon_error": "❌ An error occurred while trying to send the announcement.",
+    "clan_summon_embed_title": "📢 Clan Announcement!",
+    "clan_summon_embed_author": "Announcement from {username}",
+
+    "clan_disband_success": "✅ The clan **{clanName}** has been successfully disbanded.",
+    "clan_disband_error": "❌ An error occurred while trying to disband the clan.",
+    "clan_disband_dm": "The clan **{clanName}** has been disbanded by the leader.",
+
     "classes_level_too_low": "⚔️ You need to reach level 5 to choose a class.",
     "classes_already_chosen": "🛡️ You are already a {className}! It's not possible to change classes at the moment.",
     "classes_embed_title": "🛡️ Choose Your Specialization",
@@ -299,7 +312,10 @@
     "auction_winner_footer": "The item has been added to the winner's inventory.",
     "auction_winner_dm": "Congratulations! You won the auction for **{itemName}** with a bid of {bid} TC. The item is now in your inventory! Use /equipar to use it.",
 
-    "profile_show": "Here is the user's current profile:",
+    "profile_show": "Here is the user's profile. You can check it out in <#{channelId}>.",
+    "profile_show_error": "An error occurred while showing/updating the profile.",
+    "profile_user_not_found": "Could not find that user in the server.",
+    "profile_create_not_self": "You can only view other people's profiles. You cannot create a profile for them.",
     "profile_creation_error_category": "Error: The profile category channel was not found. Please contact an administrator.",
     "profile_creation_success": "✅ Your profile and private channel have been successfully created! You can see it here: <#{channelId}>",
     "profile_creation_error_generic": "An unexpected error occurred while creating your profile.",
