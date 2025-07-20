@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { generateProfileImage } from './profile-generator.js';
 import { shopItems } from './shop-items.js';
 import { rareItems } from './rare-items.js';
+import { missions as missionPool } from './missions.js';
 import { assignMissions, checkMissionCompletion } from './mission-system.js';
 import { getTranslator } from './i18n.js';
 import lojaSetup from './commands/loja_setup.js';
@@ -121,6 +122,13 @@ client.on(Events.InteractionCreate, async interaction => {
         await handleRating(interaction, raterId, ratedId, type, t);
     } else if (interaction.customId === 'shop_buy_button') {
         await handleBuyButton(interaction, t);
+    } else if (action === 'mission') {
+        const [subAction, userId, missionId] = args;
+        if (subAction === 'collect') {
+            await handleMissionCollect(interaction, userId, missionId);
+        } else if (subAction === 'autocollect') {
+            await handleAutoCollectToggle(interaction, userId);
+        }
     }
 
   } else if (interaction.isStringSelectMenu()) {
@@ -364,7 +372,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
         const userT = await getTranslator(user.id, userStats);
 
         if (user.id !== requesterId) {
-            const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR' };
+            const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR', autoCollectMissions: false };
             const xpGained = 25, coinsGained = 10;
             const xpToLevelUp = 100 * stats.level;
             
@@ -523,7 +531,7 @@ async function handleRating(interaction, raterId, ratedId, type, t) {
         return await interaction.update({ content: t('rating_already_rated'), components: [] });
     }
 
-    const stats = userStats.get(ratedId) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR' };
+    const stats = userStats.get(ratedId) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR', autoCollectMissions: false };
     stats.totalRatings = (stats.totalRatings || 0) + 1;
     if (type === 'up') {
         stats.reputation = (stats.reputation || 0) + 1;
@@ -613,6 +621,65 @@ async function handleBuyButton(interaction, t) {
     await interaction.editReply({ content: t('buy_interaction_success', { itemName: t(`item_${itemToBuy.id}_name`), balance: stats.coins }) });
 }
 
+async function handleMissionCollect(interaction, userId, missionId) {
+    if (interaction.user.id !== userId) {
+        return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
+    }
+
+    const t = await getTranslator(userId, userStats);
+    const activeMissions = userMissions.get(userId);
+    const missionProgress = activeMissions?.find(m => m.id === missionId);
+    const missionDetails = missionPool.find(m => m.id === missionId);
+
+    if (!missionProgress || !missionDetails) {
+        return await interaction.reply({ content: t('missions_collect_error_not_found'), ephemeral: true });
+    }
+
+    if (missionProgress.progress < missionDetails.goal) {
+        return await interaction.reply({ content: t('missions_collect_error_not_complete'), ephemeral: true });
+    }
+
+    if (missionProgress.collected) {
+        return await interaction.reply({ content: t('missions_collect_error_already_collected'), ephemeral: true });
+    }
+
+    missionProgress.collected = true;
+    const stats = userStats.get(userId);
+    const reward = missionDetails.reward;
+    stats.xp += reward.xp;
+    stats.coins += reward.coins;
+    
+    // Potentially assign a new mission here
+    // For now, just mark as collected.
+    
+    userStats.set(userId, stats);
+    userMissions.set(userId, activeMissions);
+    
+    await interaction.update({
+        content: t('missions_collect_success', { xp: reward.xp, coins: reward.coins }),
+        components: []
+    });
+
+    // We can update the main profile image here if we want to show the new coin/xp total immediately
+}
+
+
+async function handleAutoCollectToggle(interaction, userId) {
+    if (interaction.user.id !== userId) {
+        return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
+    }
+    const t = await getTranslator(userId, userStats);
+    const stats = userStats.get(userId);
+
+    if (stats) {
+        stats.autoCollectMissions = !stats.autoCollectMissions;
+        userStats.set(userId, stats);
+
+        const status = stats.autoCollectMissions ? t('missions_autocollect_status_on') : t('missions_autocollect_status_off');
+        await interaction.reply({ content: t('missions_autocollect_toggled', { status }), ephemeral: true });
+    }
+}
+
 
 client.on(Events.MessageCreate, async message => {
   if (message.author.bot || !message.mentions.has(client.user.id)) return;
@@ -660,20 +727,21 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
     }
 });
 
+const PROFILE_CATEGORY_ID = '1395589412661887068';
+
 client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     const roleName = 'limpo';
-    const categoryId = '1395589412661887068';
-
+    
     const oldHasRole = oldMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
     const newHasRole = newMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
 
     if (!oldHasRole && newHasRole) {
         console.log(`User ${newMember.displayName} received the '${roleName}' role. Creating channel and profile.`);
         const guild = newMember.guild;
-        const category = guild.channels.cache.get(categoryId);
+        const category = guild.channels.cache.get(PROFILE_CATEGORY_ID);
 
         if (!category || category.type !== ChannelType.GuildCategory) {
-            console.error(`Category with ID ${categoryId} not found or is not a category.`);
+            console.error(`Category with ID ${PROFILE_CATEGORY_ID} not found or is not a category.`);
             return;
         }
 
@@ -695,7 +763,7 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
             console.log(`Channel #${channel.name} created for ${newMember.displayName}.`);
             
-            const stats = { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale };
+            const stats = { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, autoCollectMissions: false };
             userStats.set(newMember.id, stats);
 
             const items = { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
@@ -713,6 +781,47 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
                 channelId: channel.id,
                 messageId: profileMessage.id
             });
+            
+            // Create mission thread and post missions, same as in /perfil
+            const missionThread = await channel.threads.create({
+                name: t('missions_thread_title'),
+                autoArchiveDuration: 10080,
+                reason: t('missions_thread_reason', { username: newMember.displayName }),
+            });
+
+            const autoCollectRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`mission_autocollect_toggle_${newMember.id}`)
+                    .setLabel(t('missions_autocollect_button'))
+                    .setStyle(ButtonStyle.Secondary)
+                    .setEmoji('⚙️')
+            );
+            await missionThread.send({ content: t('missions_autocollect_description'), components: [autoCollectRow] });
+            
+            const activeMissions = userMissions.get(newMember.id) || [];
+            for (const missionProgress of activeMissions) {
+                const missionDetails = missionPool.find(m => m.id === missionProgress.id);
+                if (missionDetails) {
+                    const missionEmbed = new EmbedBuilder()
+                        .setTitle(t(`mission_${missionDetails.id}_description`))
+                        .setDescription(`**${t('progress')}:** ${missionProgress.progress} / ${missionDetails.goal}\n**${t('reward')}:** ${missionDetails.reward.xp} XP & ${missionDetails.reward.coins} TC`)
+                        .setColor('#3498DB')
+                        .setFooter({text: `ID: ${missionDetails.id}`});
+
+                    const collectButton = new ButtonBuilder()
+                        .setCustomId(`mission_collect_${newMember.id}_${missionDetails.id}`)
+                        .setLabel(t('missions_collect_button'))
+                        .setStyle(ButtonStyle.Success)
+                        .setEmoji('🏆')
+                        .setDisabled(missionProgress.progress < missionDetails.goal);
+                        
+                    const row = new ActionRowBuilder().addComponents(collectButton);
+                    
+                    const missionMessage = await missionThread.send({ embeds: [missionEmbed], components: [row] });
+                    missionProgress.messageId = missionMessage.id;
+                }
+            }
+            userMissions.set(newMember.id, activeMissions);
 
         } catch (error) {
             console.error(`Failed to create channel or profile for ${newMember.displayName}:`, error);
