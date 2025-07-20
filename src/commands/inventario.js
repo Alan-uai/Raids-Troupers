@@ -1,3 +1,4 @@
+
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { shopItems } from '../shop-items.js';
 import { rareItems } from '../rare-items.js';
