@@ -15,43 +15,24 @@ const commands = [];
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-// Usando um nome de arquivo diferente para o comando de inventário para evitar conflito
-const commandFileNames = [
-    'raid.js',
-    'classes.js',
-    'escolher_classe.js',
-    'loja.js',
-    'comprar.js',
-    'inventario.js', // Assegurando que o comando de inventário seja carregado
-    'equipar.js',
-    'iniciar_leilao.js',
-    'dar_lance.js',
-    'missoes.js',
-    'cla_criar.js',
-    'cla_convidar.js',
-    'cla_aceitar.js',
-    'cla_sair.js',
-    'cla_info.js',
-    'cla_expulsar.js'
-];
-
-for (const file of commandFileNames) {
+// Apenas importa a propriedade 'data' para evitar carregar dependências pesadas
+for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
-    if (fs.existsSync(filePath)) {
-        try {
-            const commandModule = await import(filePath);
-            const command = commandModule.default;
-            if (command && 'data' in command) {
-                commands.push(command.data.toJSON());
-            } else {
-                console.log(`[AVISO] O comando em ${filePath} está faltando a propriedade "data" ou está malformado.`);
-            }
-        } catch (error) {
-            console.error(`Erro ao carregar o comando de ${filePath}:`, error);
+    try {
+        // Carrega o módulo dinamicamente
+        const commandModule = await import(filePath);
+        const command = commandModule.default;
+        
+        // Verifica se a propriedade 'data' existe antes de adicioná-la
+        if (command && 'data' in command) {
+            commands.push(command.data.toJSON());
+        } else {
+            console.log(`[AVISO] O comando em ${filePath} está faltando a propriedade "data" ou está malformado.`);
         }
-    } else {
-        console.log(`[AVISO] O arquivo de comando ${file} não foi encontrado.`);
+    } catch (error) {
+        console.error(`Erro ao carregar os dados do comando de ${filePath}:`, error);
     }
 }
 

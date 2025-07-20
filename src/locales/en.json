@@ -51,6 +51,10 @@
     "item_borda_avatar_fogo_name": "Avatar Border: Eternal Flames",
     "item_titulo_pioneiro_name": "Title: Troop Pioneer",
 
+    "item_fundo_neon_description": "A vibrant animated background of a city at night.",
+    "item_fundo_floresta_description": "An enchanted forest with mystical lights.",
+    "item_fundo_espaco_description": "Travel through the cosmos with this galactic view.",
+
     "mission_create_raid_1_description": "Create 1 Raid",
     "mission_help_raid_3_description": "Help in 3 Raids",
     "mission_kick_member_1_description": "Kick 1 member from a raid",
@@ -110,6 +114,10 @@
     "buy_success_title": "✅ Purchase Successful!",
     "buy_success_description": "You bought **{itemName}** for {price} TC!",
     "buy_success_footer": "Use /equipar to use your new item!",
+    "buy_button_label": "Buy {itemName}",
+    "buy_interaction_success": "✅ You successfully bought **{itemName}**! Your new balance is {balance} TC.",
+    "buy_interaction_fail_coins": "💰 You don't have enough Troup Coins to buy **{itemName}**.",
+    "buy_interaction_fail_owned": "🤔 You already own **{itemName}**.",
 
     "bid_no_active_auction": "❌ There are no active auctions at the moment.",
     "bid_auction_ended": "❌ This auction has already ended!",
@@ -141,8 +149,10 @@
     "inventory_title": "Inventory of {username}",
     "inventory_footer": "Use /equipar <item_id> to use an item.",
     
-    "shop_title": "🛒 Profile Backgrounds Shop",
-    "shop_description": "Use `/comprar item_id:<item_ID>` to get a new background!",
+    "shop_title": "🛒 Troupers Store",
+    "shop_description": "Click the buttons below to purchase items for your profile!",
+    "shop_channel_not_found": "Shop channel not found. Please contact an administrator.",
+    "shop_updated": "The shop message has been updated in <#{channelId}>.",
 
     "missions_none_active": "You don't have any active missions at the moment.",
     "missions_embed_title": "📜 {username}'s Missions",

@@ -10,9 +10,7 @@ import {
   EmbedBuilder,
   ChannelType,
   PermissionsBitField,
-  AttachmentBuilder,
-  REST,
-  Routes
+  AttachmentBuilder
 } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
@@ -20,9 +18,11 @@ import path from 'node:path';
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { generateProfileImage } from './profile-generator.js';
+import { shopItems } from './shop-items.js';
 import { rareItems } from './rare-items.js';
 import { assignMissions, checkMissionCompletion } from './mission-system.js';
 import { getTranslator } from './i18n.js';
+import loja from './commands/loja.js';
 
 dotenv.config();
 
@@ -74,7 +74,9 @@ for (const file of commandFiles) {
 
 client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
-  setInterval(checkAuctionEnd, 15000); 
+  setInterval(checkAuctionEnd, 15000);
+  const t = await getTranslator(null, null, 'pt-BR');
+  loja.updateShopMessage({ client, guild: { id: c.guilds.cache.first()?.id } }, t);
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -100,20 +102,23 @@ client.on(Events.InteractionCreate, async interaction => {
       }
     }
   } else if (interaction.isButton()) {
-    const [action, subAction, ...args] = interaction.customId.split('_');
+    const [action, ...args] = interaction.customId.split('_');
 
     if (action === 'raid') {
+        const [subAction, ...raidArgs] = args;
         if (subAction === 'controls') {
-            const [requesterId, raidId] = args;
+            const [requesterId, raidId] = raidArgs;
             await handleControlsButton(interaction, requesterId, raidId, t);
         } else {
-            await handleRaidButton(interaction, subAction, args, t);
+            await handleRaidButton(interaction, subAction, raidArgs, t);
         }
-    } else if (action === 'auction' && subAction === 'bid') {
+    } else if (action === 'auction' && args[0] === 'bid') {
         await interaction.reply({ content: t('auction_bid_button_reply'), ephemeral: true });
     } else if (action === 'rate') {
-        const [raterId, ratedId] = args;
-        await handleRating(interaction, raterId, ratedId, subAction, t);
+        const [type, raterId, ratedId] = args;
+        await handleRating(interaction, raterId, ratedId, type, t);
+    } else if (action === 'buy') {
+        await handleBuyButton(interaction, args[0], t);
     }
 
   } else if (interaction.isStringSelectMenu()) {
@@ -181,7 +186,7 @@ async function checkAuctionEnd() {
     if (auctionMessage) await auctionMessage.edit({ embeds: [finalEmbed], components: [] });
 
     try {
-        await winnerUser.send({ content: winnerT('auction_winner_dm', { itemName: winnerT(`item_${auction.item.id}_name`), bid: winningBid }), ephemeral: true });
+        await winnerUser.send({ content: winnerT('auction_winner_dm', { itemName: winnerT(`item_${auction.item.id}_name`), bid: winningBid }) });
     } catch (e) {
         console.log(`Could not send DM to auction winner ${winnerUser.username}`);
     }
@@ -370,7 +375,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
             }
             if(leveledUp) {
                  try {
-                    await user.send({ content: userT('level_up_notification', { level: stats.level }), ephemeral: true });
+                    await user.send({ content: userT('level_up_notification', { level: stats.level }) });
                 } catch(e) {
                     await thread.send({ content: userT('level_up_notification', { userId: user.id, level: stats.level }) });
                 }
@@ -560,6 +565,36 @@ async function handleRating(interaction, raterId, ratedId, type, t) {
             console.error(`Failed to update profile image for ${ratedId} after rating:`, updateError);
         }
     }
+}
+
+async function handleBuyButton(interaction, itemId, t) {
+    const userId = interaction.user.id;
+    const itemToBuy = shopItems.find(item => item.id === itemId);
+
+    if (!itemToBuy) {
+        return; // Should not happen if buttons are generated from shopItems
+    }
+    
+    await interaction.deferReply({ ephemeral: true });
+
+    const stats = userStats.get(userId);
+    const items = userItems.get(userId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
+
+    if (items.inventory.includes(itemId)) {
+      return await interaction.editReply({ content: t('buy_interaction_fail_owned', { itemName: t(`item_${itemToBuy.id}_name`) }) });
+    }
+
+    if (!stats || stats.coins < itemToBuy.price) {
+      return await interaction.editReply({ content: t('buy_interaction_fail_coins', { itemName: t(`item_${itemToBuy.id}_name`) }) });
+    }
+
+    stats.coins -= itemToBuy.price;
+    items.inventory.push(itemId);
+
+    userStats.set(userId, stats);
+    userItems.set(userId, items);
+    
+    await interaction.editReply({ content: t('buy_interaction_success', { itemName: t(`item_${itemToBuy.id}_name`), balance: stats.coins }) });
 }
 
 

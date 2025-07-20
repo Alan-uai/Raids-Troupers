@@ -51,6 +51,10 @@
     "item_borda_avatar_fogo_name": "Borda de Avatar: Chamas Eternas",
     "item_titulo_pioneiro_name": "Título: Pioneiro da Tropa",
     
+    "item_fundo_neon_description": "Um fundo animado e vibrante de uma cidade à noite.",
+    "item_fundo_floresta_description": "Uma floresta encantada com luzes místicas.",
+    "item_fundo_espaco_description": "Viaje pelo cosmos com esta visão galáctica.",
+    
     "mission_create_raid_1_description": "Crie 1 Raid",
     "mission_help_raid_3_description": "Ajude em 3 Raids",
     "mission_kick_member_1_description": "Expulse 1 membro de uma raid",
@@ -110,6 +114,10 @@
     "buy_success_title": "✅ Compra Realizada com Sucesso!",
     "buy_success_description": "Você comprou **{itemName}** por {price} TC!",
     "buy_success_footer": "Use /equipar para usar seu novo item!",
+    "buy_button_label": "Comprar {itemName}",
+    "buy_interaction_success": "✅ Você comprou **{itemName}** com sucesso! Seu novo saldo é de {balance} TC.",
+    "buy_interaction_fail_coins": "💰 Você não tem Troup Coins suficientes para comprar **{itemName}**.",
+    "buy_interaction_fail_owned": "🤔 Você já possui o item **{itemName}**.",
 
     "bid_no_active_auction": "❌ Não há nenhum leilão ativo no momento.",
     "bid_auction_ended": "❌ Este leilão já terminou!",
@@ -141,8 +149,10 @@
     "inventory_title": "Inventário de {username}",
     "inventory_footer": "Use /equipar <item_id> para usar um item.",
     
-    "shop_title": "🛒 Loja de Fundos de Perfil",
-    "shop_description": "Use `/comprar item_id:<ID do item>` para adquirir um novo fundo!",
+    "shop_title": "🛒 Loja Troupers",
+    "shop_description": "Clique nos botões abaixo para adquirir itens para seu perfil!",
+    "shop_channel_not_found": "Canal da loja não encontrado. Por favor, contate um administrador.",
+    "shop_updated": "A mensagem da loja foi atualizada em <#{channelId}>.",
 
     "missions_none_active": "Você não tem nenhuma missão ativa no momento.",
     "missions_embed_title": "📜 Missões de {username}",
