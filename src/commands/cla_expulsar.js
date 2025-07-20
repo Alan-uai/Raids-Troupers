@@ -45,6 +45,17 @@ export default {
             userStats.set(memberToExpel.id, memberStats);
         }
         
+        // Remover role do membro expulso
+        try {
+            const role = await interaction.guild.roles.fetch(clan.roleId);
+            const member = await interaction.guild.members.fetch(memberToExpel.id);
+            if (role && member) {
+                await member.roles.remove(role);
+            }
+        } catch (e) {
+            console.error(`Falha ao remover role do clã ${clan.name} do membro expulso ${memberToExpel.id}`, e);
+        }
+
         clans.set(clan.name.toLowerCase(), clan);
 
         await interaction.reply({ content: t('clan_kick_success', { username: memberToExpel.username }), ephemeral: true });

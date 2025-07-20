@@ -20,6 +20,7 @@
     "unknown_item": "Item Desconhecido",
     "equipped_background": "Fundo Equipado",
     "equipped_title": "Título Equipado",
+    "equipped_border": "Borda Equipada",
     "no_items_found": "Nenhum item encontrado.",
     "level": "Nível",
     "xp": "XP",
@@ -65,6 +66,8 @@
     "item_pocao_fraca_description": "Recupera uma pequena quantidade de vida.",
     "item_anel_simples_description": "Um anel simples, sem propriedades especiais.",
     "item_botas_couro_description": "Botas de couro padrão.",
+    "item_aura_kardec_name": "Aura de Kardec",
+    "item_aura_kardec_description": "A manifestação do poder absoluto. Concede um cargo exclusivo no servidor.",
 
     "item_type_background": "Tipo: Fundo de Perfil",
     "item_type_title": "Tipo: Título",
@@ -97,7 +100,14 @@
     "clan_create_not_enough_coins": "💰 Você precisa de {cost} Troup Coins para criar um clã. Você tem apenas {balance}.",
     "clan_create_name_exists": "❌ Já existe um clã com este nome.",
     "clan_create_tag_exists": "❌ Já existe um clã com esta tag.",
-    "clan_create_success": "🎉 Parabéns! O clã **{clanName}** [{clanTag}] foi fundado com sucesso! Seu perfil será atualizado.",
+    "clan_create_success": "🎉 Parabéns! O clã **{clanName}** [{clanTag}] foi fundado com sucesso!",
+    "clan_create_level_too_low": "❌ Você precisa ter no mínimo nível {level} para criar um clã.",
+    "clan_create_invalid_color": "❌ A cor precisa estar em um formato HEX válido (ex: #FF0000).",
+    "clan_create_inappropriate_name": "❌ O nome ou a tag do clã contém palavras impróprias. Por favor, escolha outro.",
+    "clan_create_category_not_found": "⚠️ A categoria de canais privados não foi encontrada. O clã foi criado sem um canal.",
+    "clan_create_error_generic": "Ocorreu um erro inesperado ao criar o clã. A transação foi revertida.",
+    "clan_channel_welcome": "⚔️ Bem-vindo ao canal privado do clã **{clanName}**! Apenas membros podem ver este local.",
+
 
     "clan_kick_self": "❌ Você não pode expulsar a si mesmo. Se quiser sair, use `/cla_sair`.",
     "clan_kick_not_in_clan": "❌ Você não está em um clã.",
@@ -292,7 +302,22 @@
     "profile_show": "Aqui está o perfil do usuário:",
     "profile_creation_error_category": "Erro: A categoria de perfis não foi encontrada. Por favor, contate um administrador.",
     "profile_creation_success": "✅ Seu perfil e canal privado foram criados com sucesso! Você pode vê-lo aqui: <#{channelId}>",
-    "profile_creation_error_generic": "Ocorreu um erro inesperado ao criar seu perfil."
+    "profile_creation_error_generic": "Ocorreu um erro inesperado ao criar seu perfil.",
+
+    "update_announcement_title": "📢 Anúncio de Atualização do Bot!",
+    "update_announcement_intro": "Olá, @everyone! O bot recebeu uma grande atualização com muitas novidades e melhorias. Confiram o que mudou:",
+    "update_announcement_profiles_title": "👤 Perfis de Usuário Avançados",
+    "update_announcement_profiles_desc": "- **Criação Automática**: Seu canal de perfil pessoal agora é criado automaticamente.\n- **Tópicos Privados**: Dentro do seu canal, você encontrará tópicos privados para **Missões**, **Marcos** e uma **Loja Exclusiva**.\n- **Botões Interativos**: Equipe itens ou selecione marcos para exibir diretamente pelo seu perfil.",
+    "update_announcement_missions_title": "📜 Sistema de Missões Inteligentes",
+    "update_announcement_missions_desc": "- **Dificuldade Dinâmica**: As missões agora se adaptam ao seu progresso. Quanto mais você joga, mais desafiadoras elas se tornam!\n- **Recompensas em Itens**: Além de XP e Moedas, agora você pode ganhar itens raros ao completar missões.\n- **Coleta Automática**: Ative a coleta automática para receber suas recompensas instantaneamente ao concluir.",
+    "update_announcement_clans_title": "⚔️ Sistema de Clãs Aprimorado",
+    "update_announcement_clans_desc": "- **Requisito de Nível**: É preciso ter nível 10 para fundar um clã.\n- **Cargos Personalizados**: Clãs agora têm seu próprio cargo com nome e cor personalizados.\n- **Canais Privados**: Clãs podem ter seu próprio canal de texto privado apenas para membros.",
+    "update_announcement_shop_title": "🛒 Loja Interativa",
+    "update_announcement_shop_desc": "- A loja principal agora é uma mensagem permanente e interativa em seu próprio canal. Selecione e compre itens com facilidade!",
+    "update_announcement_items_title": "💎 Novos Itens e Raridades",
+    "update_announcement_items_desc": "- Uma grande quantidade de novos itens foi adicionada, com um sistema de raridade detalhado, incluindo a mítica raridade **Kardec**, que concede um cargo único!",
+    "update_announcement_outro": "Explorem os novos comandos e funcionalidades! Esperamos que gostem da nova experiência.",
+    "update_announcement_success": "✅ Anúncio de atualização postado com sucesso em <#{channelId}>."
 }
 
     

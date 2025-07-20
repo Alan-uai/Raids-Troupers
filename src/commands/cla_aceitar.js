@@ -37,6 +37,17 @@ export default {
         clan.members.push(userId);
         stats.clanId = clan.id;
 
+        // Adicionar role ao membro
+        try {
+            const role = await interaction.guild.roles.fetch(clan.roleId);
+            const member = await interaction.guild.members.fetch(userId);
+            if (role && member) {
+                await member.roles.add(role);
+            }
+        } catch (e) {
+            console.error(`Falha ao adicionar role do clã ${clan.name} para o membro ${userId}`, e);
+        }
+
         clans.set(clanName.toLowerCase(), clan);
         userStats.set(userId, stats);
         userInvites.delete(clanName.toLowerCase());

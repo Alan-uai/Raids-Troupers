@@ -20,6 +20,7 @@
     "unknown_item": "Unknown Item",
     "equipped_background": "Equipped Background",
     "equipped_title": "Equipped Title",
+    "equipped_border": "Equipped Border",
     "no_items_found": "No items found.",
     "level": "Level",
     "xp": "XP",
@@ -65,6 +66,8 @@
     "item_pocao_fraca_description": "Recovers a small amount of health.",
     "item_anel_simples_description": "A simple ring with no special properties.",
     "item_botas_couro_description": "Standard issue leather boots.",
+    "item_aura_kardec_name": "Aura of Kardec",
+    "item_aura_kardec_description": "The manifestation of absolute power. Grants an exclusive role on the server.",
 
     "item_type_background": "Type: Background",
     "item_type_title": "Type: Title",
@@ -90,14 +93,21 @@
     "clan_invite_already_in_clan": "❌ {username} is already in a clan.",
     "clan_invite_sent": "✅ Invitation sent to **{username}** to join the **{clanName}** clan.",
     "clan_invite_dm_notification": "⚔️ You have been invited by **{username}** to join the **{clanName}** clan!",
-    "clan_invite_dm_instructions": "Use the command `/cla_aceitar nome_do_cla:{clanName}` to accept.",
+    "clan_invite_dm_instructions": "Use the command `/clan_aceitar nome_do_cla:{clanName}` to accept.",
     "clan_invite_dm_fail": "⚠️ Could not notify {username} via DM, but the invitation is active.",
 
     "clan_create_already_in_clan": "❌ You are already part of a clan.",
     "clan_create_not_enough_coins": "💰 You need {cost} Troup Coins to create a clan. You only have {balance}.",
     "clan_create_name_exists": "❌ A clan with this name already exists.",
     "clan_create_tag_exists": "❌ A clan with this tag already exists.",
-    "clan_create_success": "🎉 Congratulations! The **{clanName}** [{clanTag}] clan has been successfully founded! Your profile will be updated.",
+    "clan_create_success": "🎉 Congratulations! The **{clanName}** [{clanTag}] clan has been successfully founded!",
+    "clan_create_level_too_low": "❌ You must be at least level {level} to create a clan.",
+    "clan_create_invalid_color": "❌ The color must be in a valid HEX format (e.g., #FF0000).",
+    "clan_create_inappropriate_name": "❌ The clan name or tag contains inappropriate words. Please choose another.",
+    "clan_create_category_not_found": "⚠️ The private channels category was not found. The clan was created without a channel.",
+    "clan_create_error_generic": "An unexpected error occurred while creating the clan. The transaction was reverted.",
+    "clan_channel_welcome": "⚔️ Welcome to the private channel for the **{clanName}** clan! Only members can see this.",
+
 
     "clan_kick_self": "❌ You cannot kick yourself. If you want to leave, use `/cla_sair`.",
     "clan_kick_not_in_clan": "❌ You are not in a clan.",
@@ -292,7 +302,22 @@
     "profile_show": "Here is the user's current profile:",
     "profile_creation_error_category": "Error: The profile category channel was not found. Please contact an administrator.",
     "profile_creation_success": "✅ Your profile and private channel have been successfully created! You can see it here: <#{channelId}>",
-    "profile_creation_error_generic": "An unexpected error occurred while creating your profile."
+    "profile_creation_error_generic": "An unexpected error occurred while creating your profile.",
+
+    "update_announcement_title": "📢 Bot Update Announcement!",
+    "update_announcement_intro": "Hello, @everyone! The bot has received a major update with many new features and improvements. Here's what's new:",
+    "update_announcement_profiles_title": "👤 Advanced User Profiles",
+    "update_announcement_profiles_desc": "- **Automatic Creation**: Your personal profile channel is now created automatically.\n- **Private Threads**: Inside your channel, you'll find private threads for **Missions**, **Milestones**, and an **Exclusive Shop**.\n- **Interactive Buttons**: Equip items or select milestones to display directly from your profile.",
+    "update_announcement_missions_title": "📜 Intelligent Mission System",
+    "update_announcement_missions_desc": "- **Dynamic Difficulty**: Missions now adapt to your progress. The more you play, the more challenging they become!\n- **Item Rewards**: In addition to XP and Coins, you can now earn rare items by completing missions.\n- **Auto-Collect**: Enable auto-collect to get your rewards instantly upon completion.",
+    "update_announcement_clans_title": "⚔️ Enhanced Clan System",
+    "update_announcement_clans_desc": "- **Level Requirement**: You must be level 10 to found a clan.\n- **Custom Roles**: Clans now have their own role with a custom name and color.\n- **Private Channels**: Clans can have their own private text channel for members only.",
+    "update_announcement_shop_title": "🛒 Interactive Shop",
+    "update_announcement_shop_desc": "- The main shop is now a permanent, interactive message in its own channel. Select and buy items with ease!",
+    "update_announcement_items_title": "💎 New Items & Rarities",
+    "update_announcement_items_desc": "- A huge number of new items have been added, with a detailed rarity system, including the mythical **Kardec** rarity, which grants its own unique role!",
+    "update_announcement_outro": "Explore the new commands and features! We hope you enjoy the new experience.",
+    "update_announcement_success": "✅ Update announcement posted successfully in <#{channelId}>."
 }
 
     
