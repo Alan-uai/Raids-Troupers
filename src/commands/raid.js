@@ -42,7 +42,7 @@ export default {
 
     const member = await interaction.guild.members.fetch(user.id);
     const robloxUsername = member.displayName || user.username;
-    const raidChannelId = '1395591154208084049'; // TODO: Substituir pelo ID do canal #annun-raids
+    const raidChannelId = '1395591154208084049';
     const channel = interaction.client.channels.cache.get(raidChannelId);
 
     if (!channel) {

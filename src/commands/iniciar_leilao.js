@@ -19,11 +19,10 @@ export default {
             .setRequired(true))
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
   async execute(interaction, { activeAuctions, userStats }) {
-    // Admin command, can default to one language for replies or use guild locale if needed. For simplicity, using default.
     const t = await getTranslator(interaction.user.id, userStats); 
     const itemId = interaction.options.getString('item_id');
     const durationMinutes = interaction.options.getInteger('duracao_minutos');
-    const auctionChannelId = '1396200543665651752'; // TODO: Substituir pelo ID do canal #leiloes
+    const auctionChannelId = '1396406304276217906';
 
     const itemToAuction = rareItems.find(item => item.id === itemId);
 

@@ -54,7 +54,7 @@ export async function checkMissionCompletion(user, missionType, data) {
                 }
                 if(leveledUp) {
                     try {
-                       await user.send({ content: t('level_up_from_mission', { level: stats.level }) });
+                       await user.send({ content: t('level_up_from_mission', { level: stats.level }), ephemeral: true });
                     } catch(e) {
                        console.log(`Could not DM user ${user.id} about level up.`);
                     }
@@ -64,7 +64,7 @@ export async function checkMissionCompletion(user, missionType, data) {
                 
                 const missionDescription = t(`mission_${missionDetails.id}_description`);
                  try {
-                    await user.send({ content: t('mission_completed_notification', { description: missionDescription, xp: reward.xp, coins: reward.coins }) });
+                    await user.send({ content: t('mission_completed_notification', { description: missionDescription, xp: reward.xp, coins: reward.coins }), ephemeral: true });
                  } catch(e) {
                     console.log(`Could not DM user ${user.id} about mission completion.`);
                  }

@@ -26,7 +26,6 @@ import { getTranslator } from './i18n.js';
 
 dotenv.config();
 
-// Servidor Express para manter o bot online 24/7
 const app = express();
 const port = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('Bot is alive!'));
@@ -42,7 +41,6 @@ const client = new Client({
   ]
 });
 
-// Estruturas de dados em memória
 client.commands = new Collection();
 const raidStates = new Map();
 const userStats = new Map(); 
@@ -58,7 +56,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-const commands = [];
 
 for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
@@ -67,7 +64,6 @@ for (const file of commandFiles) {
     const command = commandModule.default;
     if ('data' in command && 'execute' in command) {
         client.commands.set(command.data.name, command);
-        commands.push(command.data.toJSON());
     } else {
         console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
     }
@@ -145,7 +141,6 @@ async function checkAuctionEnd() {
 
     const auctionMessage = await auctionChannel.messages.fetch(auction.messageId).catch(() => null);
     
-    // Use a default translator for public messages
     const t = await getTranslator(null, null, 'pt-BR');
 
     const finalEmbed = new EmbedBuilder()
@@ -186,7 +181,7 @@ async function checkAuctionEnd() {
     if (auctionMessage) await auctionMessage.edit({ embeds: [finalEmbed], components: [] });
 
     try {
-        await winnerUser.send(winnerT('auction_winner_dm', { itemName: winnerT(`item_${auction.item.id}_name`), bid: winningBid }));
+        await winnerUser.send({ content: winnerT('auction_winner_dm', { itemName: winnerT(`item_${auction.item.id}_name`), bid: winningBid }), ephemeral: true });
     } catch (e) {
         console.log(`Could not send DM to auction winner ${winnerUser.username}`);
     }
@@ -198,7 +193,7 @@ async function handleRaidButton(interaction, subAction, args, t) {
     const [requesterId, raidId] = args;
     const isLeader = interactor.id === requesterId;
     
-    const raidChannelId = '1395591154208084049'; // TODO: Substituir pelo ID do canal #annun-raids
+    const raidChannelId = '1395591154208084049';
     const raidChannel = await client.channels.fetch(raidChannelId);
     const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
 
@@ -297,13 +292,11 @@ async function handleRaidButton(interaction, subAction, args, t) {
 
 async function handleControlsButton(interaction, requesterId, raidId, t) {
     if (interaction.user.id !== requesterId) {
-        // Member controls
         const memberControls = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`raid_leave_${requesterId}_${raidId}`).setLabel(t('leave_raid_button')).setStyle(ButtonStyle.Danger).setEmoji('👋'),
         );
         await interaction.reply({ content: t('member_controls_title'), components: [memberControls], ephemeral: true });
     } else {
-        // Leader controls
         const leaderControls = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`raid_start_${requesterId}_${raidId}`).setLabel(t('start_raid_button')).setStyle(ButtonStyle.Success).setEmoji('✅'),
             new ButtonBuilder().setCustomId(`raid_kickmenu_${requesterId}_${raidId}`).setLabel(t('kick_member_button')).setStyle(ButtonStyle.Danger).setEmoji('❌'),
@@ -316,7 +309,7 @@ async function handleControlsButton(interaction, requesterId, raidId, t) {
 async function handleVoiceOptIn(interaction, raidId, t) {
     if (!raidId) return interaction.reply({ content: t('vc_raid_data_not_found'), ephemeral: true });
 
-    const raidChannelId = '1395591154208084049'; // TODO: Substituir pelo ID do canal #annun-raids
+    const raidChannelId = '1395591154208084049';
     const raidChannel = await client.channels.fetch(raidChannelId);
     const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
     if (!originalRaidMessage) return interaction.reply({ content: t('vc_raid_not_active'), ephemeral: true });
@@ -377,7 +370,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
             }
             if(leveledUp) {
                  try {
-                    await user.send({ content: userT('level_up_notification', { level: stats.level }) });
+                    await user.send({ content: userT('level_up_notification', { level: stats.level }), ephemeral: true });
                 } catch(e) {
                     await thread.send({ content: userT('level_up_notification', { userId: user.id, level: stats.level }) });
                 }
@@ -421,7 +414,7 @@ async function handleRaidKick(interaction, requesterId, raidId, t) {
     }
     const memberToKickId = interaction.values[0];
 
-    const raidChannelId = '1395591154208084049'; // TODO: Substituir pelo ID do canal #annun-raids
+    const raidChannelId = '1395591154208084049';
     const raidChannel = await client.channels.fetch(raidChannelId);
     const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
 
@@ -533,8 +526,7 @@ async function handleRating(interaction, raterId, ratedId, type, t) {
         await interaction.update({ content: t('rating_thanks_all_rated'), components: [] });
     } else {
         pendingRatings.set(raterId, updatedPending);
-        // Resend the select menu to rate the next person
-         const selectOptions = updatedPending.map(id => {
+        const selectOptions = updatedPending.map(id => {
             const user = client.users.cache.get(id);
             return {
                 label: user.username,
@@ -619,7 +611,7 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
 
 client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     const roleName = 'limpo';
-    const categoryId = '1395589412661887068'; // TODO: Substituir pelo ID da categoria #perfis
+    const categoryId = '1395589412661887068';
 
     const oldHasRole = oldMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
     const newHasRole = newMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
@@ -651,7 +643,7 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
             console.log(`Channel #${channel.name} created for ${newMember.displayName}.`);
             
             const stats = userStats.get(newMember.id) || { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale };
-            stats.locale = userLocale; // Always update/set locale on role grant
+            stats.locale = userLocale;
             userStats.set(newMember.id, stats);
 
             const items = userItems.get(newMember.id) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
