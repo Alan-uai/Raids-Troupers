@@ -24,6 +24,7 @@ import { missions as missionPool } from './missions.js';
 import { assignMissions, checkMissionCompletion } from './mission-system.js';
 import { getTranslator } from './i18n.js';
 import lojaSetup from './commands/loja_setup.js';
+import clanEnquete from './commands/clan_enquete.js';
 
 dotenv.config();
 
@@ -39,6 +40,7 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessageReactions,
   ]
 });
 
@@ -53,6 +55,7 @@ const userMissions = new Map();
 const clans = new Map();
 const pendingInvites = new Map();
 const userShopSelection = new Map();
+const pollVotes = clanEnquete.pollVotes;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -132,6 +135,11 @@ client.on(Events.InteractionCreate, async interaction => {
     } else if (action === 'equip' && args[0] === 'item') {
         const [_, userId] = args;
         await handleEquipButton(interaction, userId, t);
+    } else if (action === 'poll') {
+        const [subAction, pollId, optionIndex] = args;
+        if (subAction === 'vote') {
+            await handlePollVote(interaction, pollId, parseInt(optionIndex, 10), t);
+        }
     }
 
   } else if (interaction.isStringSelectMenu()) {
@@ -151,7 +159,7 @@ client.on(Events.InteractionCreate, async interaction => {
             return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
           }
           const itemId = interaction.values[0];
-          await handleEquipSelection(interaction, userId, itemId, t);
+          await handleEquipSelection(interaction, userId, t);
       }
   }
 });
@@ -763,6 +771,53 @@ async function handleEquipSelection(interaction, userId, itemId, t) {
     }
     
     await interaction.followUp({ content: replyMessage, ephemeral: true });
+}
+
+async function handlePollVote(interaction, pollId, optionIndex, t) {
+    const pollData = pollVotes.get(pollId);
+    if (!pollData) {
+        return interaction.reply({ content: t('poll_ended_or_invalid'), ephemeral: true });
+    }
+
+    const userId = interaction.user.id;
+
+    if (pollData.voters.has(userId)) {
+        const previousVoteIndex = pollData.voters.get(userId);
+        if (previousVoteIndex === optionIndex) {
+            return interaction.reply({ content: t('poll_already_voted_same'), ephemeral: true });
+        }
+        // Remove o voto antigo antes de adicionar o novo
+        pollData.counts[previousVoteIndex]--;
+    }
+
+    pollData.voters.set(userId, optionIndex);
+    pollData.counts[optionIndex]++;
+
+    // Atualiza a mensagem da enquete com a nova contagem
+    const pollMessage = await interaction.channel.messages.fetch(pollId);
+    if (!pollMessage) return;
+
+    const originalEmbed = pollMessage.embeds[0];
+    const newEmbed = EmbedBuilder.from(originalEmbed)
+        .setDescription(t('poll_description_updated', { count: pollData.voters.size }));
+
+    const newRows = [];
+    let currentOptionIndex = 0;
+    
+    pollMessage.components.forEach(row => {
+        const newRow = new ActionRowBuilder();
+        row.components.forEach(button => {
+            const optionLabel = button.label.split(' (')[0];
+            const newButton = ButtonBuilder.from(button)
+                .setLabel(`${optionLabel} (${pollData.counts[currentOptionIndex]})`);
+            newRow.addComponents(newButton);
+            currentOptionIndex++;
+        });
+        newRows.push(newRow);
+    });
+
+    await pollMessage.edit({ embeds: [newEmbed], components: newRows });
+    await interaction.reply({ content: t('poll_vote_success'), ephemeral: true });
 }
 
 client.on(Events.MessageCreate, async message => {

@@ -333,6 +333,19 @@
     "update_announcement_items_title": "💎 Novos Itens e Raridades",
     "update_announcement_items_desc": "- Uma grande quantidade de novos itens foi adicionada, com um sistema de raridade detalhado, incluindo a mítica raridade **Kardec**, que concede um cargo único!",
     "update_announcement_outro": "Explorem os novos comandos e funcionalidades! Esperamos que gostem da nova experiência.",
-    "update_announcement_success": "✅ Anúncio de atualização postado com sucesso em <#{channelId}>."
+    "update_announcement_success": "✅ Anúncio de atualização postado com sucesso em <#{channelId}>.",
+
+    "poll_options_error_2_to_5": "❌ A enquete deve ter entre 2 e 5 opções.",
+    "poll_clan_no_channel": "❌ Seu clã não possui um canal de texto para criar a enquete.",
+    "poll_clan_success": "✅ Enquete criada com sucesso no canal do clã: <#{channelId}>.",
+    "poll_clan_error": "❌ Ocorreu um erro ao tentar criar a enquete do clã.",
+    "poll_admin_success": "✅ Enquete criada com sucesso no canal <#{channelId}>.",
+    "poll_admin_error": "❌ Ocorreu um erro ao criar a enquete. Verifique as permissões do bot no canal.",
+    "poll_description_initial": "Vote clicando em uma das opções abaixo.",
+    "poll_description_updated": "Total de votos: {count}. Vote clicando em uma das opções abaixo.",
+    "poll_author": "Enquete criada por {username}",
+    "poll_ended_or_invalid": "Esta enquete não é mais válida ou já terminou.",
+    "poll_already_voted_same": "Você já votou nesta opção.",
+    "poll_vote_success": "✅ Seu voto foi registrado com sucesso!"
 }
     
