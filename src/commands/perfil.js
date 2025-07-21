@@ -31,7 +31,7 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
         userStats.set(targetUser.id, initialStats);
     }
     if (!userItems.has(targetUser.id)) {
-        const initialItems = { inventory: [], equippedBackground: 'default', equippedTitle: 'default', equippedBorder: null };
+        const initialItems = { inventory: [], equippedGear: {}, equippedCosmetics: {} };
         userItems.set(targetUser.id, initialItems);
     }
     if (!userMissions.has(targetUser.id)) {

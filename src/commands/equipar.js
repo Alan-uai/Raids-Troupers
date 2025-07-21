@@ -1,5 +1,5 @@
 import { AttachmentBuilder } from 'discord.js';
-import { allItems } from '../items.js';
+import { allItems, isCosmetic, isGear } from '../items.js';
 import { generateProfileImage } from '../profile-generator.js';
 import { getTranslator } from '../i18n.js';
 import { data } from './equipar.data.js';
@@ -27,15 +27,16 @@ export default {
 
     let replyMessage = '';
 
-    if (itemToEquip.type === 'background') {
-        items.equippedBackground = itemToEquip.url;
-        replyMessage = t('equip_background_success', { itemName: t(`item_${itemToEquip.id}_name`) });
-    } else if (itemToEquip.type === 'title') {
-        items.equippedTitle = itemToEquip.id;
-        replyMessage = t('equip_title_success', { itemName: t(`item_${itemToEquip.id}_name`) });
-    } else if (itemToEquip.type === 'avatar_border') {
-        items.equippedBorder = itemToEquip.url;
-        replyMessage = t('equip_border_success', { itemName: t(`item_${itemToEquip.id}_name`) });
+    // Inicializa os objetos de equipamento se não existirem
+    if (!items.equippedCosmetics) items.equippedCosmetics = {};
+    if (!items.equippedGear) items.equippedGear = {};
+
+    if (isCosmetic(itemToEquip)) {
+        items.equippedCosmetics[itemToEquip.type] = itemToEquip.id;
+        replyMessage = t('equip_cosmetic_success', { itemType: t(`item_type_${itemToEquip.type}`), itemName: t(`item_${itemToEquip.id}_name`) || itemToEquip.name });
+    } else if (isGear(itemToEquip)) {
+        items.equippedGear[itemToEquip.type] = itemToEquip.id;
+        replyMessage = t('equip_gear_success', { itemType: t(`item_type_${itemToEquip.type}`), itemName: t(`item_${itemToEquip.id}_name`) || itemToEquip.name });
     } else {
         return await interaction.editReply({ content: t('equip_cannot_equip_type'), ephemeral: true });
     }
@@ -64,5 +65,3 @@ export default {
     await interaction.editReply({ content: replyMessage, ephemeral: true });
   },
 };
-
-    

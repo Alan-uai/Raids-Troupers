@@ -1,6 +1,6 @@
 import { createCanvas, loadImage } from 'canvas';
 import { classes } from './classes.js';
-import { allItems } from './items.js';
+import { allItems, isGear } from './items.js';
 
 const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
     const words = text.split(' ');
@@ -28,14 +28,22 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
     
-    const equippedBackground = items?.equippedBackground || 'default';
-    const equippedTitleId = items?.equippedTitle;
-    const equippedBorderUrl = items?.equippedBorder;
+    const equippedCosmetics = items?.equippedCosmetics || {};
+    const equippedGear = items?.equippedGear || {};
+    
+    const backgroundId = equippedCosmetics.fundo;
+    const titleId = equippedCosmetics.titulo;
+    const borderId = equippedCosmetics.borda_avatar;
+
+    const backgroundItem = allItems.find(i => i.id === backgroundId);
+    const titleItem = allItems.find(i => i.id === titleId);
+    const borderItem = allItems.find(i => i.id === borderId);
+    
 
     // Fundo
-    if (equippedBackground !== 'default' && equippedBackground.startsWith('http')) {
+    if (backgroundItem && backgroundItem.url && backgroundItem.url.startsWith('http')) {
         try {
-            const background = await loadImage(equippedBackground);
+            const background = await loadImage(backgroundItem.url);
             ctx.drawImage(background, 0, 0, width, height);
         } catch (e) {
             console.error("Failed to load custom background, using default.", e);
@@ -66,9 +74,9 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     ctx.restore();
 
     // Carrega e desenha a borda se equipada
-    if (equippedBorderUrl) {
+    if (borderItem && borderItem.url) {
         try {
-            const border = await loadImage(equippedBorderUrl);
+            const border = await loadImage(borderItem.url);
             ctx.drawImage(border, avatarX - 16, avatarY - 16, avatarSize + 32, avatarSize + 32); // Ajuste o posicionamento e tamanho conforme necessário
         } catch (e) {
             console.error("Failed to load avatar border.", e);
@@ -102,13 +110,10 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     }
 
     // Título
-    if(equippedTitleId) {
-        const titleItem = allItems.find(i => i.id === equippedTitleId);
-        if (titleItem) {
-            ctx.font = 'italic 20px sans-serif';
-            ctx.fillStyle = '#FFD700'; // Gold color for the title
-            ctx.fillText(t(`item_${titleItem.id}_name`), avatarX + avatarSize + 25, avatarY + 80);
-        }
+    if (titleItem) {
+        ctx.font = 'italic 20px sans-serif';
+        ctx.fillStyle = '#FFD700'; // Gold color for the title
+        ctx.fillText(t(`item_${titleItem.id}_name`) || titleItem.name, avatarX + avatarSize + 25, avatarY + 80);
     }
 
     // Classe
@@ -124,14 +129,15 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     // Estatísticas
     const statsY = 220;
     const statsX = 50;
-    const col2X = 320;
-    const col3X = 570;
+    const col2X = 300;
+    const col3X = 550;
     const statsSpacing = 35;
-    const valueOffsetX = 180;
+    const valueOffsetX = 160;
 
     ctx.font = 'bold 20px sans-serif';
     ctx.fillStyle = '#FFFFFF';
-
+    
+    // Coluna 1
     ctx.fillText(t('level'), statsX, statsY);
     ctx.fillText(String(stats.level || 1), statsX + valueOffsetX, statsY);
     
@@ -142,6 +148,7 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     ctx.fillText(t('troup_coins'), statsX, statsY + statsSpacing * 2);
     ctx.fillText(String(stats.coins || 0), statsX + valueOffsetX, statsY + statsSpacing * 2);
 
+    // Coluna 2
     ctx.fillText(t('raids_created'), col2X, statsY);
     ctx.fillText(String(stats.raidsCreated || 0), col2X + valueOffsetX, statsY);
 
@@ -150,18 +157,35 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     
     ctx.fillText(t('reputation'), col2X, statsY + statsSpacing * 2);
     ctx.fillText(`👍 ${stats.reputation || 0}`, col2X + valueOffsetX, statsY + statsSpacing * 2);
-
+    
+    // Coluna 3
     ctx.fillText(t('kicked_others'), col3X, statsY);
     ctx.fillText(String(stats.kickedOthers || 0), col3X + valueOffsetX, statsY);
 
     ctx.fillText(t('was_kicked'), col3X, statsY + statsSpacing);
     ctx.fillText(String(stats.wasKicked || 0), col3X + valueOffsetX, statsY + statsSpacing);
+
+    // XP Bônus
+    let totalXPBonus = 0;
+    if (equippedGear) {
+        for (const gearId of Object.values(equippedGear)) {
+            const gearItem = allItems.find(i => i.id === gearId);
+            if (gearItem && gearItem.bonus) {
+                totalXPBonus += gearItem.bonus;
+            }
+        }
+    }
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = '#39FF14'; // Verde neon para o bônus
+    ctx.fillText(t('xp_bonus'), col3X, statsY + statsSpacing * 2);
+    ctx.fillText(`+${totalXPBonus}%`, col3X + valueOffsetX, statsY + statsSpacing * 2);
+
     
     // Cargos
     ctx.font = '16px sans-serif';
     ctx.fillStyle = '#B9BBBE';
     const roles = member.roles.cache
-        .filter(r => r.name !== '@everyone' && r.name !== 'limpo') // Adicionado filtro para 'limpo'
+        .filter(r => r.name !== '@everyone' && r.name !== 'limpo')
         .map(r => r.name)
         .join(', ');
         

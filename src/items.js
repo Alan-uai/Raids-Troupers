@@ -20,35 +20,20 @@ export const rarities = {
   KARDEC: 'Kardec'
 };
 
-const createItems = (rarity, count, itemType, descriptions) => {
-    const items = [];
-    for (let i = 1; i <= count; i++) {
-        const { name, desc } = descriptions[i-1];
-        items.push({
-            id: `${rarity.toLowerCase().replace(/ /g, '_')}_${itemType}_${i}`,
-            name,
-            description: desc,
-            rarity: rarities[rarity.toUpperCase().replace(/ /g, '_')],
-            type: itemType,
-            source: 'mission'
-        });
-    }
-    return items;
+const rarityOrder = Object.values(rarities);
+
+const gearTypes = {
+    capacete: { base: ["Elmo", "Capacete", "Tiara", "Coroa", "Chapéu", "Gorro", "Capuz", "Máscara"], bonusMultiplier: 1.2 },
+    casaco: { base: ["Peitoral", "Armadura", "Manto", "Casaco", "Robe", "Couraça"], bonusMultiplier: 1.8 },
+    luva: { base: ["Manoplas", "Luvas", "Braçadeiras"], bonusMultiplier: 1.1 },
+    cinto: { base: ["Cinto", "Faixa", "Cinturão"], bonusMultiplier: 1.0 },
+    minisaia: { base: ["Grevas de Perna", "Kilt de Batalha", "Calças Reforçadas"], bonusMultiplier: 1.5 },
+    bota: { base: ["Grevas", "Botas", "Sapatos", "Coturnos"], bonusMultiplier: 1.1 },
+    colar: { base: ["Amuleto", "Colar", "Gargantilha", "Pingente"], bonusMultiplier: 1.3 },
+    arma: { base: ["Lâmina", "Adaga", "Espada", "Machado", "Maça", "Cajado", "Arco", "Besta", "Pistola", "Canhão", "Escudo"], bonusMultiplier: 2.0 }
 };
 
-// Templates for item names and descriptions
-const gearTemplates = {
-    arma: ["Lâmina", "Adaga", "Espada", "Machado", "Maça", "Cajado", "Arco", "Besta", "Pistola", "Canhão"],
-    capacete: ["Elmo", "Capacete", "Tiara", "Coroa", "Chapéu", "Gorro", "Capuz", "Máscara"],
-    luva: ["Manoplas", "Luvas", "Braçadeiras"],
-    bota: ["Grevas", "Botas", "Sapatos", "Coturnos"],
-    casaco: ["Peitoral", "Armadura", "Manto", "Casaco", "Robe", "Couraça"],
-    cinto: ["Cinto", "Faixa", "Cinturão"],
-    colar: ["Amuleto", "Colar", "Gargantilha"],
-    minisaia: ["Kilt", "Saia", "Tanga de Batalha"]
-};
-
-const cosmeticTemplates = {
+const cosmeticTypes = {
     fundo: ["Paisagem", "Cenário", "Vista", "Plano de Fundo"],
     borda_avatar: ["Aura", "Moldura", "Borda", "Círculo"],
     titulo: ["Título", "Epíteto", "Alcunha", "Denominação"]
@@ -59,46 +44,53 @@ const places = ["da Perdição", "de Valhalla", "do Abismo", "da Aurora", "do Cr
 const concepts = ["da Alma", "do Tempo", "do Espaço", "da Morte", "da Vida", "do Destino", "da Loucura", "da Sabedoria", "do Poder"];
 
 function generateRandomName(base) {
-    return `${base} ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${places[Math.floor(Math.random() * places.length)]}`;
+    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const place = places[Math.floor(Math.random() * places.length)];
+    return `${base} ${adj} ${place}`;
 }
 function generateRandomDesc(name) {
-    return `Um item lendário conhecido como ${name}, imbuído com o poder ${concepts[Math.floor(Math.random() * concepts.length)]}.`;
+    const concept = concepts[Math.floor(Math.random() * concepts.length)];
+    return `Um item lendário conhecido como ${name}, imbuído com o poder ${concept}.`;
 }
 
-// Generate 25 gear + 25 cosmetic items for each rarity
+// Generate 50 items (25 gear, 25 cosmetic) for each rarity
 const allGeneratedItems = [];
 
-Object.values(rarities).forEach(rarityName => {
+Object.values(rarities).forEach((rarityName, rarityIndex) => {
     if (rarityName === rarities.KARDEC) return;
 
     // 25 Gear Items
     for (let i = 0; i < 25; i++) {
-        const gearTypeKeys = Object.keys(gearTemplates);
-        const randomType = gearTypeKeys[Math.floor(Math.random() * gearTypeKeys.length)];
-        const randomBase = gearTemplates[randomType][Math.floor(Math.random() * gearTemplates[randomType].length)];
+        const gearTypeKeys = Object.keys(gearTypes);
+        const randomTypeKey = gearTypeKeys[Math.floor(Math.random() * gearTypeKeys.length)];
+        const typeInfo = gearTypes[randomTypeKey];
+        const randomBase = typeInfo.base[Math.floor(Math.random() * typeInfo.base.length)];
         const name = generateRandomName(randomBase);
+        const bonus = Math.round((rarityIndex + 1) * typeInfo.bonusMultiplier * 0.5); // XP Bonus %
+        
         allGeneratedItems.push({
             id: `${rarityName.toLowerCase().replace(/ /g, '_')}_gear_${i}`,
             name: name,
             description: generateRandomDesc(name),
-            type: randomType,
+            type: randomTypeKey,
             rarity: rarityName,
-            source: 'mission'
+            source: 'mission',
+            bonus: bonus
         });
     }
 
     // 25 Cosmetic Items
     for (let i = 0; i < 25; i++) {
-        const cosmeticTypeKeys = Object.keys(cosmeticTemplates);
-        const randomType = cosmeticTypeKeys[Math.floor(Math.random() * cosmeticTypeKeys.length)];
-        const randomBase = cosmeticTemplates[randomType][Math.floor(Math.random() * cosmeticTemplates[randomType].length)];
+        const cosmeticTypeKeys = Object.keys(cosmeticTypes);
+        const randomTypeKey = cosmeticTypeKeys[Math.floor(Math.random() * cosmeticTypeKeys.length)];
+        const randomBase = cosmeticTypes[randomTypeKey][Math.floor(Math.random() * cosmeticTypes[randomTypeKey].length)];
         const name = generateRandomName(randomBase);
         allGeneratedItems.push({
             id: `${rarityName.toLowerCase().replace(/ /g, '_')}_cosmetic_${i}`,
             name: name,
             description: generateRandomDesc(name),
-            type: randomType,
-            url: randomType === 'titulo' ? null : 'https://i.pinimg.com/originals/3a/0c/a6/3a0ca6840b784a3d6d53205763261a29.gif', // Placeholder URL
+            type: randomTypeKey,
+            url: randomTypeKey === 'titulo' ? null : 'https://i.pinimg.com/originals/3a/0c/a6/3a0ca6840b784a3d6d53205763261a29.gif', // Placeholder URL
             rarity: rarityName,
             source: 'mission'
         });
@@ -116,7 +108,7 @@ export const allItems = [
     description: 'Um fundo animado e vibrante de uma cidade à noite.',
     price: 500,
     url: 'https://i.pinimg.com/originals/b5/a4/6c/b5a46c3b583f819ed9551a37c446538b.gif',
-    type: 'background',
+    type: 'fundo',
     rarity: rarities.COMUM,
     source: 'shop'
   },
@@ -126,7 +118,7 @@ export const allItems = [
     description: 'Uma floresta encantada com luzes místicas.',
     price: 500,
     url: 'https://i.pinimg.com/originals/ef/d6/1f/efd61f1f505e6e85744837a7605d33a1.gif',
-    type: 'background',
+    type: 'fundo',
     rarity: rarities.COMUM,
     source: 'shop'
   },
@@ -136,7 +128,7 @@ export const allItems = [
     description: 'Viaje pelo cosmos com esta visão galáctica.',
     price: 750,
     url: 'https://i.pinimg.com/originals/a0/a7/92/a0a792c636f1cda8b1a4577889f41f4f.gif',
-    type: 'background',
+    type: 'fundo',
     rarity: rarities.INCOMUM,
     source: 'shop'
   },
@@ -150,7 +142,7 @@ export const allItems = [
     description: 'Um fundo lendário mostrando o covil de um dragão majestoso.',
     min_bid: 2000,
     url: 'https://i.pinimg.com/originals/7b/25/f8/7b25f8b9e671f5407d7fb0f88219c8f2.gif',
-    type: 'background',
+    type: 'fundo',
     rarity: rarities.LENDARIO,
     source: 'auction'
   },
@@ -160,7 +152,7 @@ export const allItems = [
     description: 'Uma borda de avatar animada com chamas que nunca se apagam.',
     min_bid: 1500,
     url: 'https://i.pinimg.com/originals/a4/1c/b3/a41cb3325a756b14f856429f5f68b356.gif',
-    type: 'avatar_border',
+    type: 'borda_avatar',
     rarity: rarities.RARO,
     source: 'auction'
   },
@@ -170,7 +162,7 @@ export const allItems = [
     description: 'Um título para aqueles que estiveram aqui desde o começo.',
     min_bid: 1000,
     url: null,
-    type: 'title',
+    type: 'titulo',
     rarity: rarities.MAIS_QUE_RARO,
     source: 'auction'
   },
@@ -178,19 +170,31 @@ export const allItems = [
   // =================================
   // ===== Itens de Raridade Kardec ====
   // =================================
-  { id: 'kardec_luva', name: 'Luvas do Vazio de Kardec', description: 'Canalizam o poder do nada absoluto.', type: 'luva', rarity: rarities.KARDEC, source: 'mission' },
-  { id: 'kardec_coroa', name: 'Coroa da Onisciência de Kardec', description: 'Concede vislumbres de todas as realidades.', type: 'capacete', rarity: rarities.KARDEC, source: 'mission' },
-  { id: 'kardec_casaco', name: 'Sobretudo das Sombras de Kardec', description: 'Tecido com a própria escuridão entre as estrelas.', type: 'casaco', rarity: rarities.KARDEC, source: 'mission' },
-  { id: 'kardec_cinto', name: 'Fivela da Singularidade de Kardec', description: 'Dobra o espaço e o tempo ao seu redor.', type: 'cinto', rarity: rarities.KARDEC, source: 'mission' },
-  { id: 'kardec_bota', name: 'Botas do Caminhante de Kardec', description: 'Pisam em todos os caminhos e em nenhum.', type: 'bota', rarity: rarities.KARDEC, source: 'mission' },
-  { id: 'kardec_calca', name: 'Calça Cargo do Paradoxo de Kardec', description: 'Seus bolsos contêm infinitos universos.', type: 'minisaia', rarity: rarities.KARDEC, source: 'mission' }, // Usando minisaia como tipo base para calças
+  { id: 'kardec_luva', name: 'Luvas do Vazio de Kardec', description: 'Canalizam o poder do nada absoluto.', type: 'luva', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_coroa', name: 'Coroa da Onisciência de Kardec', description: 'Concede vislumbres de todas as realidades.', type: 'capacete', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_casaco', name: 'Sobretudo das Sombras de Kardec', description: 'Tecido com a própria escuridão entre as estrelas.', type: 'casaco', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_cinto', name: 'Fivela da Singularidade de Kardec', description: 'Dobra o espaço e o tempo ao seu redor.', type: 'cinto', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_bota', name: 'Botas do Caminhante de Kardec', description: 'Pisam em todos os caminhos e em nenhum.', type: 'bota', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_calca', name: 'Calça Cargo do Paradoxo de Kardec', description: 'Seus bolsos contêm infinitos universos.', type: 'minisaia', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_arma', name: 'Fragmento da Realidade de Kardec', description: 'Uma arma que reescreve as leis da física.', type: 'arma', rarity: rarities.KARDEC, source: 'mission', bonus: 80 },
+  { id: 'kardec_colar', name: 'Olho de Kardec', description: 'Vê tudo, entende tudo, destrói tudo.', type: 'colar', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
   // Cosméticos Kardec
-  { id: 'kardec_fundo', name: 'Fundo: Coração do Abismo', description: 'Um gradiente sangrento e pulsante.', url: 'https://i.pinimg.com/originals/85/4c/3b/854c3b75a661614b876a4b8f36214578.gif', type: 'background', rarity: rarities.KARDEC, source: 'mission' },
-  { id: 'kardec_titulo', name: 'Título: A Entidade', description: 'Sua presença transcende a compreensão mortal.', url: null, type: 'title', rarity: rarities.KARDEC, source: 'mission' },
-  { id: 'kardec_borda', name: 'Borda: Fúria Neon', description: 'Uma borda rosa choque que grita poder.', url: 'https://i.pinimg.com/originals/c9/1a/87/c91a87265e337198a287a176839441d8.gif', type: 'avatar_border', rarity: rarities.KARDEC, source: 'mission' },
+  { id: 'kardec_fundo', name: 'Fundo: Coração do Abismo', description: 'Um gradiente sangrento e pulsante.', url: 'https://i.pinimg.com/originals/85/4c/3b/854c3b75a661614b876a4b8f36214578.gif', type: 'fundo', rarity: rarities.KARDEC, source: 'mission' },
+  { id: 'kardec_titulo', name: 'Título: A Entidade', description: 'Sua presença transcende a compreensão mortal.', url: null, type: 'titulo', rarity: rarities.KARDEC, source: 'mission' },
+  { id: 'kardec_borda', name: 'Borda: Fúria Neon', description: 'Uma borda rosa choque que grita poder.', url: 'https://i.pinimg.com/originals/c9/1a/87/c91a87265e337198a287a176839441d8.gif', type: 'borda_avatar', rarity: rarities.KARDEC, source: 'mission' },
   
   // =================================
   // ===== Recompensas de Missão (Geradas) =====
   // =================================
   ...allGeneratedItems
 ];
+
+// Helper para verificar se um item é cosmético
+export function isCosmetic(item) {
+    return ['fundo', 'borda_avatar', 'titulo'].includes(item.type);
+}
+
+// Helper para verificar se um item é de equipamento
+export function isGear(item) {
+    return !isCosmetic(item) && item.source !== 'shop' && item.source !== 'auction';
+}

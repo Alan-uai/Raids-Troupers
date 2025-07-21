@@ -239,7 +239,7 @@ async function checkAuctionEnd() {
     const finalEmbed = new EmbedBuilder()
         .setColor('#808080')
         .setTitle(`🌟 ${t('auction_ended_title')} 🌟`)
-        .setDescription(t('auction_ended_desc', { itemName: t(`item_${item.id}_name`) }));
+        .setDescription(t('auction_ended_desc', { itemName: t(`item_${item.id}_name`) || item.name }));
 
     const bids = auction.bids;
     if (bids.size === 0) {
@@ -260,7 +260,7 @@ async function checkAuctionEnd() {
         userStats.set(winnerId, stats);
     }
 
-    const items = userItems.get(winnerId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default' };
+    const items = userItems.get(winnerId) || { inventory: [], equippedGear: {}, equippedCosmetics: {} };
     items.inventory.push(item.id);
     userItems.set(winnerId, items);
 
@@ -274,7 +274,7 @@ async function checkAuctionEnd() {
     if (auctionMessage) await auctionMessage.edit({ embeds: [finalEmbed], components: [] });
 
     try {
-        await winnerUser.send({ content: winnerT('auction_winner_dm', { itemName: winnerT(`item_${item.id}_name`), bid: winningBid }) });
+        await winnerUser.send({ content: winnerT('auction_winner_dm', { itemName: winnerT(`item_${item.id}_name`) || item.name, bid: winningBid }) });
     } catch (e) {
         console.log(`Could not send DM to auction winner ${winnerUser.username}`);
     }
@@ -448,17 +448,33 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
 
         if (user.id !== requesterId) {
             const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR', autoCollectMissions: false };
-            const xpGained = 25, coinsGained = 10;
+            const items = userItems.get(user.id) || { inventory: [], equippedGear: {}, equippedCosmetics: {} };
+            
+            // Calculate XP Bonus
+            let xpBonusPercent = 0;
+            if (items.equippedGear) {
+                for (const gearId of Object.values(items.equippedGear)) {
+                    const gearItem = allItems.find(i => i.id === gearId);
+                    if (gearItem && gearItem.bonus) {
+                        xpBonusPercent += gearItem.bonus;
+                    }
+                }
+            }
+
+            let xpGained = 25;
+            xpGained = Math.ceil(xpGained * (1 + xpBonusPercent / 100));
+            const coinsGained = 10;
             
             stats.raidsHelped += 1;
             stats.xp += xpGained;
             stats.coins += coinsGained;
 
-            const xpToLevelUp = 100 * stats.level;
+            let xpToLevelUp = 100 * stats.level;
             let leveledUp = false;
             while (stats.xp >= xpToLevelUp) {
                 stats.level += 1;
                 stats.xp -= xpToLevelUp;
+                xpToLevelUp = 100 * stats.level;
                 leveledUp = true;
             }
             if(leveledUp) {
@@ -643,7 +659,7 @@ async function handleRating(interaction, raterId, ratedId, type, t) {
             const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
             const guild = profileChannel.guild;
             const member = await guild.members.fetch(ratedId);
-            const items = userItems.get(ratedId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default', equippedBorder: null };
+            const items = userItems.get(ratedId) || { inventory: [], equippedGear: {}, equippedCosmetics: {} };
             
             const newProfileImageBuffer = await generateProfileImage(member, stats, items, clans, ratedT);
             const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
@@ -678,11 +694,11 @@ async function handleBuyButton(interaction, t) {
     const items = userItems.get(userId);
 
     if (items.inventory.includes(itemId)) {
-      return await interaction.editReply({ content: t('buy_interaction_fail_owned', { itemName: t(`item_${itemToBuy.id}_name`) }) });
+      return await interaction.editReply({ content: t('buy_interaction_fail_owned', { itemName: t(`item_${itemToBuy.id}_name`) || itemToBuy.name }) });
     }
 
     if (!stats || stats.coins < itemToBuy.price) {
-      return await interaction.editReply({ content: t('buy_interaction_fail_coins', { itemName: t(`item_${itemToBuy.id}_name`) }) });
+      return await interaction.editReply({ content: t('buy_interaction_fail_coins', { itemName: t(`item_${itemToBuy.id}_name`) || itemToBuy.name }) });
     }
 
     stats.coins -= itemToBuy.price;
@@ -693,7 +709,7 @@ async function handleBuyButton(interaction, t) {
     
     userShopSelection.delete(userId);
     
-    await interaction.editReply({ content: t('buy_interaction_success', { itemName: t(`item_${itemToBuy.id}_name`), balance: stats.coins }) });
+    await interaction.editReply({ content: t('buy_interaction_success', { itemName: t(`item_${itemToBuy.id}_name`) || itemToBuy.name, balance: stats.coins }) });
 }
 
 async function handleEquipButton(interaction, userId, t) {
@@ -710,14 +726,14 @@ async function handleEquipButton(interaction, userId, t) {
 
     const equippableItems = inventory
         .map(id => allItems.find(item => item.id === id))
-        .filter(item => item && ['background', 'title', 'avatar_border'].includes(item.type));
+        .filter(item => item && (item.type === 'fundo' || item.type === 'titulo' || item.type === 'borda_avatar' || item.bonus));
 
     if (equippableItems.length === 0) {
         return await interaction.reply({ content: t('equip_no_equippable_items'), ephemeral: true });
     }
 
     const options = equippableItems.map(item => ({
-        label: t(`item_${item.id}_name`),
+        label: t(`item_${item.id}_name`) || item.name,
         description: t(`item_type_${item.type}`),
         value: item.id
     }));
@@ -745,17 +761,18 @@ async function handleEquipSelection(interaction, userId, itemId, t) {
         return await interaction.followUp({ content: t('equip_item_not_exist'), ephemeral: true });
     }
 
-    let replyMessage = '';
+    if (!items.equippedCosmetics) items.equippedCosmetics = {};
+    if (!items.equippedGear) items.equippedGear = {};
 
-    if (itemToEquip.type === 'background') {
-        items.equippedBackground = itemToEquip.url;
-        replyMessage = t('equip_background_success', { itemName: t(`item_${itemToEquip.id}_name`) });
-    } else if (itemToEquip.type === 'title') {
-        items.equippedTitle = itemToEquip.id;
-        replyMessage = t('equip_title_success', { itemName: t(`item_${itemToEquip.id}_name`) });
-    } else if (itemToEquip.type === 'avatar_border') {
-        items.equippedBorder = itemToEquip.url;
-        replyMessage = t('equip_border_success', { itemName: t(`item_${itemToEquip.id}_name`) });
+    let replyMessage = '';
+    const itemDisplayName = t(`item_${itemToEquip.id}_name`) || itemToEquip.name;
+
+    if (['fundo', 'titulo', 'borda_avatar'].includes(itemToEquip.type)) {
+        items.equippedCosmetics[itemToEquip.type] = itemToEquip.id;
+        replyMessage = t('equip_cosmetic_success', { itemType: t(`item_type_${itemToEquip.type}`), itemName: itemDisplayName });
+    } else if (itemToEquip.bonus) {
+        items.equippedGear[itemToEquip.type] = itemToEquip.id;
+        replyMessage = t('equip_gear_success', { itemType: t(`item_type_${itemToEquip.type}`), itemName: itemDisplayName });
     } else {
         return await interaction.followUp({ content: t('equip_cannot_equip_type'), ephemeral: true });
     }
