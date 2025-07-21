@@ -1,0 +1,131 @@
+// src/milestone-system.js
+import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { getTranslator } from './i18n.js';
+import { milestones } from './milestones.js';
+
+function getStatValue(stats, itemStats, statPath) {
+    if (!stats) return 0;
+    if (statPath.startsWith('inventory')) {
+        return itemStats?.inventory?.length || 0;
+    }
+    const path = statPath.split('.');
+    let current = stats;
+    for (let i = 0; i < path.length; i++) {
+        if (current === undefined || current === null) return 0;
+        current = current[path[i]];
+    }
+    return current || 0;
+}
+
+function getCompletedTiers(milestone, currentProgress) {
+    let completedCount = 0;
+    for (const tier of milestone.tiers) {
+        if (currentProgress >= tier.goal) {
+            completedCount++;
+        } else {
+            break;
+        }
+    }
+    return completedCount;
+}
+
+export async function createMilestoneEmbed(milestone, stats, itemStats, view, t) {
+    const userId = stats.userId || 'user'; // Assume stats has userId
+    const currentProgress = getStatValue(stats, itemStats, milestone.stat);
+    const completedTiersCount = getCompletedTiers(milestone, currentProgress);
+    
+    const embed = new EmbedBuilder()
+        .setTitle(t(`milestone_${milestone.id}_title`))
+        .setColor('#F1C40F');
+
+    const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId(`milestone_select_${milestone.id}_${userId}`)
+        .setPlaceholder(t('milestone_select_level'))
+        .addOptions(milestone.tiers.map(tier => ({
+            label: `${t(`milestone_${milestone.id}_title`)} - Nível ${tier.level}`,
+            value: String(tier.level),
+            description: `Meta: ${tier.goal}`
+        })));
+    
+    const row = new ActionRowBuilder();
+
+    if (view === 'general') {
+        let description = t(`milestone_${milestone.id}_description`) + '\n\n**Progresso Geral:**\n';
+        const tierSymbols = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+        let tierLine = '';
+        for (let i = 0; i < 10; i++) {
+            if (i < completedTiersCount) {
+                tierLine += `**<:Completed:12345> ${tierSymbols[i]}** `; // Placeholder for a checkmark emoji
+            } else {
+                tierLine += `~~<:Locked:12345> ${tierSymbols[i]}~~ `; // Placeholder for a lock emoji
+            }
+        }
+        embed.setDescription(description + tierLine);
+        row.addComponents(selectMenu);
+    } else {
+        const tierLevel = parseInt(view, 10);
+        const tier = milestone.tiers.find(t => t.level === tierLevel);
+        if (tier) {
+            embed.setDescription(t(`milestone_${milestone.id}_description`));
+            embed.addFields({ name: `Nível ${tier.level}`, value: t('milestone_current_progress', { progress: currentProgress, goal: tier.goal }) });
+        }
+        const backButton = new ButtonBuilder()
+            .setCustomId(`milestone_back_${milestone.id}_${userId}`)
+            .setLabel(t('milestone_back_button'))
+            .setStyle(ButtonStyle.Secondary);
+        row.addComponents(selectMenu, backButton);
+    }
+
+    return { embed, row };
+}
+
+export async function checkMilestoneCompletion(user, data) {
+    const { userStats, userItems, userProfiles, client } = data;
+    const userId = user.id;
+    const stats = userStats.get(userId);
+    const itemStats = userItems.get(userId);
+
+    if (!stats) return;
+    stats.completedMilestones = stats.completedMilestones || {};
+
+    const profileInfo = userProfiles.get(userId);
+    if (!profileInfo) return;
+
+    const t = await getTranslator(userId, userStats);
+    const profileChannel = await client.channels.fetch(profileInfo.channelId).catch(() => null);
+    if (!profileChannel) return;
+
+    const milestoneThread = profileChannel.threads.cache.find(th => th.name === t('milestones_thread_title'));
+    if (!milestoneThread) return;
+
+    for (const milestone of milestones) {
+        const currentProgress = getStatValue(stats, itemStats, milestone.stat);
+        const lastKnownProgress = stats.completedMilestones[milestone.id]?.progress || 0;
+        
+        let newlyCompletedTier = null;
+        for (const tier of milestone.tiers) {
+            if (currentProgress >= tier.goal && lastKnownProgress < tier.goal) {
+                newlyCompletedTier = tier; // This is the latest tier they just passed
+            }
+        }
+
+        if (newlyCompletedTier) {
+            await milestoneThread.send({ content: t('milestone_completed_notification', { username: user.username, milestoneName: `${t(`milestone_${milestone.id}_title`)} Nível ${newlyCompletedTier.level}` }) });
+        }
+        
+        // Update progress and message
+        stats.completedMilestones[milestone.id] = {
+            ...stats.completedMilestones[milestone.id],
+            progress: currentProgress
+        };
+        const messageId = stats.completedMilestones[milestone.id]?.messageId;
+        if(messageId){
+            const messageToUpdate = await milestoneThread.messages.fetch(messageId).catch(()=>null);
+            if(messageToUpdate){
+                 const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', t);
+                 await messageToUpdate.edit({ embeds: [milestoneData.embed], components: [milestoneData.row] });
+            }
+        }
+    }
+    userStats.set(userId, stats);
+}

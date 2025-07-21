@@ -1,72 +1,93 @@
 // src/milestones.js
-import { EmbedBuilder } from 'discord.js';
-import { getTranslator } from './i18n.js';
-
 export const milestones = [
-    { id: 'raids_helped', type: 'RAID_HELPED', goal: 50, stat: 'raidsHelped' },
-    { id: 'raids_created', type: 'RAID_CREATED', goal: 25, stat: 'raidsCreated' },
-    { id: 'positive_ratings', type: 'RATE_PLAYER', goal: 100, stat: 'reputation' },
-    { id: 'coins_earned', type: 'EARN_COINS', goal: 10000, stat: 'coins' },
-    { id: 'level_reached', type: 'LEVEL_UP', goal: 50, stat: 'level' },
-    { id: 'items_owned', type: 'ITEM_ACQUIRED', goal: 20, stat: 'inventory.length' },
-    { id: 'members_kicked', type: 'KICK_MEMBER', goal: 10, stat: 'kickedOthers' },
-    { id: 'clans_joined', type: 'JOIN_CLAN', goal: 3, stat: 'clansJoined' }, // requires new stat
-    { id: 'clan_leader', type: 'CREATE_CLAN', goal: 1, stat: 'clanCreated' }, // requires new stat
-    { id: 'auctions_won', type: 'AUCTION_WON', goal: 5, stat: 'auctionsWon' } // requires new stat
+    // 1. Raids Helded
+    { 
+      id: 'raids_helped', type: 'RAID_HELPED', stat: 'raidsHelped',
+      tiers: [
+        { level: 1, goal: 10 }, { level: 2, goal: 25 }, { level: 3, goal: 50 }, { level: 4, goal: 100 },
+        { level: 5, goal: 150 }, { level: 6, goal: 250 }, { level: 7, goal: 500 }, { level: 8, goal: 750 },
+        { level: 9, goal: 1000 }, { level: 10, goal: 1500 }
+      ] 
+    },
+    // 2. Raids Created
+    { 
+      id: 'raids_created', type: 'RAID_CREATED', stat: 'raidsCreated',
+      tiers: [
+        { level: 1, goal: 5 }, { level: 2, goal: 15 }, { level: 3, goal: 30 }, { level: 4, goal: 60 },
+        { level: 5, goal: 100 }, { level: 6, goal: 175 }, { level: 7, goal: 300 }, { level: 8, goal: 500 },
+        { level: 9, goal: 750 }, { level: 10, goal: 1000 }
+      ] 
+    },
+    // 3. Positive Ratings
+    { 
+      id: 'positive_ratings', type: 'RATE_PLAYER', stat: 'reputation',
+      tiers: [
+        { level: 1, goal: 20 }, { level: 2, goal: 50 }, { level: 3, goal: 100 }, { level: 4, goal: 200 },
+        { level: 5, goal: 350 }, { level: 6, goal: 500 }, { level: 7, goal: 750 }, { level: 8, goal: 1000 },
+        { level: 9, goal: 1250 }, { level: 10, goal: 1500 }
+      ] 
+    },
+    // 4. Coins Earned
+    { 
+      id: 'coins_earned', type: 'EARN_COINS', stat: 'coins',
+      tiers: [
+        { level: 1, goal: 1000 }, { level: 2, goal: 5000 }, { level: 3, goal: 10000 }, { level: 4, goal: 25000 },
+        { level: 5, goal: 50000 }, { level: 6, goal: 75000 }, { level: 7, goal: 100000 }, { level: 8, goal: 150000 },
+        { level: 9, goal: 200000 }, { level: 10, goal: 250000 }
+      ] 
+    },
+    // 5. Level Reached
+    { 
+      id: 'level_reached', type: 'LEVEL_UP', stat: 'level',
+      tiers: [
+        { level: 1, goal: 5 }, { level: 2, goal: 10 }, { level: 3, goal: 20 }, { level: 4, goal: 30 },
+        { level: 5, goal: 40 }, { level: 6, goal: 50 }, { level: 7, goal: 60 }, { level: 8, goal: 75 },
+        { level: 9, goal: 90 }, { level: 10, goal: 100 }
+      ] 
+    },
+    // 6. Items Owned
+    { 
+      id: 'items_owned', type: 'ITEM_ACQUIRED', stat: 'inventory.length',
+      tiers: [
+        { level: 1, goal: 5 }, { level: 2, goal: 10 }, { level: 3, goal: 20 }, { level: 4, goal: 35 },
+        { level: 5, goal: 50 }, { level: 6, goal: 75 }, { level: 7, goal: 100 }, { level: 8, goal: 125 },
+        { level: 9, goal: 150 }, { level: 10, goal: 200 }
+      ] 
+    },
+    // 7. Members Kicked
+    { 
+      id: 'members_kicked', type: 'KICK_MEMBER', stat: 'kickedOthers',
+      tiers: [
+        { level: 1, goal: 1 }, { level: 2, goal: 5 }, { level: 3, goal: 10 }, { level: 4, goal: 20 },
+        { level: 5, goal: 30 }, { level: 6, goal: 40 }, { level: 7, goal: 50 }, { level: 8, goal: 75 },
+        { level: 9, goal: 100 }, { level: 10, goal: 150 }
+      ] 
+    },
+    // 8. Clans Joined (requires new stat `clansJoined`)
+    { 
+      id: 'clans_joined', type: 'JOIN_CLAN', stat: 'clansJoined',
+      tiers: [
+        { level: 1, goal: 1 }, { level: 2, goal: 2 }, { level: 3, goal: 3 }, { level: 4, goal: 4 },
+        { level: 5, goal: 5 }, { level: 6, goal: 6 }, { level: 7, goal: 7 }, { level: 8, goal: 8 },
+        { level: 9, goal: 9 }, { level: 10, goal: 10 }
+      ] 
+    },
+    // 9. Clan Created (requires new stat `clanCreated`)
+    { 
+      id: 'clan_created', type: 'CREATE_CLAN', stat: 'clanCreated',
+      tiers: [
+        { level: 1, goal: 1 }, { level: 2, goal: 2 }, { level: 3, goal: 3 }, { level: 4, goal: 4 },
+        { level: 5, goal: 5 }, { level: 6, goal: 6 }, { level: 7, goal: 7 }, { level: 8, goal: 8 },
+        { level: 9, goal: 9 }, { level: 10, goal: 10 }
+      ] 
+    },
+    // 10. Auctions Won (requires new stat `auctionsWon`)
+    { 
+      id: 'auctions_won', type: 'AUCTION_WON', stat: 'auctionsWon',
+      tiers: [
+        { level: 1, goal: 1 }, { level: 2, goal: 3 }, { level: 3, goal: 5 }, { level: 4, goal: 10 },
+        { level: 5, goal: 15 }, { level: 6, goal: 20 }, { level: 7, goal: 30 }, { level: 8, goal: 40 },
+        { level: 9, goal: 50 }, { level: 10, goal: 75 }
+      ] 
+    }
 ];
-
-function getStatValue(stats, itemStats, statPath) {
-    if (statPath.startsWith('inventory')) {
-        return itemStats?.inventory?.length || 0;
-    }
-    const path = statPath.split('.');
-    let current = stats;
-    for (let i = 0; i < path.length; i++) {
-        if (current === undefined) return 0;
-        current = current[path[i]];
-    }
-    return current || 0;
-}
-
-export async function checkMilestoneCompletion(user, data) {
-    const { userStats, userItems, userProfiles, client } = data;
-    const userId = user.id;
-    const stats = userStats.get(userId);
-    const itemStats = userItems.get(userId);
-
-    if (!stats) return;
-    stats.completedMilestones = stats.completedMilestones || {};
-
-    const profileInfo = userProfiles.get(userId);
-    if (!profileInfo) return;
-
-    const t = await getTranslator(userId, userStats);
-    const profileChannel = await client.channels.fetch(profileInfo.channelId).catch(() => null);
-    if (!profileChannel) return;
-
-    const milestoneThread = profileChannel.threads.cache.find(th => th.name === t('milestones_thread_title'));
-    if (!milestoneThread) return;
-
-    const messages = await milestoneThread.messages.fetch({ limit: 100 });
-
-    for (const milestone of milestones) {
-        const currentProgress = getStatValue(stats, itemStats, milestone.stat);
-        
-        const messageToUpdate = messages.find(m => m.embeds[0]?.title === t(`milestone_${milestone.id}_title`));
-        if (messageToUpdate) {
-            const newEmbed = new EmbedBuilder()
-                .setTitle(t(`milestone_${milestone.id}_title`))
-                .setDescription(t(`milestone_${milestone.id}_description`))
-                .setColor(currentProgress >= milestone.goal ? '#2ECC71' : '#F1C40F')
-                .setFields({ name: t('progress'), value: `${currentProgress} / ${milestone.goal}`});
-            
-            await messageToUpdate.edit({ embeds: [newEmbed] });
-        }
-        
-        if (currentProgress >= milestone.goal && !stats.completedMilestones[milestone.id]) {
-            stats.completedMilestones[milestone.id] = true;
-            await milestoneThread.send({ content: t('milestone_completed_notification', { username: user.username, milestoneName: t(`milestone_${milestone.id}_title`) }) });
-        }
-    }
-    userStats.set(userId, stats);
-}

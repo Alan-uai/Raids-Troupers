@@ -20,11 +20,13 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { generateProfileImage } from './profile-generator.js';
 import { allItems } from './items.js';
-import { missions as missionPool } from './missions.js';
+import { missions as missionPool, milestones } from './missions.js';
 import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList } from './mission-system.js';
 import { getTranslator } from './i18n.js';
 import lojaSetup from './commands/loja_setup.js';
 import clanEnquete from './commands/clan_enquete.js';
+import { createMilestoneEmbed } from './milestone-system.js';
+
 
 dotenv.config();
 
@@ -156,9 +158,7 @@ client.on(Events.InteractionCreate, async interaction => {
             if (stats) {
                 stats.autoCollectMissions = !stats.autoCollectMissions;
                 userStats.set(userId, stats);
-                const status = stats.autoCollectMissions ? t('missions_autocollect_status_on') : t('missions_autocollect_status_off');
-                await interaction.reply({ content: t('missions_autocollect_toggled', { status }), ephemeral: true });
-                await postMissionList(interaction.message.thread, userId, 'daily', { userMissions, userStats, client }); // Refresh view
+                await postMissionList(interaction.message.thread, userId, 'daily', { userMissions, userStats, client }, interaction); // Refresh view
             }
         }
     } else if (action === 'profile') {
@@ -179,6 +179,14 @@ client.on(Events.InteractionCreate, async interaction => {
     } else if (action === 'suggestion') {
         const voteType = args[0]; // 'approve' or 'reject'
         await handleSuggestionVote(interaction, voteType, t);
+    } else if (action === 'milestone') {
+        const [subAction, milestoneId, userId] = args;
+        if (interaction.user.id !== userId) {
+            return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
+        }
+        if (subAction === 'back') {
+            await handleMilestoneInteraction(interaction, milestoneId, userId, 'general', t);
+        }
     }
 
 
@@ -200,7 +208,14 @@ client.on(Events.InteractionCreate, async interaction => {
           }
           const itemId = interaction.values[0];
           await handleEquipSelection(interaction, userId, itemId, t);
-      }
+      } else if (action === 'milestone' && args[0] === 'select') {
+        const [_, milestoneId, userId] = args;
+        const selectedLevel = interaction.values[0];
+        if (interaction.user.id !== userId) {
+            return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
+        }
+        await handleMilestoneInteraction(interaction, milestoneId, userId, selectedLevel, t);
+    }
   }
 });
 
@@ -860,6 +875,20 @@ async function handleSuggestionVote(interaction, voteType, t) {
         await interaction.message.delete().catch(() => {});
         interaction.followUp({ content: t('suggestion_deleted_low_votes'), ephemeral: true }).catch(() => {});
     }
+}
+
+async function handleMilestoneInteraction(interaction, milestoneId, userId, selectedLevel, t) {
+    await interaction.deferUpdate();
+    const stats = userStats.get(userId);
+    const items = userItems.get(userId);
+    const milestone = milestones.find(m => m.id === milestoneId);
+
+    if (!milestone || !stats) {
+        return await interaction.followUp({ content: t('milestone_error_data'), ephemeral: true });
+    }
+
+    const milestoneData = await createMilestoneEmbed(milestone, stats, items, selectedLevel, t);
+    await interaction.message.edit({ embeds: [milestoneData.embed], components: [milestoneData.row] });
 }
 
 

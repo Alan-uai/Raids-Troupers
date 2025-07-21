@@ -106,12 +106,16 @@
     "milestone_members_kicked_description": "Expulse jogadores de Raids quando necessário.",
     "milestone_clans_joined_title": "Socialite",
     "milestone_clans_joined_description": "Faça parte de diferentes clãs.",
-    "milestone_clan_leader_title": "Fundador",
-    "milestone_clan_leader_description": "Crie e lidere seu próprio clã.",
+    "milestone_clan_created_title": "Fundador",
+    "milestone_clan_created_description": "Crie e lidere seu próprio clã.",
     "milestone_auctions_won_title": "Magnata dos Leilões",
     "milestone_auctions_won_description": "Vença leilões de itens raros.",
     "milestone_completed_notification": "🎉 Marco Concluído! Parabéns, {username}, por alcançar **{milestoneName}**!",
-    
+    "milestone_current_progress": "Progresso Atual: {progress} / {goal}",
+    "milestone_select_level": "Selecione um nível para ver detalhes",
+    "milestone_back_button": "Voltar à Visão Geral",
+    "milestone_error_data": "Erro: Não foi possível recuperar os dados do marco.",
+
     "clan_command_not_in_clan": "❌ Você não está em um clã para usar este comando.",
     "clan_command_not_leader": "❌ Apenas o líder do clã pode usar este comando.",
     "clan_command_clan_not_found": "❌ Seu clã anterior não foi encontrado. Seu status foi corrigido.",
@@ -402,4 +406,3 @@
     "search_suggestions_title": "Top Sugestões para a Tag: {tag}",
     "search_suggestions_error": "Ocorreu um erro ao buscar as sugestões."
 }
-    

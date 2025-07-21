@@ -106,11 +106,15 @@
     "milestone_members_kicked_description": "Kick players from Raids when necessary.",
     "milestone_clans_joined_title": "Socialite",
     "milestone_clans_joined_description": "Be part of different clans.",
-    "milestone_clan_leader_title": "Founder",
-    "milestone_clan_leader_description": "Create and lead your own clan.",
+    "milestone_clan_created_title": "Founder",
+    "milestone_clan_created_description": "Create and lead your own clan.",
     "milestone_auctions_won_title": "Auction Tycoon",
     "milestone_auctions_won_description": "Win auctions for rare items.",
     "milestone_completed_notification": "🎉 Milestone Completed! Congratulations, {username}, for achieving **{milestoneName}**!",
+    "milestone_current_progress": "Current Progress: {progress} / {goal}",
+    "milestone_select_level": "Select a level to view details",
+    "milestone_back_button": "Back to General View",
+    "milestone_error_data": "Error: Could not retrieve milestone data.",
 
     "clan_command_not_in_clan": "❌ You are not in a clan to use this command.",
     "clan_command_not_leader": "❌ Only the clan leader can use this command.",
@@ -402,5 +406,3 @@
     "search_suggestions_title": "Top Suggestions for Tag: {tag}",
     "search_suggestions_error": "An error occurred while searching for suggestions."
 }
-
-    

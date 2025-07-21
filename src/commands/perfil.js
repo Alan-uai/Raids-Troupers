@@ -4,6 +4,7 @@ import { getTranslator } from '../i18n.js';
 import { assignMissions, postMissionList } from '../mission-system.js';
 import { data } from './perfil.data.js';
 import { milestones } from '../milestones.js';
+import { createMilestoneEmbed } from '../milestone-system.js';
 
 const PROFILE_CATEGORY_ID = '1395589412661887068';
 
@@ -50,12 +51,16 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
                 name: member.displayName,
                 type: ChannelType.GuildText,
                 parent: category,
+                topic: `Canal de perfil para ${member.user.tag}. ID do usuário: ${member.id}`,
                 permissionOverwrites: [
-                    { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, // Everyone can't see
+                    { 
+                        id: interaction.guild.id, // @everyone
+                        deny: [PermissionsBitField.Flags.ViewChannel] 
+                    },
                     { 
                       id: member.id, 
                       allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory],
-                      deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.CreatePublicThreads, PermissionsBitField.Flags.CreatePrivateThreads, PermissionsBitField.Flags.SendMessagesInThreads]
+                      deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.CreatePublicThreads, PermissionsBitField.Flags.CreatePrivateThreads, PermissionsBitField.Flags.SendMessagesInThreads, PermissionsBitField.Flags.ManageMessages]
                     },
                     { 
                       id: interaction.client.user.id, 
@@ -63,13 +68,14 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
                     }
                 ],
             });
+            
+            await channel.send({ content: t('welcome_new_user', { user: member }) });
 
             const stats = userStats.get(member.id);
             const items = userItems.get(member.id);
             const profileImageBuffer = await generateProfileImage(member, stats, items, clans, t);
             const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
             
-            await channel.send({ content: t('welcome_new_user', { user: member }) });
             const profileMessage = await channel.send({ files: [attachment] });
 
             const profileActionsEmbed = new EmbedBuilder()
@@ -95,13 +101,12 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
 
             const milestoneThread = await channel.threads.create({ name: t('milestones_thread_title'), autoArchiveDuration: 10080, reason: t('milestones_thread_reason', { username: member.displayName }) });
             for (const milestone of milestones) {
-                const embed = new EmbedBuilder()
-                    .setTitle(t(`milestone_${milestone.id}_title`))
-                    .setDescription(t(`milestone_${milestone.id}_description`))
-                    .addFields({ name: t('progress'), value: `0 / ${milestone.goal}`})
-                    .setColor('#F1C40F');
-                await milestoneThread.send({ embeds: [embed] });
+                 const milestoneData = await createMilestoneEmbed(milestone, stats, userItems.get(userId), 'general', t);
+                 const message = await milestoneThread.send({ embeds: [milestoneData.embed], components: [milestoneData.row] });
+                 // Store message ID against milestone ID for easier updates
+                 stats.completedMilestones[milestone.id] = { ...(stats.completedMilestones[milestone.id] || {}), messageId: message.id };
             }
+             userStats.set(member.id, stats);
 
             const exclusiveShopThread = await channel.threads.create({ name: t('exclusive_shop_thread_title'), autoArchiveDuration: 10080, reason: t('exclusive_shop_thread_reason', { username: member.displayName }) });
             await exclusiveShopThread.send({ content: t('exclusive_shop_thread_description') });
