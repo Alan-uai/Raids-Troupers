@@ -4,6 +4,7 @@ import { getTranslator } from '../i18n.js';
 import { assignMissions } from '../mission-system.js';
 import { data } from './perfil.data.js';
 import { missions as missionPool } from '../missions.js';
+import { milestones } from '../milestones.js';
 
 const PROFILE_CATEGORY_ID = '1395589412661887068';
 
@@ -22,7 +23,7 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
     // --- Garante que o usuário tem dados básicos ---
     if (!userStats.has(targetUser.id)) {
         const userLocale = targetUser.locale || 'pt-BR';
-        const initialStats = { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, autoCollectMissions: false };
+        const initialStats = { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, autoCollectMissions: false, completedMilestones: {} };
         userStats.set(targetUser.id, initialStats);
     }
     if (!userItems.has(targetUser.id)) {
@@ -53,7 +54,7 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
                 parent: category,
                 permissionOverwrites: [
                     { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel], deny: [PermissionsBitField.Flags.SendMessages] },
+                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory], deny: [PermissionsBitField.Flags.SendMessages] },
                     { id: interaction.client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageThreads] }
                 ],
             });
@@ -71,27 +72,47 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
                 messageId: profileMessage.id
             });
             
-            // --- Criação de Tópicos Privados ---
-            const missionThread = await channel.threads.create({ name: t('missions_thread_title'), autoArchiveDuration: 10080, reason: t('missions_thread_reason', { username: member.displayName }) });
+            // --- Tópico de Missões Diárias ---
+            const dailyMissionThread = await channel.threads.create({ name: t('daily_missions_thread_title'), autoArchiveDuration: 10080, reason: t('missions_thread_reason', { username: member.displayName }) });
             const autoCollectRow = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`mission_autocollect_toggle_${member.id}`).setLabel(t('missions_autocollect_button')).setStyle(ButtonStyle.Secondary).setEmoji('⚙️'));
-            await missionThread.send({ content: t('missions_autocollect_description'), components: [autoCollectRow] });
+            await dailyMissionThread.send({ content: t('missions_autocollect_description'), components: [autoCollectRow] });
             
-            const activeMissions = userMissions.get(member.id) || [];
-            for (const missionProgress of activeMissions) {
+            const activeMissions = userMissions.get(member.id) || {};
+            for (const missionProgress of activeMissions.daily) {
                 const missionDetails = missionPool.find(m => m.id === missionProgress.id);
                 if (missionDetails) {
-                    const rewardText = missionDetails.reward.item ? `Item: ${t(`item_${missionDetails.reward.item}_name`)}` : `${missionDetails.reward.xp} XP & ${missionDetails.reward.coins} TC`;
-                    const missionEmbed = new EmbedBuilder().setTitle(t(`mission_${missionDetails.id}_description`)).setDescription(`**${t('progress')}:** ${missionProgress.progress} / ${missionDetails.goal}\n**${t('reward')}:** ${rewardText}`).setColor('#3498DB').setFooter({text: `ID: ${missionDetails.id}`});
-                    const collectButton = new ButtonBuilder().setCustomId(`mission_collect_${member.id}_${missionDetails.id}`).setLabel(t('missions_collect_button')).setStyle(ButtonStyle.Success).setEmoji('🏆').setDisabled(missionProgress.progress < missionDetails.goal);
-                    const row = new ActionRowBuilder().addComponents(collectButton);
-                    const missionMessage = await missionThread.send({ embeds: [missionEmbed], components: [row] });
+                    const rewardText = `${missionDetails.reward.xp} XP & ${missionDetails.reward.coins} TC`;
+                    const missionEmbed = new EmbedBuilder().setTitle(t(`mission_${missionDetails.id}_title`)).setDescription(t(`mission_${missionDetails.id}_description`)).addFields({name: t('progress'), value: `${missionProgress.progress} / ${missionDetails.goal}`, inline: true}, {name: t('reward'), value: rewardText, inline: true}).setColor('#3498DB').setFooter({text: `ID: ${missionDetails.id}`});
+                    const missionMessage = await dailyMissionThread.send({ embeds: [missionEmbed] });
                     missionProgress.messageId = missionMessage.id;
                 }
             }
             userMissions.set(member.id, activeMissions);
 
+             // --- Tópico de Missão Semanal ---
+            const weeklyMissionThread = await channel.threads.create({ name: t('weekly_mission_thread_title'), autoArchiveDuration: 10080, reason: t('missions_thread_reason', { username: member.displayName }) });
+            const weeklyMission = activeMissions.weekly;
+            if (weeklyMission) {
+                const missionDetails = missionPool.find(m => m.id === weeklyMission.id);
+                if(missionDetails) {
+                    const rewardText = `Item: ${t(`item_${missionDetails.reward.item}_name`)}`;
+                    const missionEmbed = new EmbedBuilder().setTitle(t(`mission_${missionDetails.id}_title`)).setDescription(t(`mission_${missionDetails.id}_description`)).addFields({name: t('progress'), value: `${weeklyMission.progress} / ${missionDetails.goal}`, inline: true}, {name: t('reward'), value: rewardText, inline: true}).setColor('#9B59B6').setFooter({text: `ID: ${missionDetails.id}`});
+                    const collectButton = new ButtonBuilder().setCustomId(`mission_collect_weekly_${member.id}`).setLabel(t('missions_collect_button')).setStyle(ButtonStyle.Success).setEmoji('🏆').setDisabled(weeklyMission.progress < missionDetails.goal);
+                    const row = new ActionRowBuilder().addComponents(collectButton);
+                    const missionMessage = await weeklyMissionThread.send({ embeds: [missionEmbed], components: [row] });
+                    weeklyMission.messageId = missionMessage.id;
+                }
+            }
+            
             const milestoneThread = await channel.threads.create({ name: t('milestones_thread_title'), autoArchiveDuration: 10080, reason: t('milestones_thread_reason', { username: member.displayName }) });
-            await milestoneThread.send({ content: t('milestones_thread_description') });
+            for (const milestone of milestones) {
+                const embed = new EmbedBuilder()
+                    .setTitle(t(`milestone_${milestone.id}_title`))
+                    .setDescription(t(`milestone_${milestone.id}_description`))
+                    .addFields({ name: t('progress'), value: `0 / ${milestone.goal}`})
+                    .setColor('#F1C40F');
+                await milestoneThread.send({ embeds: [embed] });
+            }
 
             const exclusiveShopThread = await channel.threads.create({ name: t('exclusive_shop_thread_title'), autoArchiveDuration: 10080, reason: t('exclusive_shop_thread_reason', { username: member.displayName }) });
             await exclusiveShopThread.send({ content: t('exclusive_shop_thread_description') });

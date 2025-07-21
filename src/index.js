@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { generateProfileImage } from './profile-generator.js';
 import { allItems } from './items.js';
 import { missions as missionPool } from './missions.js';
-import { assignMissions, checkMissionCompletion } from './mission-system.js';
+import { assignMissions, checkMissionCompletion, collectReward } from './mission-system.js';
 import { getTranslator } from './i18n.js';
 import lojaSetup from './commands/loja_setup.js';
 import clanEnquete from './commands/clan_enquete.js';
@@ -60,22 +60,37 @@ const pollVotes = clanEnquete.pollVotes;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js') && !file.endsWith('.data.js'));
+const allFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+
+const commandFiles = allFiles.filter(file => !file.endsWith('.data.js'));
+const dataFiles = new Set(allFiles.filter(file => file.endsWith('.data.js')).map(file => file.replace('.data.js', '')));
 
 for (const file of commandFiles) {
-  const filePath = path.join(commandsPath, file);
-  try {
-    const commandModule = await import(filePath);
-    const command = commandModule.default;
-    if (command && 'data' in command && 'execute' in command) {
-        client.commands.set(command.data.name, command);
-    } else {
-        console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+    const filePath = path.join(commandsPath, file);
+    const commandName = file.replace('.js', '');
+
+    try {
+        const commandModule = await import(filePath);
+        let commandData;
+
+        if (dataFiles.has(commandName)) {
+            const dataFilePath = path.join(commandsPath, `${commandName}.data.js`);
+            const dataModule = await import(dataFilePath);
+            commandData = dataModule.data;
+        } else {
+            commandData = commandModule.default.data;
+        }
+
+        if (commandData) {
+            client.commands.set(commandData.name, commandModule.default);
+        } else {
+             console.log(`[WARNING] The command at ${filePath} is missing a "data" property.`);
+        }
+    } catch (error) {
+        console.error(`Error loading command at ${filePath}:`, error);
     }
-  } catch(error) {
-    console.error(`Error loading command at ${filePath}:`, error);
-  }
 }
+
 
 client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
@@ -126,9 +141,11 @@ client.on(Events.InteractionCreate, async interaction => {
     } else if (interaction.customId === 'shop_buy_button') {
         await handleBuyButton(interaction, t);
     } else if (action === 'mission') {
-        const [subAction, userId, missionId] = args;
+        const [subAction, userId, ...rest] = args;
         if (subAction === 'collect') {
-            await handleMissionCollect(interaction, userId, missionId);
+             if (args[1] === 'weekly') {
+                await handleWeeklyMissionCollect(interaction, userId);
+            }
         } else if (subAction === 'autocollect') {
             await handleAutoCollectToggle(interaction, userId);
         }
@@ -159,7 +176,7 @@ client.on(Events.InteractionCreate, async interaction => {
             return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
           }
           const itemId = interaction.values[0];
-          await handleEquipSelection(interaction, userId, t);
+          await handleEquipSelection(interaction, userId, itemId, t);
       }
   }
 });
@@ -640,33 +657,31 @@ async function handleBuyButton(interaction, t) {
     await interaction.editReply({ content: t('buy_interaction_success', { itemName: t(`item_${itemToBuy.id}_name`), balance: stats.coins }) });
 }
 
-async function handleMissionCollect(interaction, userId, missionId) {
+async function handleWeeklyMissionCollect(interaction, userId) {
     if (interaction.user.id !== userId) {
         return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
     }
-
     await interaction.deferUpdate();
 
     const t = await getTranslator(userId, userStats);
-    const activeMissions = userMissions.get(userId);
-    const missionProgress = activeMissions?.find(m => m.id === missionId);
-    const missionDetails = missionPool.find(m => m.id === missionId);
+    const missions = userMissions.get(userId);
+    const weeklyMission = missions?.weekly;
+    if (!weeklyMission) return;
 
-    if (!missionProgress || !missionDetails) {
+    const missionDetails = missionPool.find(m => m.id === weeklyMission.id);
+
+    if (!missionDetails) {
         return await interaction.followUp({ content: t('missions_collect_error_not_found'), ephemeral: true });
     }
-
-    if (missionProgress.progress < missionDetails.goal) {
+    if (weeklyMission.progress < missionDetails.goal) {
         return await interaction.followUp({ content: t('missions_collect_error_not_complete'), ephemeral: true });
     }
-
-    if (missionProgress.collected) {
+    if (weeklyMission.collected) {
         return await interaction.followUp({ content: t('missions_collect_error_already_collected'), ephemeral: true });
     }
-
-    const stats = userStats.get(userId);
+    
     const data = { userStats, userMissions, userItems, client, userProfiles, clans };
-    await collectReward(user, missionDetails, missionProgress, data, interaction);
+    await collectReward(interaction.user, weeklyMission, data, interaction, 'weekly');
 }
 
 async function handleAutoCollectToggle(interaction, userId) {
@@ -866,7 +881,7 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
     }
 });
 
-const PROFILE_CATEGORY_ID = '1395589412661887068';
+const PROFILE_CATEGORY_ID_EVENT = '1395589412661887068';
 
 client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     const roleName = 'limpo';
@@ -877,10 +892,10 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     if (!oldHasRole && newHasRole) {
         console.log(`User ${newMember.displayName} received the '${roleName}' role. Creating channel and profile.`);
         const guild = newMember.guild;
-        const category = guild.channels.cache.get(PROFILE_CATEGORY_ID);
+        const category = guild.channels.cache.get(PROFILE_CATEGORY_ID_EVENT);
 
         if (!category || category.type !== ChannelType.GuildCategory) {
-            console.error(`Category with ID ${PROFILE_CATEGORY_ID} not found or is not a category.`);
+            console.error(`Category with ID ${PROFILE_CATEGORY_ID_EVENT} not found or is not a category.`);
             return;
         }
 
@@ -896,13 +911,13 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
                 parent: category,
                 permissionOverwrites: [
                     { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                    { id: newMember.id, allow: [PermissionsBitField.Flags.ViewChannel], deny: [PermissionsBitField.Flags.SendMessages] },
+                    { id: newMember.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory], deny: [PermissionsBitField.Flags.SendMessages] },
                 ],
             });
 
             console.log(`Channel #${channel.name} created for ${newMember.displayName}.`);
             
-            const stats = { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, autoCollectMissions: false };
+            const stats = { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, autoCollectMissions: false, completedMilestones: {} };
             userStats.set(newMember.id, stats);
 
             const items = { inventory: [], equippedBackground: 'default', equippedTitle: 'default', equippedBorder: null };
@@ -921,66 +936,9 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
                 messageId: profileMessage.id
             });
             
-            // Create mission thread and post missions, same as in /perfil
-            const missionThread = await channel.threads.create({
-                name: t('missions_thread_title'),
-                autoArchiveDuration: 10080,
-                reason: t('missions_thread_reason', { username: newMember.displayName }),
-            });
+           // Implementar tópicos...
+            await channel.send("Tópicos de missões e outros serão implementados aqui.");
 
-            const autoCollectRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`mission_autocollect_toggle_${newMember.id}`)
-                    .setLabel(t('missions_autocollect_button'))
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('⚙️')
-            );
-            await missionThread.send({ content: t('missions_autocollect_description'), components: [autoCollectRow] });
-            
-            const activeMissions = userMissions.get(newMember.id) || [];
-            for (const missionProgress of activeMissions) {
-                const missionDetails = missionPool.find(m => m.id === missionProgress.id);
-                if (missionDetails) {
-                    const rewardText = missionDetails.reward.item
-                        ? `Item: ${t(`item_${missionDetails.reward.item}_name`)}`
-                        : `${missionDetails.reward.xp} XP & ${missionDetails.reward.coins} TC`;
-                    
-                    const missionEmbed = new EmbedBuilder()
-                        .setTitle(t(`mission_${missionDetails.id}_description`))
-                        .setDescription(`**${t('progress')}:** ${missionProgress.progress} / ${missionDetails.goal}\n**${t('reward')}:** ${rewardText}`)
-                        .setColor('#3498DB')
-                        .setFooter({text: `ID: ${missionDetails.id}`});
-
-                    const collectButton = new ButtonBuilder()
-                        .setCustomId(`mission_collect_${newMember.id}_${missionDetails.id}`)
-                        .setLabel(t('missions_collect_button'))
-                        .setStyle(ButtonStyle.Success)
-                        .setEmoji('🏆')
-                        .setDisabled(missionProgress.progress < missionDetails.goal);
-                        
-                    const row = new ActionRowBuilder().addComponents(collectButton);
-                    
-                    const missionMessage = await missionThread.send({ embeds: [missionEmbed], components: [row] });
-                    missionProgress.messageId = missionMessage.id;
-                }
-            }
-            userMissions.set(newMember.id, activeMissions);
-            
-            // 2. Tópico de Marcos (Milestones) - Estrutura Inicial
-            const milestoneThread = await channel.threads.create({
-                name: t('milestones_thread_title'),
-                autoArchiveDuration: 10080,
-                reason: t('milestones_thread_reason', { username: newMember.displayName }),
-            });
-            await milestoneThread.send({ content: t('milestones_thread_description') });
-
-            // 3. Tópico de Loja Exclusiva - Estrutura Inicial
-            const exclusiveShopThread = await channel.threads.create({
-                name: t('exclusive_shop_thread_title'),
-                autoArchiveDuration: 10080,
-                reason: t('exclusive_shop_thread_reason', { username: newMember.displayName }),
-            });
-            await exclusiveShopThread.send({ content: t('exclusive_shop_thread_description') });
 
         } catch (error) {
             console.error(`Failed to create channel or profile for ${newMember.displayName}:`, error);
