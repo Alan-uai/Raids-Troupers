@@ -207,7 +207,14 @@ client.on(Events.InteractionCreate, async interaction => {
        if (customIdParts[1] === 'back') {
           const [, , milestoneId, userId] = customIdParts;
           if (interaction.user.id !== userId) return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
-          await handleMilestoneInteraction(interaction, milestoneId, userId, 'general', t);
+          const milestone = milestones.find(m => m.id === milestoneId);
+          if (milestone) {
+            stats.userId = userId;
+            const milestoneData = await createMilestoneEmbed(milestone, userStats.get(userId), userItems.get(userId), 'general', t);
+            if (milestoneData) {
+                await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
+            }
+          }
         }
     }
 
@@ -235,10 +242,10 @@ client.on(Events.InteractionCreate, async interaction => {
           await handleEquipSelection(interaction, userId, itemId, t);
       } else if (action === 'milestone' && customIdParts[1] === 'select') {
         const [, , milestoneId, userId] = customIdParts;
-        const selectedLevel = interaction.values[0];
         if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
+        const selectedLevel = interaction.values[0];
         await handleMilestoneInteraction(interaction, milestoneId, userId, selectedLevel, t);
     }
   }
@@ -555,9 +562,13 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
         }
     }
 
-    await originalRaidMessage.delete().catch(e => console.error("Error deleting original message:", e));
-    await thread.setLocked(true).catch(e => console.error("Error locking thread:", e));
-    await thread.setArchived(true).catch(e => console.error("Error archiving thread:", e));
+    setTimeout(async () => {
+        await originalRaidMessage.delete().catch(e => console.error("Error deleting original message:", e));
+        if (thread) {
+            await thread.delete().catch(e => console.error("Error deleting thread:", e));
+        }
+    }, 5000);
+
     raidStates.delete(raidId);
 }
 
@@ -894,17 +905,23 @@ async function handleSuggestionVote(interaction, voteType, t) {
     const message = interaction.message;
     if (!message) return;
 
-    // Fetch the thread starter to prevent them from voting on their own suggestion
     const thread = interaction.channel;
     if (!thread.isThread()) return;
     
-    // In a forum post thread, the message owner is the bot, we need the thread owner
     const starterMessage = await thread.fetchStarterMessage().catch(() => null);
-    if (!starterMessage) return; // Should not happen in forum posts
+    if (!starterMessage) return;
 
-    const authorId = starterMessage.embeds[0]?.author?.name.match(/\(ID: (.*?)\)/)?.[1];
-     if (!authorId) { // Fallback for older suggestions without ID in author
-        const suggestionAuthorMatch = starterMessage.embeds[0]?.author?.name.match(/Sugestão de (.*)/);
+    let authorId;
+    const authorField = starterMessage.embeds[0]?.author;
+    if (authorField && authorField.name) {
+        const idMatch = authorField.name.match(/\(ID: (.*?)\)/);
+        if (idMatch) {
+            authorId = idMatch[1];
+        }
+    }
+   
+     if (!authorId) {
+        const suggestionAuthorMatch = authorField?.name.match(/Sugestão de (.*)/);
         if (suggestionAuthorMatch) {
             const username = suggestionAuthorMatch[1];
             const member = interaction.guild.members.cache.find(m => m.user.username === username);
@@ -1054,3 +1071,5 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 client.login(process.env.DISCORD_TOKEN);
 
 
+
+    
