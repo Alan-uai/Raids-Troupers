@@ -26,7 +26,7 @@ import { milestones } from './milestones.js';
 import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList, animateAndCollectReward } from './mission-system.js';
 import { getTranslator } from './i18n.js';
 import lojaSetup from './commands/loja_setup.js';
-import clanEnquete from './commands/clan_enquete.js';
+import { pollVotes } from './commands/clan_enquete.js';
 import { createMilestoneEmbed, checkMilestoneCompletion } from './milestone-system.js';
 
 
@@ -60,7 +60,7 @@ const clans = new Map();
 const pendingInvites = new Map();
 const userShopSelection = new Map();
 const suggestionVotes = new Map();
-const pollVotes = clanEnquete.pollVotes;
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -140,19 +140,19 @@ client.on(Events.InteractionCreate, async interaction => {
     } else if (interaction.customId === 'shop_buy_button') {
         await handleBuyButton(interaction, t);
     } else if (action === 'mission') {
-        const [subAction, userId, ...restArgs] = customIdParts.slice(1);
-         if (interaction.user.id !== userId) {
+        const [, subAction, userId, ...restArgs] = customIdParts;
+        if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
         
-        const missionThread = interaction.message.thread || interaction.channel;
+        const missionThread = interaction.channel;
         if (!missionThread) {
             console.error("Could not determine mission thread from interaction.");
             return;
         }
 
         if (subAction === 'view') {
-            const type = restArgs[0]; // 'daily' or 'weekly'
+            const type = restArgs[0];
             await postMissionList(missionThread, userId, type, { userMissions, userStats, client }, interaction);
         } else if (subAction === 'collectall') {
             await collectAllRewards(interaction, userId, { userStats, userItems, userMissions, client, userProfiles, clans });
@@ -161,7 +161,8 @@ client.on(Events.InteractionCreate, async interaction => {
             if (stats) {
                 stats.autoCollectMissions = !stats.autoCollectMissions;
                 userStats.set(userId, stats);
-                const currentViewType = (interaction.message.components[0].components[0].customId.includes('weekly')) ? 'daily' : 'weekly';
+                const currentViewButton = interaction.message.components[0].components[0];
+                const currentViewType = currentViewButton.customId.includes('weekly') ? 'daily' : 'weekly';
                 await postMissionList(missionThread, userId, currentViewType, { userMissions, userStats, client }, interaction);
             }
         } else if (subAction === 'collect') {
@@ -194,8 +195,7 @@ client.on(Events.InteractionCreate, async interaction => {
             await interaction.followUp({ content: t('profile_refreshed'), ephemeral: true });
         }
     } else if (action === 'poll') {
-        const voteAction = customIdParts[1];
-        if (voteAction === 'vote') {
+        if (customIdParts[1] === 'vote') {
             const pollId = customIdParts[2];
             const optionIndex = parseInt(customIdParts[3], 10);
             await handlePollVote(interaction, pollId, optionIndex, t);
@@ -204,12 +204,10 @@ client.on(Events.InteractionCreate, async interaction => {
         const voteType = customIdParts[1]; // 'approve' or 'reject'
         await handleSuggestionVote(interaction, voteType, t);
     } else if (action === 'milestone') {
-        const [subAction, milestoneId, userId] = customIdParts.slice(1);
-        if (interaction.user.id !== userId) {
-            return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
-        }
-        if (subAction === 'back') {
-            await handleMilestoneInteraction(interaction, milestoneId, userId, 'general', t);
+       if (customIdParts[1] === 'back') {
+          const [, , milestoneId, userId] = customIdParts;
+          if (interaction.user.id !== userId) return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
+          await handleMilestoneInteraction(interaction, milestoneId, userId, 'general', t);
         }
     }
 
@@ -236,8 +234,7 @@ client.on(Events.InteractionCreate, async interaction => {
           const itemId = interaction.values[0];
           await handleEquipSelection(interaction, userId, itemId, t);
       } else if (action === 'milestone' && customIdParts[1] === 'select') {
-        const milestoneId = customIdParts[2];
-        const userId = customIdParts[3];
+        const [, , milestoneId, userId] = customIdParts;
         const selectedLevel = interaction.values[0];
         if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
@@ -894,7 +891,32 @@ async function handlePollVote(interaction, pollId, optionIndex, t) {
 }
 
 async function handleSuggestionVote(interaction, voteType, t) {
-    const messageId = interaction.message.id;
+    const message = interaction.message;
+    if (!message) return;
+
+    // Fetch the thread starter to prevent them from voting on their own suggestion
+    const thread = interaction.channel;
+    if (!thread.isThread()) return;
+    
+    // In a forum post thread, the message owner is the bot, we need the thread owner
+    const starterMessage = await thread.fetchStarterMessage().catch(() => null);
+    if (!starterMessage) return; // Should not happen in forum posts
+
+    const authorId = starterMessage.embeds[0]?.author?.name.match(/\(ID: (.*?)\)/)?.[1];
+     if (!authorId) { // Fallback for older suggestions without ID in author
+        const suggestionAuthorMatch = starterMessage.embeds[0]?.author?.name.match(/Sugestão de (.*)/);
+        if (suggestionAuthorMatch) {
+            const username = suggestionAuthorMatch[1];
+            const member = interaction.guild.members.cache.find(m => m.user.username === username);
+            if (member?.id === interaction.user.id) {
+                 return interaction.reply({ content: t('suggestion_cannot_vote_own'), ephemeral: true });
+            }
+        }
+    } else if (authorId === interaction.user.id) {
+         return interaction.reply({ content: t('suggestion_cannot_vote_own'), ephemeral: true });
+    }
+
+    const messageId = message.id;
     const userId = interaction.user.id;
 
     const userVotes = suggestionVotes.get(userId) || {};
@@ -904,10 +926,10 @@ async function handleSuggestionVote(interaction, voteType, t) {
 
     await interaction.deferUpdate();
 
-    const embed = EmbedBuilder.from(interaction.message.embeds[0]);
+    const embed = EmbedBuilder.from(message.embeds[0]);
     const votesField = embed.data.fields.find(f => f.name === 'Votos');
     
-    if (!votesField) return; // safety check
+    if (!votesField) return;
 
     const approveMatch = votesField.value.match(/Aprovar: (\d+)/);
     const rejectMatch = votesField.value.match(/Reprovar: (\d+)/);
@@ -926,7 +948,7 @@ async function handleSuggestionVote(interaction, voteType, t) {
         { name: 'Votos', value: `Aprovar: ${approves}\nReprovar: ${rejects}`, inline: true }
     );
     
-    await interaction.message.edit({ embeds: [embed] });
+    await message.edit({ embeds: [embed] });
     
     userVotes[messageId] = true;
     suggestionVotes.set(userId, userVotes);
@@ -939,7 +961,7 @@ async function handleSuggestionVote(interaction, voteType, t) {
     await interaction.followUp({ content: t('suggestion_vote_success'), ephemeral: true });
     
     if (rejects >= 5 && approves === 0) {
-        await interaction.message.delete().catch(() => {});
+        await message.thread.delete().catch(() => {});
         await interaction.followUp({ content: t('suggestion_deleted_low_votes'), ephemeral: true }).catch(() => {});
     }
 }

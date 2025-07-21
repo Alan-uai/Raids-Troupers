@@ -162,10 +162,16 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
 
     if (sentTimerMessage) {
         await sentTimerMessage.edit({ embeds: [timerEmbed] }).catch(e => {
-            console.error(`Failed to edit timer message for ${locale}, it might have been deleted.`, e.message);
-            shopData.timerMessageId = null; // Mark as deleted
+            if (e.code === 10008) { // Unknown Message
+              console.warn(`Timer message for ${locale} was deleted. It will be recreated.`);
+              shopData.timerMessageId = null; // Mark as deleted to recreate it
+            } else {
+              console.error(`Failed to edit timer message for ${locale}:`, e.message);
+            }
         });
-    } else {
+    } 
+    
+    if (!shopData.timerMessageId) { // Recreate if it was deleted or never existed
         const newTimerMessage = await shopChannel.send({ embeds: [timerEmbed] });
         shopData.timerMessageId = newTimerMessage.id;
     }

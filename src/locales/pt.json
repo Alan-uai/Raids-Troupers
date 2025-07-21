@@ -444,6 +444,7 @@
     "suggestion_success": "✅ Sua sugestão foi enviada para o canal <#{channelId}>!",
     "suggestion_error": "❌ Ocorreu um erro ao tentar enviar sua sugestão.",
     "suggestion_already_voted": "Você já votou nesta sugestão.",
+    "suggestion_cannot_vote_own": "Você não pode votar na sua própria sugestão.",
     "suggestion_deleted_low_votes": "A sugestão foi apagada automaticamente por receber 5 votos de reprovação sem nenhuma aprovação.",
     "suggestion_vote_success": "✅ Obrigado pelo seu voto! Você ganhou 20 XP e 10 TC.",
     "search_suggestions_not_found": "Nenhuma sugestão encontrada com esta tag.",
