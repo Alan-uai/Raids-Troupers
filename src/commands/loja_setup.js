@@ -131,15 +131,27 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
         }
         
         const row = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('shop_select_item')
+                .setPlaceholder(t('shop_select_placeholder'))
+                .setDisabled(shopItems.length === 0)
+                .addOptions(
+                    shopItems.length > 0 ?
+                    shopItems.map(item => ({
+                        label: t(`item_${item.id}_name`) || item.name,
+                        description: t('shop_select_item_desc', { price: item.price }),
+                        value: item.id,
+                    })) : [{ label: 'empty', value: 'empty' }]
+                ),
             new ButtonBuilder()
                 .setCustomId('shop_buy_button')
                 .setLabel(t('shop_buy_button_label'))
                 .setStyle(ButtonStyle.Success)
                 .setEmoji('🛒')
+                .setDisabled(shopItems.length === 0)
         );
             
-        const menuRow = new ActionRowBuilder().addComponents(selectMenu);
-        const components = shopItems.length > 0 ? [menuRow, row] : [];
+        const components = shopItems.length > 0 ? [row] : [];
         
         let sentMainMessage;
         if (shopData.mainMessageId) {
@@ -152,6 +164,17 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
             // Se a mensagem principal não existe, limpa mensagens antigas do bot para começar do zero
             const messagesToDelete = (await shopChannel.messages.fetch({ limit: 50 }).catch(() => [])).filter(m => m.author.id === client.user.id);
             if (messagesToDelete.size > 0) await shopChannel.bulkDelete(messagesToDelete).catch(() => {});
+            
+            // Post timer message first
+            const nextUpdateForTimer = getNextUpdate(3);
+            const timeRemainingForTimer = nextUpdateForTimer.getTime() - Date.now();
+            const timerEmbed = new EmbedBuilder()
+              .setColor('#3498DB')
+              .setDescription(t('shop_footer_rotation', { time: formatTime(timeRemainingForTimer) }));
+            const newTimerMessage = await shopChannel.send({ embeds: [timerEmbed] });
+            shopData.timerMessageId = newTimerMessage.id;
+            
+            // Then post main shop message
             const newMainMessage = await shopChannel.send({ embeds: [embed], components });
             shopData.mainMessageId = newMainMessage.id;
         }
@@ -174,7 +197,7 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
             console.error(`Failed to edit timer message for ${locale}, it might have been deleted.`, e.message);
             shopData.timerMessageId = null; // Mark as deleted
         });
-    } else {
+    } else if(!updateItems) { // Only create if not already handled during initial post
         const newTimerMessage = await shopChannel.send({ embeds: [timerEmbed] });
         shopData.timerMessageId = newTimerMessage.id;
     }

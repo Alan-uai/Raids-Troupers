@@ -138,8 +138,6 @@ client.on(Events.InteractionCreate, async interaction => {
         await handleRating(interaction, raterId, ratedId, type, t);
     } else if (interaction.customId === 'shop_buy_button') {
         await handleBuyButton(interaction, t);
-    } else if (interaction.customId === 'shop_select_button') {
-        await interaction.reply({ content: t('shop_select_button_reply'), ephemeral: true });
     } else if (action === 'mission') {
         const [subAction, userId, ...restArgs] = args;
          if (interaction.user.id !== userId) {
@@ -155,7 +153,7 @@ client.on(Events.InteractionCreate, async interaction => {
             if (stats) {
                 stats.autoCollectMissions = !stats.autoCollectMissions;
                 userStats.set(userId, stats);
-                const currentViewType = args[2] || 'daily';
+                const currentViewType = restArgs[0] || 'daily';
                 await postMissionList(interaction.message.thread, userId, currentViewType, { userMissions, userStats, client }, interaction); // Refresh view
             }
         } else if (subAction === 'collect') {
