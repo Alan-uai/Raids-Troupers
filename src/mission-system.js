@@ -1,9 +1,10 @@
 
+
 import { missions as missionPool } from './missions.js';
 import { generateProfileImage } from './profile-generator.js';
 import { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getTranslator } from './i18n.js';
-import { allItems } from './items.js';
+import { allItems, rarities } from './items.js';
 import { checkMilestoneCompletion } from './milestone-system.js';
 
 // Mapa para armazenar os IDs das mensagens das listas de missões
@@ -40,64 +41,77 @@ function generateIntelligentMission(missionTemplate, stats) {
     if(newMission.reward.xp) newMission.reward.xp = Math.ceil(newMission.reward.xp * multiplier);
     if(newMission.reward.coins) newMission.reward.coins = Math.ceil(newMission.reward.coins * multiplier);
     
-    // Assegura que missões semanais tenham recompensas de item
-    if (newMission.category === 'weekly' && !newMission.reward.item) {
-        const itemRewardPool = allItems.filter(i => i.source === 'mission' && ['INCOMUM', 'RARO', 'MAIS_QUE_RARO', 'MENOS_QUE_LENDARIO'].includes(i.rarity));
-        if(itemRewardPool.length > 0) {
-            newMission.reward.item = itemRewardPool[Math.floor(Math.random() * itemRewardPool.length)].id;
-        } else {
-             newMission.reward.coins = (newMission.reward.coins || 0) + 100;
-             newMission.reward.xp = (newMission.reward.xp || 0) + 50;
-        }
-    }
-    
     return newMission;
 }
 
 
 export function assignMissions(userId, userMissions, stats) {
-    const dailyMissionTemplates = missionPool.filter(m => m.category === 'daily');
-    const weeklyMissionTemplates = missionPool.filter(m => m.category === 'weekly');
-    
     const missionsToAssign = {
         daily: [],
         weekly: []
     };
 
-    const shuffledDailies = [...dailyMissionTemplates].sort(() => 0.5 - Math.random());
-    for(let i = 0; i < 3; i++) { // Assign 3 daily missions
-        if (!shuffledDailies[i]) continue;
-        const intelligentMission = generateIntelligentMission(shuffledDailies[i], stats);
-        missionsToAssign.daily.push({
-            id: intelligentMission.id,
-            progress: 0,
-            completed: false,
-            collected: false,
-            goal: intelligentMission.goal,
-            reward: intelligentMission.reward
-        });
-    }
+    // --- Daily Missions Assignment ---
+    const dailyTemplates = [...missionPool.filter(m => m.category === 'daily')].sort(() => 0.5 - Math.random());
+    
+    // Assign one with 'Mais que Comum' item
+    const commonItemPool = allItems.filter(i => i.source === 'mission' && i.rarity === rarities.MAIS_QUE_COMUM);
+    const dailyWithCommonItem = generateIntelligentMission(dailyTemplates.pop(), stats);
+    dailyWithCommonItem.reward = { item: commonItemPool[Math.floor(Math.random() * commonItemPool.length)].id };
+    missionsToAssign.daily.push(dailyWithCommonItem);
 
-    const shuffledWeeklies = [...weeklyMissionTemplates].sort(() => 0.5 - Math.random());
-    for(let i = 0; i < 1; i++) { // Assign 1 weekly mission
-        if (!shuffledWeeklies[i]) continue;
-        const intelligentWeekly = generateIntelligentMission(shuffledWeeklies[i], stats);
-        missionsToAssign.weekly.push({
-            id: intelligentWeekly.id,
-            progress: 0,
-            completed: false,
-            collected: false,
-            goal: intelligentWeekly.goal,
-            reward: intelligentWeekly.reward
-        });
+    // Assign one with 'Comum' item
+    const regularItemPool = allItems.filter(i => i.source === 'mission' && i.rarity === rarities.COMUM);
+    const dailyWithRegularItem = generateIntelligentMission(dailyTemplates.pop(), stats);
+    dailyWithRegularItem.reward = { item: regularItemPool[Math.floor(Math.random() * regularItemPool.length)].id };
+    missionsToAssign.daily.push(dailyWithRegularItem);
+
+    // Assign 3 more regular daily missions
+    for (let i = 0; i < 3; i++) {
+        if (!dailyTemplates.length) break;
+        const intelligentMission = generateIntelligentMission(dailyTemplates.pop(), stats);
+        missionsToAssign.daily.push(intelligentMission);
     }
     
+    // Finalize daily missions
+    missionsToAssign.daily = missionsToAssign.daily.map(mission => ({
+        id: mission.id, progress: 0, completed: false, collected: false, goal: mission.goal, reward: mission.reward
+    }));
+
+    // --- Weekly Missions Assignment ---
+    const weeklyTemplates = [...missionPool.filter(m => m.category === 'weekly')].sort(() => 0.5 - Math.random());
+    
+    // Define reward pools
+    const rarePool = allItems.filter(i => i.source === 'mission' && i.rarity === rarities.RARO);
+    const ultraRarePlusPool = allItems.filter(i => i.source === 'mission' && [rarities.ULTRA_RARO, rarities.MAIS_QUE_RARO, rarities.MENOS_QUE_LENDARIO, rarities.LENDARIO].includes(i.rarity));
+
+    // Assign 3 with 'Raro' items
+    for (let i = 0; i < 3; i++) {
+        if (!weeklyTemplates.length || !rarePool.length) break;
+        const intelligentWeekly = generateIntelligentMission(weeklyTemplates.pop(), stats);
+        intelligentWeekly.reward = { item: rarePool[Math.floor(Math.random() * rarePool.length)].id };
+        missionsToAssign.weekly.push(intelligentWeekly);
+    }
+
+    // Assign 2 with 'Ultra Raro+' items
+    for (let i = 0; i < 2; i++) {
+        if (!weeklyTemplates.length || !ultraRarePlusPool.length) break;
+        const intelligentWeekly = generateIntelligentMission(weeklyTemplates.pop(), stats);
+        intelligentWeekly.reward = { item: ultraRarePlusPool[Math.floor(Math.random() * ultraRarePlusPool.length)].id };
+        missionsToAssign.weekly.push(intelligentWeekly);
+    }
+    
+    // Finalize weekly missions
+     missionsToAssign.weekly = missionsToAssign.weekly.map(mission => ({
+        id: mission.id, progress: 0, completed: false, collected: false, goal: mission.goal, reward: mission.reward
+    }));
+
     userMissions.set(userId, missionsToAssign);
     console.log(`Assigned initial intelligent missions to ${userId}`);
 }
 
 async function collectReward(user, missionProgress, data) {
-    const { userStats, userItems } = data;
+    const { userStats, userItems, client } = data;
     const userId = user.id;
     const t = await getTranslator(userId, userStats);
 
@@ -111,11 +125,11 @@ async function collectReward(user, missionProgress, data) {
         items.inventory.push(reward.item);
         userItems.set(userId, items);
         const itemDetails = allItems.find(i => i.id === reward.item);
-        const itemName = t(`item_${itemDetails.id}_name`);
+        const itemName = t(`item_${itemDetails.id}_name`) || itemDetails.name;
         rewardMessage = t('missions_collect_success_item', { itemName });
 
         if (itemDetails.rarity === 'Kardec') {
-            const guild = data.client.guilds.cache.first();
+            const guild = client.guilds.cache.first();
             let role = guild.roles.cache.find(r => r.name === 'Kardec');
             if (!role) {
                 try {
@@ -235,7 +249,7 @@ export async function checkMissionCompletion(user, missionType, data, amount = 1
 // Helper para gerar embeds de uma lista de missões
 function generateMissionEmbeds(missions, category, userId, t) {
     if (!missions || missions.length === 0) {
-        return [{embed: new EmbedBuilder().setDescription(t('missions_no_missions_of_type', { type: category })), row: null}];
+        return [{embed: new EmbedBuilder().setDescription(t('missions_no_missions_of_type', { type: t(category) })), row: null}];
     }
     
     const embeds = [];
@@ -284,7 +298,7 @@ function generateMissionEmbeds(missions, category, userId, t) {
 
 
 export async function postMissionList(thread, userId, type, data, interaction = null) {
-    const { userMissions, userStats } = data;
+    const { userMissions, userStats, client } = data;
     const t = await getTranslator(userId, userStats);
 
     if (interaction) {
@@ -301,10 +315,11 @@ export async function postMissionList(thread, userId, type, data, interaction = 
     
     // Clear existing messages from the bot in the thread
     const messages = await thread.messages.fetch({ limit: 50 });
-    const botMessages = messages.filter(m => m.author.id === data.client.user.id);
+    const botMessages = messages.filter(m => m.author.id === client.user.id);
     if(botMessages.size > 0) {
        await thread.bulkDelete(botMessages).catch(e => console.error("Failed to bulk delete messages:", e));
     }
+    missionMessageIds.set(userId, { ...(missionMessageIds.get(userId) || {}), currentView: type });
 
     // Build buttons
     const viewButton = new ButtonBuilder()
@@ -393,7 +408,7 @@ async function animateLine(channel, show = true) {
 
 
 export async function animateAndCollectReward(interaction, userId, missionId, missionCategory, data) {
-    const { userMissions, userStats, client } = data;
+    const { userMissions, userStats } = data;
     const t = await getTranslator(userId, userStats);
 
     await interaction.deferUpdate();

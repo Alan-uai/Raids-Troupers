@@ -1,4 +1,5 @@
 
+
 import {
   Client,
   GatewayIntentBits,
@@ -140,12 +141,12 @@ client.on(Events.InteractionCreate, async interaction => {
     } else if (interaction.customId === 'shop_select_button') {
         await interaction.reply({ content: t('shop_select_button_reply'), ephemeral: true });
     } else if (action === 'mission') {
-        const [subAction, userId, missionId, missionCategory] = args;
-        if (interaction.user.id !== userId) {
+        const [subAction, userId, ...restArgs] = args;
+         if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
         if (subAction === 'view') {
-            const type = args[2]; // 'daily' or 'weekly'
+            const type = restArgs[0]; // 'daily' or 'weekly'
             await postMissionList(interaction.message.thread, userId, type, { userMissions, userStats, client }, interaction);
         } else if (subAction === 'collectall') {
             await collectAllRewards(interaction, userId, { userStats, userItems, userMissions, client, userProfiles, clans });
@@ -154,9 +155,11 @@ client.on(Events.InteractionCreate, async interaction => {
             if (stats) {
                 stats.autoCollectMissions = !stats.autoCollectMissions;
                 userStats.set(userId, stats);
-                await postMissionList(interaction.message.thread, userId, 'daily', { userMissions, userStats, client }, interaction); // Refresh view
+                const currentViewType = args[2] || 'daily';
+                await postMissionList(interaction.message.thread, userId, currentViewType, { userMissions, userStats, client }, interaction); // Refresh view
             }
         } else if (subAction === 'collect') {
+             const [missionId, missionCategory] = restArgs;
              await animateAndCollectReward(interaction, userId, missionId, missionCategory, { userStats, userItems, userMissions, client, userProfiles, clans });
         }
     } else if (action === 'profile') {
@@ -890,6 +893,8 @@ async function handleSuggestionVote(interaction, voteType, t) {
     const embed = EmbedBuilder.from(interaction.message.embeds[0]);
     const votesField = embed.data.fields.find(f => f.name === 'Votos');
     
+    if (!votesField) return; // safety check
+
     const approveMatch = votesField.value.match(/Aprovar: (\d+)/);
     const rejectMatch = votesField.value.match(/Reprovar: (\d+)/);
 
