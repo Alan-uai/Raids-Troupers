@@ -1,9 +1,10 @@
+
 import { missions as missionPool } from './missions.js';
 import { generateProfileImage } from './profile-generator.js';
 import { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getTranslator } from './i18n.js';
 import { allItems } from './items.js';
-import { checkMilestoneCompletion } from './milestones.js';
+import { checkMilestoneCompletion } from './milestone-system.js';
 
 function getDifficultyMultiplier(statValue) {
     if (statValue < 10) return 1;
@@ -312,3 +313,5 @@ async function updateProfileImage(user, data) {
         }
     }
 }
+
+    
