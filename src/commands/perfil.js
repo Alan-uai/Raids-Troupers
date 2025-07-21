@@ -85,8 +85,6 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
                 ],
             });
             
-            await channel.send({ content: t('welcome_new_user', { user: member }) });
-
             const stats = userStats.get(member.id);
             const items = userItems.get(member.id);
             const profileImageBuffer = await generateProfileImage(member, stats, items, clans, t);

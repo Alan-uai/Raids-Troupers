@@ -336,13 +336,53 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function strikeThrough(text) {
-    let final = '';
-    for(const char of text) {
-        final += `~~${char}~~`;
+async function animateLine(channel, show = true) {
+    const chars = ['┄', '─', '━'];
+    const width = 25; // How wide the line should be
+    let lineMessage = null;
+
+    if (show) {
+        // Expand animation
+        for (let i = 0; i < width; i++) {
+            let line = '';
+            for (let j = 0; j < width; j++) {
+                const dist = Math.abs(j - Math.floor(width / 2));
+                if (dist <= i) {
+                    const charIndex = Math.min(chars.length - 1, Math.floor(dist / (width / 6)));
+                    line += chars[charIndex];
+                } else {
+                    line += ' ';
+                }
+            }
+            if (!lineMessage) {
+                lineMessage = await channel.send(`\`${line}\``);
+            } else {
+                await lineMessage.edit(`\`${line}\``).catch(()=>{});
+            }
+            await sleep(60);
+        }
+        return lineMessage;
+    } else {
+        // Contract animation (assuming message is passed in)
+        lineMessage = channel; // Here channel is actually the message object
+        for (let i = width -1; i >= 0; i--) {
+             let line = '';
+            for (let j = 0; j < width; j++) {
+                const dist = Math.abs(j - Math.floor(width / 2));
+                if (dist <= i) {
+                     const charIndex = Math.min(chars.length - 1, Math.floor(dist / (width / 6)));
+                     line += chars[charIndex];
+                } else {
+                    line += ' ';
+                }
+            }
+            await lineMessage.edit(`\`${line}\``).catch(()=>{});
+            await sleep(60);
+        }
+        await lineMessage.delete().catch(()=>{});
     }
-    return final;
 }
+
 
 export async function animateAndCollectReward(interaction, userId, missionId, missionCategory, data) {
     const { userMissions, userStats, client } = data;
@@ -360,12 +400,11 @@ export async function animateAndCollectReward(interaction, userId, missionId, mi
     
     const missionMessage = interaction.message;
     const originalEmbed = EmbedBuilder.from(missionMessage.embeds[0]);
+    const reward = missionProgress.reward || missionPool.find(m => m.id === missionProgress.id)?.reward;
 
-    // Phase 1: Animation
+    // Phase 1: Strikethrough Animation
     const fieldsToAnimate = ['title', 'description'];
     const maxLen = Math.max(...fieldsToAnimate.map(f => originalEmbed.data[f]?.length || 0));
-
-    let rewardDisplayMessage;
 
     for (let i = 1; i <= maxLen; i++) {
         const tempEmbed = EmbedBuilder.from(originalEmbed);
@@ -374,37 +413,35 @@ export async function animateAndCollectReward(interaction, userId, missionId, mi
         let title = originalEmbed.data.title || '';
         let desc = originalEmbed.data.description || '';
 
-        tempEmbed.setTitle('~~' + title.substring(0, i) + '~~' + title.substring(i));
-        tempEmbed.setDescription('~~' + desc.substring(0, i) + '~~' + desc.substring(i));
+        const strike = (text, len) => '~~' + text.substring(0, len) + '~~' + text.substring(len);
+
+        if (title) tempEmbed.setTitle(strike(title, i));
+        if (desc) tempEmbed.setDescription(strike(desc, i));
         
-        // Update reward text and spawn/update the reward display embed
-        let rewardField = tempEmbed.data.fields.find(f => f.name === t('reward'));
-        if (rewardField) {
-            const rewardValue = rewardField.value;
-            const xpMatch = rewardValue.match(/(\d+)\s*XP/);
-            const tcMatch = rewardValue.match(/(\d+)\s*TC/);
-
-            if (xpMatch && !rewardDisplayMessage) {
-                 rewardDisplayMessage = await interaction.channel.send({ embeds: [new EmbedBuilder().setColor('#FFFF00').setDescription(`+ ${xpMatch[0]}`)] });
-            }
-            if (tcMatch && rewardDisplayMessage && rewardDisplayMessage.embeds[0].description.includes('XP')) {
-                await rewardDisplayMessage.edit({ embeds: [new EmbedBuilder().setColor('#FFFF00').setDescription(`${rewardDisplayMessage.embeds[0].description} & ${tcMatch[0]}`)] });
-            }
-        }
-
-
-        await missionMessage.edit({ embeds: [tempEmbed], components: [] });
+        await missionMessage.edit({ embeds: [tempEmbed], components: [] }).catch(()=>{});
         await sleep(75); // animation speed
     }
 
-    // Phase 2: Collect and Cleanup
-    await collectReward(interaction.user, missionProgress, data);
+    // Phase 2: Collect Reward and show line animation
+    const result = await collectReward(interaction.user, missionProgress, data);
+    
+    // Line appears
+    const lineMessage = await animateLine(interaction.channel, true);
+    
+    const rewardEmbed = new EmbedBuilder()
+        .setColor('#FFFF00')
+        .setDescription(result.message);
+        
+    const rewardDisplayMessage = await interaction.channel.send({ embeds: [rewardEmbed] });
+
+    await sleep(2500); // wait 2.5 seconds to read the reward
+
+    // Cleanup
+    await rewardDisplayMessage.delete().catch(()=>{});
+    await animateLine(lineMessage, false); // Line disappears
+    await missionMessage.delete().catch(()=>{});
+
     await updateProfileImage(interaction.user, data);
-
-    await sleep(2000); // wait 2 seconds
-
-    await missionMessage.delete();
-    if(rewardDisplayMessage) await rewardDisplayMessage.delete();
 
     await interaction.followUp({ content: t('mission_reward_collected_ephemeral', { missionName: originalEmbed.data.title }), ephemeral: true });
 }
