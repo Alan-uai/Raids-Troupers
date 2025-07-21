@@ -4,7 +4,7 @@ import { getTranslator } from '../i18n.js';
 import { assignMissions, postMissionList } from '../mission-system.js';
 import { data } from './perfil.data.js';
 import { milestones } from '../milestones.js';
-import { createMilestoneEmbed } from '../milestone-system.js';
+import { createMilestoneEmbed, checkMilestoneCompletion } from '../milestone-system.js';
 
 const PROFILE_CATEGORY_ID = '1395589412661887068';
 
@@ -25,7 +25,7 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
         const userLocale = targetUser.locale || 'pt-BR';
         const initialStats = { 
             level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, 
-            kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, 
+            kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale.startsWith('pt') ? 'pt-BR' : 'en-US', 
             autoCollectMissions: false, completedMilestones: {}, clanJoinDate: null, daysInClan: 0,
             classLevels: {}, lastClassUsedInRaid: null, battleStrategist: 0, auctionsWon: 0, mentoredPlayers: 0,
         };
@@ -33,7 +33,7 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
         
         // Atribui cargo de idioma
         try {
-            const langRoleName = userLocale.startsWith('pt') ? 'Br' : 'En';
+            const langRoleName = initialStats.locale.startsWith('pt') ? 'Br' : 'En';
             const role = interaction.guild.roles.cache.find(r => r.name === langRoleName);
             if (role) {
                 await member.roles.add(role);
@@ -98,7 +98,7 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
                     new ButtonBuilder().setCustomId(`profile_class_${member.id}`).setLabel(t('choose_class_button')).setStyle(ButtonStyle.Secondary).setEmoji('⚔️'),
                     new ButtonBuilder().setCustomId(`profile_refresh_${member.id}`).setEmoji('🔁').setStyle(ButtonStyle.Success)
                 );
-
+            // No introductory text, just the buttons
             await channel.send({ components: [actionRow] });
 
             userProfiles.set(member.id, {
@@ -109,22 +109,22 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
             // Criação dos Tópicos Privados
             const missionThread = await channel.threads.create({ name: t('missions_thread_title'), autoArchiveDuration: 10080, reason: t('missions_thread_reason', { username: member.displayName }) });
             await postMissionList(missionThread, member.id, 'daily', { userMissions, userStats, client });
-
+            
             const milestoneThread = await channel.threads.create({ name: t('milestones_thread_title'), autoArchiveDuration: 10080, reason: t('milestones_thread_reason', { username: member.displayName }) });
+            // Post initial milestone embeds
             for (const milestone of milestones) {
-                 if (milestone.id === 'secret_mastery' || milestone.type === 'PLACEHOLDER') continue;
-                 const statsForMilestone = userStats.get(member.id) || {};
-                 statsForMilestone.userId = member.id; // Garante que o userId está presente para os customIds
-                 const itemsForMilestone = userItems.get(member.id);
-                 const milestoneData = await createMilestoneEmbed(milestone, statsForMilestone, itemsForMilestone, 'general', t);
-                 if(milestoneData) {
+                if (milestone.type === 'PLACEHOLDER' || milestone.id === 'secret_mastery') continue;
+                const statsForMilestone = userStats.get(member.id) || {};
+                statsForMilestone.userId = member.id;
+                const itemsForMilestone = userItems.get(member.id);
+                const milestoneData = await createMilestoneEmbed(milestone, statsForMilestone, itemsForMilestone, 'general', t);
+                if (milestoneData) {
                     const message = await milestoneThread.send({ embeds: [milestoneData.embed], components: [milestoneData.row] });
-                    // Armazena o ID da mensagem para futuras atualizações
                     const userStatsData = userStats.get(member.id);
                     if (!userStatsData.completedMilestones) userStatsData.completedMilestones = {};
                     userStatsData.completedMilestones[milestone.id] = { ...(userStatsData.completedMilestones[milestone.id] || {}), messageId: message.id };
                     userStats.set(member.id, userStatsData);
-                 }
+                }
             }
 
             const exclusiveShopThread = await channel.threads.create({ name: t('exclusive_shop_thread_title'), autoArchiveDuration: 10080, reason: t('exclusive_shop_thread_reason', { username: member.displayName }) });

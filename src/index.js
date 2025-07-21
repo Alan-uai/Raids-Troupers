@@ -214,7 +214,7 @@ client.on(Events.InteractionCreate, async interaction => {
       } else if (action === 'rating' && args[0] === 'select') {
           const [raterId] = args;
           await handleRatingSelection(interaction, raterId, t);
-      } else if (action === 'shop' && args[0] === 'select' && args[1] === 'item') {
+      } else if (interaction.customId === 'shop_select_item') {
           userShopSelection.set(interaction.user.id, interaction.values[0]);
           await interaction.reply({ content: t('shop_item_selected'), ephemeral: true });
       } else if (action === 'equip' && args[0] === 'select') {
@@ -855,7 +855,7 @@ async function handlePollVote(interaction, pollId, optionIndex, t) {
     pollData.voters.set(userId, optionIndex);
     pollData.counts[optionIndex]++;
 
-    const pollMessage = await interaction.channel.messages.fetch(pollId);
+    const pollMessage = await interaction.channel.messages.fetch(pollId).catch(() => null);
     if (!pollMessage) return;
 
     const originalEmbed = pollMessage.embeds[0];
@@ -876,7 +876,7 @@ async function handlePollVote(interaction, pollId, optionIndex, t) {
         });
         newRows.push(newRow);
     });
-
+    
     await pollMessage.edit({ embeds: [newEmbed], components: newRows });
     await interaction.reply({ content: t('poll_vote_success'), ephemeral: true });
 }
@@ -926,7 +926,7 @@ async function handleSuggestionVote(interaction, voteType, t) {
     
     if (rejects >= 5 && approves === 0) {
         await interaction.message.delete().catch(() => {});
-        interaction.followUp({ content: t('suggestion_deleted_low_votes'), ephemeral: true }).catch(() => {});
+        await interaction.followUp({ content: t('suggestion_deleted_low_votes'), ephemeral: true }).catch(() => {});
     }
 }
 

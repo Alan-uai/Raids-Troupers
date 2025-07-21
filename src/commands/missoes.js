@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { missions as missionPool } from '../missions.js';
 import { getTranslator } from '../i18n.js';
+import { allItems } from '../items.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -20,9 +21,13 @@ export default {
     const t = await getTranslator(interaction.user.id, userStats);
     const userId = interaction.user.id;
     const category = interaction.options.getString('categoria');
-    const activeMissionsData = userMissions.get(userId);
 
-    const missionsToShow = activeMissionsData ? activeMissionsData[category] : [];
+    if (!userMissions.has(userId)) {
+      return await interaction.reply({ content: t('missions_none_active'), ephemeral: true });
+    }
+    
+    const activeMissionsData = userMissions.get(userId);
+    const missionsToShow = activeMissionsData[category];
 
     if (!missionsToShow || missionsToShow.length === 0) {
       return await interaction.reply({ content: t('missions_none_active_category', { category: t(category) }), ephemeral: true });
@@ -38,16 +43,21 @@ export default {
       if (missionDetails) {
         let rewardText;
         const reward = missionProgress.reward || missionDetails.reward;
+
         if (reward.item) {
             const itemDetails = allItems.find(i => i.id === reward.item);
-            rewardText = itemDetails ? `Item: **${t(`item_${itemDetails.id}_name`)}**` : '**Item Secreto**';
+            rewardText = itemDetails ? `Item: **${t(`item_${itemDetails.id}_name`, {defaultValue: itemDetails.name})}**` : `**${t('unknown_item')}**`;
         } else {
             rewardText = `**${reward.xp || 0}** XP & **${reward.coins || 0}** TC`;
         }
         
+        const progressStatus = missionProgress.collected 
+            ? t('missions_collected_button') 
+            : (missionProgress.completed ? t('missions_collect_button') : `${missionProgress.progress} / ${missionProgress.goal}`);
+
         embed.addFields({
           name: `${t(`mission_${missionDetails.id}_title`)}`,
-          value: `*${t(`mission_${missionDetails.id}_description`)}*\n**${t('progress')}:** ${missionProgress.progress} / ${missionProgress.goal}\n**${t('reward')}:** ${rewardText}`,
+          value: `*${t(`mission_${missionDetails.id}_description`)}*\n**${t('progress')}:** ${progressStatus}\n**${t('reward')}:** ${rewardText}`,
           inline: false,
         });
       }

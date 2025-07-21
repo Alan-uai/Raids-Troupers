@@ -6,6 +6,16 @@ const SHOP_CHANNEL_ID_PT = '1396416240263630868';
 const SHOP_CHANNEL_ID_EN = '1396725532913303612';
 const shopStorage = new Map(); // Armazenará os itens atualmente na loja para cada localidade
 
+function getNextUpdate(hours) {
+    const now = new Date();
+    const nextUpdate = new Date(now);
+    nextUpdate.setUTCHours(Math.ceil(now.getUTCHours() / hours) * hours, 0, 0, 0);
+    if (nextUpdate <= now) {
+        nextUpdate.setUTCHours(nextUpdate.getUTCHours() + hours);
+    }
+    return nextUpdate;
+}
+
 function getShopItems(locale) {
     if (!shopStorage.has(locale) || shopStorage.get(locale).lastUpdate < Date.now() - 3 * 60 * 60 * 1000) {
         updateShopInventory(locale);
@@ -18,9 +28,13 @@ function updateShopInventory(locale) {
     const now = new Date();
     let shopItems = [];
 
-    // Lógica para itens raros/lendários/místicos baseada no tempo
     const hour = now.getUTCHours();
-    if (hour % 24 === 0) { // A cada 24h
+    // Lógica para itens raros/lendários/místicos baseada no tempo
+    if (now.getFullYear() > 2024 && now.getMonth() === 0 && now.getDate() === 1) { // 1º de Janeiro do ano seguinte
+        const kardecPool = allItems.filter(i => i.source === 'shop' && i.rarity === 'Kardec');
+        if (kardecPool.length > 0) shopItems.push(kardecPool[Math.floor(Math.random() * kardecPool.length)]);
+    }
+    else if (hour % 24 === 0) { // A cada 24h
         const mythicPool = allItems.filter(i => i.source === 'shop' && i.rarity.includes('Místico'));
         if (mythicPool.length > 0) shopItems.push(mythicPool[Math.floor(Math.random() * mythicPool.length)]);
     } else if (hour % 12 === 0) { // A cada 12h
@@ -30,14 +44,6 @@ function updateShopInventory(locale) {
         const rarePool = allItems.filter(i => i.source === 'shop' && i.rarity.includes('Raro'));
         if (rarePool.length > 0) shopItems.push(rarePool[Math.floor(Math.random() * rarePool.length)]);
     }
-
-    // Lógica para item Kardec (anual)
-    const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
-    if (dayOfYear === 1) { // 1º de Janeiro
-        const kardecPool = allItems.filter(i => i.source === 'shop' && i.rarity === 'Kardec');
-        if (kardecPool.length > 0) shopItems.push(kardecPool[Math.floor(Math.random() * kardecPool.length)]);
-    }
-
 
     // Preenche o resto com itens comuns/incomuns
     const regularPool = allItems.filter(item => item.source === 'shop' && !item.rarity.includes('Raro') && !item.rarity.includes('Lendário') && !item.rarity.includes('Místico') && item.rarity !== 'Kardec');
@@ -65,20 +71,23 @@ async function postOrUpdateShopMessage(client, t, channelId, locale) {
 
     const shopItems = getShopItems(locale);
 
+    const timerEmbed = new EmbedBuilder()
+      .setColor('#3498DB')
+      .setDescription(t('shop_footer_rotation', { time: `<t:${Math.floor(getNextUpdate(3).getTime() / 1000)}:R>` }));
+
     const embed = new EmbedBuilder()
       .setColor('#FFA500')
       .setTitle(t('shop_title'))
       .setDescription(t('shop_description'))
-      .setTimestamp()
-      .setFooter({ text: t('shop_footer_rotation') });
+      .setTimestamp();
 
     if (shopItems.length === 0) {
         embed.setDescription(t('shop_empty'));
     } else {
         shopItems.forEach(item => {
             embed.addFields({
-                name: `${t(`item_${item.id}_name`)} - ${item.price} TC`,
-                value: `*${t(`item_${item.id}_description`)}*\n**${t('rarity')}:** ${item.rarity}`,
+                name: `${t(`item_${item.id}_name`) || item.name} - ${item.price} TC`,
+                value: `*${t(`item_${item.id}_description`) || item.description}*\n**${t('rarity')}:** ${item.rarity}`,
                 inline: false,
             });
         });
@@ -92,12 +101,13 @@ async function postOrUpdateShopMessage(client, t, channelId, locale) {
     if (shopItems.length > 0) {
          selectMenu.addOptions(
             shopItems.map(item => ({
-                label: t(`item_${item.id}_name`),
+                label: t(`item_${item.id}_name`) || item.name,
                 description: t('shop_select_item_desc', { price: item.price }),
                 value: item.id,
             }))
         );
     } else {
+        // Discord API requires at least one option
         selectMenu.addOptions([{ label: 'empty', value: 'empty' }]);
     }
     
@@ -109,17 +119,24 @@ async function postOrUpdateShopMessage(client, t, channelId, locale) {
         .setEmoji('🛒')
         .setDisabled(shopItems.length === 0);
 
-    const row = new ActionRowBuilder().addComponents(selectMenu);
+    const menuRow = new ActionRowBuilder().addComponents(selectMenu);
     const buttonRow = new ActionRowBuilder().addComponents(buyButton);
+    const components = shopItems.length > 0 ? [menuRow, buttonRow] : [];
 
     try {
         const messages = await shopChannel.messages.fetch({ limit: 10 });
-        const botMessage = messages.find(m => m.author.id === client.user.id);
+        const botMessages = messages.filter(m => m.author.id === client.user.id);
+        const mainMessage = botMessages.first(); // Assumes the last message is the main one
+        const timerMessage = botMessages.last(); // Assumes the first message is the timer
 
-        if (botMessage) {
-            await botMessage.edit({ embeds: [embed], components: [row, buttonRow] });
+        if (mainMessage && timerMessage && botMessages.size >= 2) {
+             await timerMessage.edit({ embeds: [timerEmbed] });
+             await mainMessage.edit({ embeds: [embed], components });
         } else {
-            await shopChannel.send({ embeds: [embed], components: [row, buttonRow] });
+            // If messages don't exist, clear old ones and send new ones
+            if(botMessages.size > 0) await shopChannel.bulkDelete(botMessages);
+            await shopChannel.send({ embeds: [timerEmbed] });
+            await shopChannel.send({ embeds: [embed], components });
         }
         return { success: true, channelId };
     } catch (error) {
@@ -137,11 +154,10 @@ export default {
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
   async execute(interaction) {
     const t_pt = await getTranslator(interaction.user.id, null, 'pt-BR');
+    const t_en = await getTranslator(interaction.user.id, null, 'en-US');
     
     await interaction.reply({ content: t_pt('shop_updating_message'), ephemeral: true });
     
-    // Update shops immediately
-    const t_en = await getTranslator(interaction.user.id, null, 'en-US');
     const ptResult = await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR');
     const enResult = await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US');
     
@@ -149,19 +165,22 @@ export default {
     if (ptResult.success && enResult.success) {
         feedback = t_pt('shop_updated_all');
     } else {
-        feedback = 'Houve problemas ao atualizar as lojas:\n';
-        if (!ptResult.success) feedback += `- Falha ao atualizar a loja PT-BR no canal <#${ptResult.channelId}>.\n`;
-        if (!enResult.success) feedback += `- Falha ao atualizar a loja EN-US no canal <#${enResult.channelId}>.`;
+        feedback = t_pt('shop_update_error_header');
+        if (!ptResult.success) feedback += `- ${t_pt('shop_update_error_pt', {channelId: ptResult.channelId})}\n`;
+        if (!enResult.success) feedback += `- ${t_pt('shop_update_error_en', {channelId: enResult.channelId})}`;
     }
 
     await interaction.followUp({ content: feedback, ephemeral: true });
 
     // Set interval to update shops periodically
-    setInterval(async () => {
-        console.log("Running periodic shop update...");
-        await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR');
-        await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US');
-    }, 3 * 60 * 60 * 1000); // 3 hours
+    // This should ideally be managed outside the command execution to avoid multiple intervals.
+    if (!interaction.client.shopUpdateInterval) {
+        interaction.client.shopUpdateInterval = setInterval(async () => {
+            console.log("Running periodic shop update...");
+            await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR');
+            await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US');
+        }, 3 * 60 * 60 * 1000); // 3 hours
+    }
   },
   postOrUpdateShopMessage,
 };

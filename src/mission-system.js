@@ -235,7 +235,7 @@ export async function checkMissionCompletion(user, missionType, data, amount = 1
 // Helper para gerar embeds de uma lista de missões
 function generateMissionEmbeds(missions, category, userId, t) {
     if (!missions || missions.length === 0) {
-        return [new EmbedBuilder().setDescription(t('missions_no_missions_of_type', { type: category }))];
+        return [{embed: new EmbedBuilder().setDescription(t('missions_no_missions_of_type', { type: category })), row: null}];
     }
     
     const embeds = [];
@@ -270,8 +270,7 @@ function generateMissionEmbeds(missions, category, userId, t) {
             .addFields(
                 { name: t('progress'), value: `${missionProgress.progress} / ${missionProgress.goal}`, inline: true },
                 { name: t('reward'), value: rewardText, inline: true }
-            )
-            .setAuthor({name: missionProgress.id}); // Store ID here for retrieval
+            );
 
         if (missionProgress.completed && !missionProgress.collected) {
            embed.setFooter({ text: 'Pronto para coletar!' });
@@ -294,6 +293,11 @@ export async function postMissionList(thread, userId, type, data, interaction = 
     
     const activeMissions = userMissions.get(userId);
     const stats = userStats.get(userId);
+
+    if (!activeMissions) {
+        console.error(`No missions found for user ${userId} to post list.`);
+        return;
+    }
     
     // Clear existing messages from the bot in the thread
     const messages = await thread.messages.fetch({ limit: 50 });
@@ -307,7 +311,7 @@ export async function postMissionList(thread, userId, type, data, interaction = 
         .setCustomId(`mission_view_${userId}_${type === 'daily' ? 'weekly' : 'daily'}`)
         .setLabel(type === 'daily' ? t('missions_view_weekly_button') : t('missions_view_daily_button'))
         .setStyle(ButtonStyle.Primary);
-
+    
     const collectAllButton = new ButtonBuilder()
         .setCustomId(`mission_collectall_${userId}`)
         .setLabel(t('missions_collect_all_button'))
@@ -317,18 +321,22 @@ export async function postMissionList(thread, userId, type, data, interaction = 
     const autoCollectStatus = stats?.autoCollectMissions ? t('missions_autocollect_status_on') : t('missions_autocollect_status_off');
     const autoCollectButton = new ButtonBuilder()
         .setCustomId(`mission_autocollect_${userId}`)
-        .setLabel(`${t('missions_autocollect_button')} (${autoCollectStatus})`)
+        .setLabel(`${t('missions_autocollect_button')}`)
         .setStyle(ButtonStyle.Secondary);
         
     const controlRow = new ActionRowBuilder().addComponents(viewButton, collectAllButton, autoCollectButton);
-    await thread.send({ components: [controlRow] });
+    await thread.send({ content: t('missions_autocollect_description') + `\n**Status:** ${autoCollectStatus}`, components: [controlRow] });
 
     // Get embeds for the current view
     const missionsToShow = (type === 'daily' ? activeMissions.daily : activeMissions.weekly).filter(Boolean);
     const missionEmbeds = generateMissionEmbeds(missionsToShow, type, userId, t);
 
     for (const {embed, row} of missionEmbeds) {
-        await thread.send({ embeds: [embed], components: [row] });
+        if(row){
+             await thread.send({ embeds: [embed], components: [row] });
+        } else {
+             await thread.send({ embeds: [embed] });
+        }
     }
 }
 
@@ -343,12 +351,12 @@ async function animateLine(channel, show = true) {
 
     if (show) {
         // Expand animation
-        for (let i = 0; i < width; i++) {
+        for (let i = 0; i <= Math.ceil(width / 2); i++) {
             let line = '';
             for (let j = 0; j < width; j++) {
                 const dist = Math.abs(j - Math.floor(width / 2));
                 if (dist <= i) {
-                    const charIndex = Math.min(chars.length - 1, Math.floor(dist / (width / 6)));
+                    const charIndex = Math.min(chars.length - 1, Math.floor(dist / (width / 8)));
                     line += chars[charIndex];
                 } else {
                     line += ' ';
@@ -359,25 +367,25 @@ async function animateLine(channel, show = true) {
             } else {
                 await lineMessage.edit(`\`${line}\``).catch(()=>{});
             }
-            await sleep(60);
+            await sleep(50);
         }
         return lineMessage;
     } else {
-        // Contract animation (assuming message is passed in)
+        // Contract animation
         lineMessage = channel; // Here channel is actually the message object
-        for (let i = width -1; i >= 0; i--) {
+        for (let i = Math.ceil(width / 2); i >= 0; i--) {
              let line = '';
             for (let j = 0; j < width; j++) {
                 const dist = Math.abs(j - Math.floor(width / 2));
                 if (dist <= i) {
-                     const charIndex = Math.min(chars.length - 1, Math.floor(dist / (width / 6)));
+                     const charIndex = Math.min(chars.length - 1, Math.floor(dist / (width / 8)));
                      line += chars[charIndex];
                 } else {
                     line += ' ';
                 }
             }
             await lineMessage.edit(`\`${line}\``).catch(()=>{});
-            await sleep(60);
+            await sleep(50);
         }
         await lineMessage.delete().catch(()=>{});
     }
@@ -400,7 +408,6 @@ export async function animateAndCollectReward(interaction, userId, missionId, mi
     
     const missionMessage = interaction.message;
     const originalEmbed = EmbedBuilder.from(missionMessage.embeds[0]);
-    const reward = missionProgress.reward || missionPool.find(m => m.id === missionProgress.id)?.reward;
 
     // Phase 1: Strikethrough Animation
     const fieldsToAnimate = ['title', 'description'];
@@ -413,19 +420,18 @@ export async function animateAndCollectReward(interaction, userId, missionId, mi
         let title = originalEmbed.data.title || '';
         let desc = originalEmbed.data.description || '';
 
-        const strike = (text, len) => '~~' + text.substring(0, len) + '~~' + text.substring(len);
+        const strike = (text, len) => '~~' + text.substring(0, Math.min(len, text.length)) + '~~' + text.substring(Math.min(len, text.length));
 
         if (title) tempEmbed.setTitle(strike(title, i));
         if (desc) tempEmbed.setDescription(strike(desc, i));
         
         await missionMessage.edit({ embeds: [tempEmbed], components: [] }).catch(()=>{});
-        await sleep(75); // animation speed
+        await sleep(25); // animation speed
     }
 
     // Phase 2: Collect Reward and show line animation
     const result = await collectReward(interaction.user, missionProgress, data);
     
-    // Line appears
     const lineMessage = await animateLine(interaction.channel, true);
     
     const rewardEmbed = new EmbedBuilder()
@@ -434,11 +440,11 @@ export async function animateAndCollectReward(interaction, userId, missionId, mi
         
     const rewardDisplayMessage = await interaction.channel.send({ embeds: [rewardEmbed] });
 
-    await sleep(2500); // wait 2.5 seconds to read the reward
+    await sleep(3500); // wait 3.5 seconds to read the reward
 
     // Cleanup
     await rewardDisplayMessage.delete().catch(()=>{});
-    await animateLine(lineMessage, false); // Line disappears
+    await animateLine(lineMessage, false); 
     await missionMessage.delete().catch(()=>{});
 
     await updateProfileImage(interaction.user, data);
