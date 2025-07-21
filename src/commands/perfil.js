@@ -29,6 +29,17 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
             autoCollectMissions: false, completedMilestones: {}, clanJoinDate: null, daysInClan: 0
         };
         userStats.set(targetUser.id, initialStats);
+        
+        // Atribui cargo de idioma
+        try {
+            const langRoleName = userLocale.startsWith('pt') ? 'Br' : 'En';
+            const role = interaction.guild.roles.cache.find(r => r.name === langRoleName);
+            if (role) {
+                await member.roles.add(role);
+            }
+        } catch (e) {
+            console.error(`Failed to assign language role to ${member.displayName}:`, e);
+        }
     }
     if (!userItems.has(targetUser.id)) {
         const initialItems = { inventory: [], equippedGear: {}, equippedCosmetics: {} };

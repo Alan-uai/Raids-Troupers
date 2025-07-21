@@ -2,13 +2,13 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 import { allItems } from '../items.js';
 import { getTranslator } from '../i18n.js';
 
-const SHOP_CHANNEL_ID = '1396416240263630868';
-let shopMessageId = null; 
+const SHOP_CHANNEL_ID_PT = '1396416240263630868';
+const SHOP_CHANNEL_ID_EN = '1396725532913303612';
 
-async function updateShopMessage(client, t) {
-    const shopChannel = await client.channels.fetch(SHOP_CHANNEL_ID).catch(() => null);
+async function updateShopMessage(client, t, channelId) {
+    const shopChannel = await client.channels.fetch(channelId).catch(() => null);
     if (!shopChannel || shopChannel.type !== ChannelType.GuildText) {
-        console.error('Shop channel not found or is not a text channel.');
+        console.error(`Shop channel ${channelId} not found or is not a text channel.`);
         return;
     }
 
@@ -54,14 +54,12 @@ async function updateShopMessage(client, t) {
         const botMessage = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title === t('shop_title'));
 
         if (botMessage) {
-            shopMessageId = botMessage.id;
             await botMessage.edit({ embeds: [embed], components: [row, buttonRow] });
         } else {
-            const newMessage = await shopChannel.send({ embeds: [embed], components: [row, buttonRow] });
-            shopMessageId = newMessage.id;
+            await shopChannel.send({ embeds: [embed], components: [row, buttonRow] });
         }
     } catch (error) {
-        console.error("Failed to update or send shop message:", error);
+        console.error(`Failed to update or send shop message to ${channelId}:`, error);
     }
 }
 
@@ -69,15 +67,22 @@ async function updateShopMessage(client, t) {
 export default {
   data: new SlashCommandBuilder()
     .setName('loja_setup')
-    .setDescription('[Admin] Configura ou atualiza a mensagem da loja no canal dedicado.')
-    .setDescriptionLocalizations({ "en-US": "[Admin] Sets up or updates the shop message in the dedicated channel." })
+    .setDescription('[Admin] Configura ou atualiza as mensagens das lojas no servidor.')
+    .setDescriptionLocalizations({ "en-US": "[Admin] Sets up or updates the shop messages on the server." })
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
   async execute(interaction) {
-    const t = await getTranslator(interaction.user.id, null);
-    await interaction.reply({ content: t('shop_updating_message'), ephemeral: true });
-    await updateShopMessage(interaction.client, t);
+    const t_pt = await getTranslator(interaction.user.id, null, 'pt-BR');
+    const t_en = await getTranslator(interaction.user.id, null, 'en-US');
+    
+    await interaction.reply({ content: t_pt('shop_updating_message'), ephemeral: true });
+
+    // Update Portuguese Shop
+    await updateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT);
+    
+    // Update English Shop
+    await updateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN);
+    
+    await interaction.followUp({ content: t_pt('shop_updated_all'), ephemeral: true });
   },
   updateShopMessage, 
 };
-
-    
