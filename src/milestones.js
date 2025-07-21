@@ -54,34 +54,34 @@ export const milestones = [
         { level: 9, goal: 150 }, { level: 10, goal: 200 }
       ] 
     },
-    // 7. Members Kicked
+    // 7. Guia da Tropa
     { 
-      id: 'members_kicked', type: 'KICK_MEMBER', stat: 'kickedOthers',
+      id: 'troop_guide', type: 'GUIDE_TROOP', stat: 'guidedTroop',
       tiers: [
-        { level: 1, goal: 1 }, { level: 2, goal: 5 }, { level: 3, goal: 10 }, { level: 4, goal: 20 },
-        { level: 5, goal: 30 }, { level: 6, goal: 40 }, { level: 7, goal: 50 }, { level: 8, goal: 75 },
-        { level: 9, goal: 100 }, { level: 10, goal: 150 }
+        { level: 1, goal: 10 }, { level: 2, goal: 25 }, { level: 3, goal: 50 }, { level: 4, goal: 75 },
+        { level: 5, goal: 100 }, { level: 6, goal: 150 }, { level: 7, goal: 200 }, { level: 8, goal: 300 },
+        { level: 9, goal: 400 }, { level: 10, goal: 500 }
       ] 
     },
-    // 8. Clans Joined (requires new stat `clansJoined`)
+    // 8. Membro Leal
     { 
-      id: 'clans_joined', type: 'JOIN_CLAN', stat: 'clansJoined',
+      id: 'loyal_member', type: 'STAY_LOYAL', stat: 'daysInClan',
       tiers: [
-        { level: 1, goal: 1 }, { level: 2, goal: 2 }, { level: 3, goal: 3 }, { level: 4, goal: 4 },
-        { level: 5, goal: 5 }, { level: 6, goal: 6 }, { level: 7, goal: 7 }, { level: 8, goal: 8 },
-        { level: 9, goal: 9 }, { level: 10, goal: 10 }
+        { level: 1, goal: 7 }, { level: 2, goal: 14 }, { level: 3, goal: 30 }, { level: 4, goal: 60 },
+        { level: 5, goal: 90 }, { level: 6, goal: 120 }, { level: 7, goal: 180 }, { level: 8, goal: 270 },
+        { level: 9, goal: 365 }, { level: 10, goal: 500 }
       ] 
     },
-    // 9. Clan Created (requires new stat `clanCreated`)
+    // 9. Mentor de Elite
     { 
-      id: 'clan_created', type: 'CREATE_CLAN', stat: 'clanCreated',
+      id: 'elite_mentor', type: 'MENTOR_PLAYER', stat: 'mentoredPlayers',
       tiers: [
-        { level: 1, goal: 1 }, { level: 2, goal: 2 }, { level: 3, goal: 3 }, { level: 4, goal: 4 },
-        { level: 5, goal: 5 }, { level: 6, goal: 6 }, { level: 7, goal: 7 }, { level: 8, goal: 8 },
-        { level: 9, goal: 9 }, { level: 10, goal: 10 }
+        { level: 1, goal: 5 }, { level: 2, goal: 10 }, { level: 3, goal: 20 }, { level: 4, goal: 30 },
+        { level: 5, goal: 50 }, { level: 6, goal: 75 }, { level: 7, goal: 100 }, { level: 8, goal: 150 },
+        { level: 9, goal: 200 }, { level: 10, goal: 250 }
       ] 
     },
-    // 10. Auctions Won (requires new stat `auctionsWon`)
+    // 10. Auctions Won
     { 
       id: 'auctions_won', type: 'AUCTION_WON', stat: 'auctionsWon',
       tiers: [

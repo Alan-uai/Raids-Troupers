@@ -23,7 +23,11 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
     // --- Garante que o usuário tem dados básicos ---
     if (!userStats.has(targetUser.id)) {
         const userLocale = targetUser.locale || 'pt-BR';
-        const initialStats = { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, autoCollectMissions: false, completedMilestones: {} };
+        const initialStats = { 
+            level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, 
+            kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, 
+            autoCollectMissions: false, completedMilestones: {}, guidedTroop: 0, daysInClan: 0, mentoredPlayers: 0, auctionsWon: 0, clanJoinDate: null
+        };
         userStats.set(targetUser.id, initialStats);
     }
     if (!userItems.has(targetUser.id)) {
@@ -102,6 +106,7 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
 
             const milestoneThread = await channel.threads.create({ name: t('milestones_thread_title'), autoArchiveDuration: 10080, reason: t('milestones_thread_reason', { username: member.displayName }) });
             for (const milestone of milestones) {
+                 if (milestone.id === 'secret_mastery') continue;
                  const statsForMilestone = userStats.get(member.id) || {};
                  statsForMilestone.userId = member.id; // Garante que o userId está presente para os customIds
                  const itemsForMilestone = userItems.get(member.id);
