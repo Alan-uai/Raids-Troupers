@@ -1,8 +1,6 @@
 // src/milestones.js
 import { rarities } from './items.js';
 
-const allRaritiesExceptKardec = Object.values(rarities).filter(r => r !== rarities.KARDEC);
-
 export const milestones = [
     // 1. Raids Helded
     { 
@@ -53,50 +51,56 @@ export const milestones = [
     { 
       id: 'items_owned', type: 'ITEM_ACQUIRED', stat: 'inventory.length',
       tiers: [
-        { level: 1, goal: 5 }, { level: 2, goal: 10 }, { level: 3, goal: 20 }, { level: 4, goal: 35 },
-        { level: 5, goal: 50 }, { level: 6, goal: 75 }, { level: 7, goal: 100 }, { level: 8, goal: 125 },
-        { level: 9, goal: 150 }, { level: 10, goal: 200 }
+        { level: 1, goal: 10 }, { level: 2, goal: 25 }, { level: 3, goal: 50 }, { level: 4, goal: 75 },
+        { level: 5, goal: 100 }, { level: 6, goal: 150 }, { level: 7, goal: 200 }, { level: 8, goal: 250 },
+        { level: 9, goal: 300 }, { level: 10, goal: 350 }
       ] 
     },
     // 7. Membro Leal
     { 
       id: 'loyal_member', type: 'STAY_LOYAL', stat: 'daysInClan',
       tiers: [
-        { level: 1, goal: 7 }, { level: 2, goal: 14 }, { level: 3, goal: 30 }, { level: 4, goal: 60 },
-        { level: 5, goal: 90 }, { level: 6, goal: 120 }, { level: 7, goal: 180 }, { level: 8, goal: 270 },
-        { level: 9, goal: 365 }, { level: 10, goal: 500 }
+        { level: 1, goal: 7 }, { level: 2, goal: 15 }, { level: 3, goal: 30 }, { level: 4, goal: 60 },
+        { level: 5, goal: 90 }, { level: 6, goal: 180 }, { level: 7, goal: 270 }, { level: 8, goal: 365 },
+        { level: 9, goal: 500 }, { level: 10, goal: 730 }
       ] 
     },
     // 8. Colecionador de Raridades
     {
-      id: 'rarity_collector', type: 'COLLECT_RARITIES', stat: { name: 'rarityCollector', rarities: allRaritiesExceptKardec },
+      id: 'rarity_collector', type: 'COLLECT_RARITIES', stat: { name: 'rarityCollector' }, // Stat is complex, handled in system
       tiers: [
-        { level: 1, goal: 1 }, { level: 2, goal: 2 }, { level: 3, goal: 3 }, { level: 4, goal: 4 },
-        { level: 5, goal: 5 }, { level: 6, goal: 6 }, { level: 7, goal: 7 }, { level: 8, goal: 8 },
-        { level: 9, goal: 9 }, { level: 10, goal: 10 }
+        { level: 1, goal: 1, rarity: rarities.MAIS_QUE_COMUM },
+        { level: 2, goal: 1, rarity: rarities.COMUM },
+        { level: 3, goal: 1, rarity: rarities.INCOMUM },
+        { level: 4, goal: 1, rarity: rarities.RARO },
+        { level: 5, goal: 1, rarity: rarities.MAIS_QUE_RARO },
+        { level: 6, goal: 1, rarity: rarities.ULTRA_RARO },
+        { level: 7, goal: 1, rarity: rarities.MENOS_QUE_LENDARIO },
+        { level: 8, goal: 1, rarity: rarities.LENDARIO },
+        { level: 9, goal: 1, rarity: rarities.MAIS_QUE_LENDARIO },
+        { level: 10, goal: 1, rarity: rarities.ULTRA_LENDARIO }
       ],
       secret_tier: {
-        goal: 1, // 1 Kardec item
-        stat: { name: 'rarityCollector', rarities: [rarities.KARDEC]}
+        goal: 1, 
+        rarity: rarities.KARDEC
       }
     },
-    // 9. (Placeholder - Was auctions_won)
+    // 9. (Placeholder)
     { 
       id: 'placeholder_1', type: 'PLACEHOLDER', stat: 'placeholder',
       tiers: [ { level: 1, goal: 9999 } ]
     },
-    // 10. (Placeholder - Was elite_mentor)
+    // 10. (Placeholder)
     { 
       id: 'placeholder_2', type: 'PLACEHOLDER', stat: 'placeholder',
       tiers: [ { level: 1, goal: 9999 } ]
     },
-    // 11. Secret Milestone
+    // 11. Secret Milestone (Unlocks after completing all others)
     {
-      id: 'secret_mastery', type: 'SECRET', stat: 'level', // The stat is just a placeholder, the logic is custom
-      tiers: [
-        { level: 1, goal: 150 }, { level: 2, goal: 200 }, { level: 3, goal: 250 }, { level: 4, goal: 300 },
-        { level: 5, goal: 350 }, { level: 6, goal: 400 }, { level: 7, goal: 450 }, { level: 8, goal: 500 },
-        { level: 9, goal: 750 }, { level: 10, goal: 1000 }
-      ]
+      id: 'secret_mastery', type: 'SECRET', stat: 'level', // The stat is just a placeholder, logic is custom
+      tiers: [], // Tiers are not applicable here, it's a single secret achievement
+      secret_tier: {
+        goal: 1, // Get 1 Kardec item
+      }
     }
 ];
