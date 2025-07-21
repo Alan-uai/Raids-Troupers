@@ -23,13 +23,13 @@ export const rarities = {
 const rarityOrder = Object.values(rarities);
 
 const gearTypes = {
-    capacete: { base: ["Elmo", "Capacete", "Tiara", "Coroa", "Chapéu", "Gorro", "Capuz", "Máscara"], bonusMultiplier: 1.2 },
-    casaco: { base: ["Peitoral", "Armadura", "Manto", "Casaco", "Robe", "Couraça"], bonusMultiplier: 1.8 },
-    luva: { base: ["Manoplas", "Luvas", "Braçadeiras"], bonusMultiplier: 1.1 },
-    cinto: { base: ["Cinto", "Faixa", "Cinturão"], bonusMultiplier: 1.0 },
-    minisaia: { base: ["Grevas de Perna", "Kilt de Batalha", "Calças Reforçadas"], bonusMultiplier: 1.5 },
-    bota: { base: ["Grevas", "Botas", "Sapatos", "Coturnos"], bonusMultiplier: 1.1 },
-    colar: { base: ["Amuleto", "Colar", "Gargantilha", "Pingente"], bonusMultiplier: 1.3 },
+    cabeça: { base: ["Elmo", "Capacete", "Tiara", "Coroa", "Chapéu", "Gorro", "Capuz", "Máscara"], bonusMultiplier: 1.2 },
+    tronco: { base: ["Peitoral", "Armadura", "Manto", "Casaco", "Robe", "Couraça"], bonusMultiplier: 1.8 },
+    mãos: { base: ["Manoplas", "Luvas", "Braçadeiras"], bonusMultiplier: 1.1 },
+    cintura: { base: ["Cinto", "Faixa", "Cinturão"], bonusMultiplier: 1.0 },
+    pernas: { base: ["Grevas de Perna", "Kilt de Batalha", "Calças Reforçadas"], bonusMultiplier: 1.5 },
+    pés: { base: ["Grevas", "Botas", "Sapatos", "Coturnos"], bonusMultiplier: 1.1 },
+    pescoço: { base: ["Amuleto", "Colar", "Gargantilha", "Pingente"], bonusMultiplier: 1.3 },
     arma: { base: ["Lâmina", "Adaga", "Espada", "Machado", "Maça", "Cajado", "Arco", "Besta", "Pistola", "Canhão", "Escudo"], bonusMultiplier: 2.0 }
 };
 
@@ -170,14 +170,14 @@ export const allItems = [
   // =================================
   // ===== Itens de Raridade Kardec ====
   // =================================
-  { id: 'kardec_luva', name: 'Luvas do Vazio de Kardec', description: 'Canalizam o poder do nada absoluto.', type: 'luva', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
-  { id: 'kardec_coroa', name: 'Coroa da Onisciência de Kardec', description: 'Concede vislumbres de todas as realidades.', type: 'capacete', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
-  { id: 'kardec_casaco', name: 'Sobretudo das Sombras de Kardec', description: 'Tecido com a própria escuridão entre as estrelas.', type: 'casaco', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
-  { id: 'kardec_cinto', name: 'Fivela da Singularidade de Kardec', description: 'Dobra o espaço e o tempo ao seu redor.', type: 'cinto', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
-  { id: 'kardec_bota', name: 'Botas do Caminhante de Kardec', description: 'Pisam em todos os caminhos e em nenhum.', type: 'bota', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
-  { id: 'kardec_calca', name: 'Calça Cargo do Paradoxo de Kardec', description: 'Seus bolsos contêm infinitos universos.', type: 'minisaia', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_mãos', name: 'Luvas do Vazio de Kardec', description: 'Canalizam o poder do nada absoluto.', type: 'mãos', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_cabeça', name: 'Coroa da Onisciência de Kardec', description: 'Concede vislumbres de todas as realidades.', type: 'cabeça', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_tronco', name: 'Sobretudo das Sombras de Kardec', description: 'Tecido com a própria escuridão entre as estrelas.', type: 'tronco', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_cintura', name: 'Fivela da Singularidade de Kardec', description: 'Dobra o espaço e o tempo ao seu redor.', type: 'cintura', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_pés', name: 'Botas do Caminhante de Kardec', description: 'Pisam em todos os caminhos e em nenhum.', type: 'pés', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_pernas', name: 'Calça Cargo do Paradoxo de Kardec', description: 'Seus bolsos contêm infinitos universos.', type: 'pernas', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
   { id: 'kardec_arma', name: 'Fragmento da Realidade de Kardec', description: 'Uma arma que reescreve as leis da física.', type: 'arma', rarity: rarities.KARDEC, source: 'mission', bonus: 80 },
-  { id: 'kardec_colar', name: 'Olho de Kardec', description: 'Vê tudo, entende tudo, destrói tudo.', type: 'colar', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
+  { id: 'kardec_pescoço', name: 'Olho de Kardec', description: 'Vê tudo, entende tudo, destrói tudo.', type: 'pescoço', rarity: rarities.KARDEC, source: 'mission', bonus: 50 },
   // Cosméticos Kardec
   { id: 'kardec_fundo', name: 'Fundo: Coração do Abismo', description: 'Um gradiente sangrento e pulsante.', url: 'https://i.pinimg.com/originals/85/4c/3b/854c3b75a661614b876a4b8f36214578.gif', type: 'fundo', rarity: rarities.KARDEC, source: 'mission' },
   { id: 'kardec_titulo', name: 'Título: A Entidade', description: 'Sua presença transcende a compreensão mortal.', url: null, type: 'titulo', rarity: rarities.KARDEC, source: 'mission' },
@@ -196,5 +196,5 @@ export function isCosmetic(item) {
 
 // Helper para verificar se um item é de equipamento
 export function isGear(item) {
-    return !isCosmetic(item) && item.source !== 'shop' && item.source !== 'auction';
+     return Object.keys(gearTypes).includes(item.type);
 }
