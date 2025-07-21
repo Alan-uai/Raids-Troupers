@@ -178,7 +178,7 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     ctx.font = 'bold 20px sans-serif';
     ctx.fillStyle = '#39FF14'; // Verde neon para o bônus
     ctx.fillText(t('xp_bonus'), col3X, statsY + statsSpacing * 2);
-    ctx.fillText(`+${totalXPBonus}%`, col3X + valueOffsetX, statsY + statsSpacing * 2);
+    ctx.fillText(`+${totalXPBonus.toFixed(2)}%`, col3X + valueOffsetX, statsY + statsSpacing * 2);
 
     
     // Cargos
