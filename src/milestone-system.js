@@ -53,11 +53,11 @@ export async function createMilestoneEmbed(milestone, stats, itemStats, view, t)
         let description = t(`milestone_${milestone.id}_description`) + '\n\n**Progresso Geral:**\n';
         const tierSymbols = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
         let tierLine = '';
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < tierSymbols.length; i++) {
             if (i < completedTiersCount) {
-                tierLine += `**<:Completed:12345> ${tierSymbols[i]}** `; // Placeholder for a checkmark emoji
+                tierLine += `**${tierSymbols[i]}** `; // Completed: Bold and white
             } else {
-                tierLine += `~~<:Locked:12345> ${tierSymbols[i]}~~ `; // Placeholder for a lock emoji
+                tierLine += `~~${tierSymbols[i]}~~ `; // Incomplete: Strikethrough (appears greyish)
             }
         }
         embed.setDescription(description + tierLine);
@@ -98,7 +98,12 @@ export async function checkMilestoneCompletion(user, data) {
     const milestoneThread = profileChannel.threads.cache.find(th => th.name === t('milestones_thread_title'));
     if (!milestoneThread) return;
 
+    let allMilestonesCompleted = true;
+
     for (const milestone of milestones) {
+        // Skip secret milestone in normal check unless conditions are met later
+        if (milestone.id === 'secret_mastery') continue;
+
         const currentProgress = getStatValue(stats, itemStats, milestone.stat);
         const lastKnownProgress = stats.completedMilestones[milestone.id]?.progress || 0;
         
@@ -107,6 +112,10 @@ export async function checkMilestoneCompletion(user, data) {
             if (currentProgress >= tier.goal && lastKnownProgress < tier.goal) {
                 newlyCompletedTier = tier; // This is the latest tier they just passed
             }
+        }
+        
+        if (getCompletedTiers(milestone, currentProgress) < 10) {
+            allMilestonesCompleted = false;
         }
 
         if (newlyCompletedTier) {
@@ -122,10 +131,24 @@ export async function checkMilestoneCompletion(user, data) {
         if(messageId){
             const messageToUpdate = await milestoneThread.messages.fetch(messageId).catch(()=>null);
             if(messageToUpdate){
+                 stats.userId = userId;
                  const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', t);
                  await messageToUpdate.edit({ embeds: [milestoneData.embed], components: [milestoneData.row] });
             }
         }
     }
+    
+    // Check for secret milestone
+    const secretMilestone = milestones.find(m => m.id === 'secret_mastery');
+    if (allMilestonesCompleted && !stats.completedMilestones[secretMilestone.id]?.messageId) {
+        stats.userId = userId; // Ensure userId is present for embed creation
+        const secretMilestoneData = await createMilestoneEmbed(secretMilestone, stats, itemStats, 'general', t);
+        const message = await milestoneThread.send({ embeds: [secretMilestoneData.embed], components: [secretMilestoneData.row] });
+        stats.completedMilestones[secretMilestone.id] = {
+            ...stats.completedMilestones[secretMilestone.id],
+            messageId: message.id
+        };
+    }
+
     userStats.set(userId, stats);
 }

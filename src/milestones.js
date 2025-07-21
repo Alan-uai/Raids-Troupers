@@ -89,5 +89,14 @@ export const milestones = [
         { level: 5, goal: 15 }, { level: 6, goal: 20 }, { level: 7, goal: 30 }, { level: 8, goal: 40 },
         { level: 9, goal: 50 }, { level: 10, goal: 75 }
       ] 
+    },
+    // 11. Secret Milestone
+    {
+      id: 'secret_mastery', type: 'SECRET', stat: 'level', // The stat is just a placeholder, the logic is custom
+      tiers: [
+        { level: 1, goal: 150 }, { level: 2, goal: 200 }, { level: 3, goal: 250 }, { level: 4, goal: 300 },
+        { level: 5, goal: 350 }, { level: 6, goal: 400 }, { level: 7, goal: 450 }, { level: 8, goal: 500 },
+        { level: 9, goal: 750 }, { level: 10, goal: 1000 }
+      ]
     }
 ];

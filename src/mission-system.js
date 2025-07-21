@@ -6,8 +6,8 @@ import { getTranslator } from './i18n.js';
 import { allItems } from './items.js';
 import { checkMilestoneCompletion } from './milestone-system.js';
 
-// Mapa para armazenar os IDs das mensagens das listas de missões (diárias/semanais)
-const missionMessageIds = new Map(); // userId -> { daily: messageId, weekly: messageId }
+// Mapa para armazenar os IDs das mensagens das listas de missões
+const missionMessageIds = new Map(); // userId -> { control: messageId, list: messageId, currentView: 'daily' }
 
 function getDifficultyMultiplier(statValue) {
     if (statValue < 10) return 1;
@@ -36,10 +36,12 @@ function generateIntelligentMission(missionTemplate, stats) {
     const multiplier = getDifficultyMultiplier(statValue);
     
     if(newMission.goal) newMission.goal = Math.max(1, Math.ceil(newMission.goal * multiplier));
+    
     if(newMission.reward.xp) newMission.reward.xp = Math.ceil(newMission.reward.xp * multiplier);
     if(newMission.reward.coins) newMission.reward.coins = Math.ceil(newMission.reward.coins * multiplier);
     
-    if (newMission.category === 'weekly') {
+    // Assegura que missões semanais tenham recompensas de item
+    if (newMission.category === 'weekly' && !newMission.reward.item) {
         const itemRewardPool = allItems.filter(i => i.source === 'mission' && ['INCOMUM', 'RARO', 'MAIS_QUE_RARO', 'MENOS_QUE_LENDARIO'].includes(i.rarity));
         if(itemRewardPool.length > 0) {
             newMission.reward.item = itemRewardPool[Math.floor(Math.random() * itemRewardPool.length)].id;
@@ -54,16 +56,16 @@ function generateIntelligentMission(missionTemplate, stats) {
 
 
 export function assignMissions(userId, userMissions, stats) {
-    const dailyMissions = missionPool.filter(m => m.category === 'daily');
-    const weeklyMissions = missionPool.filter(m => m.category === 'weekly');
+    const dailyMissionTemplates = missionPool.filter(m => m.category === 'daily');
+    const weeklyMissionTemplates = missionPool.filter(m => m.category === 'weekly');
     
     const missionsToAssign = {
         daily: [],
-        weekly: null
+        weekly: []
     };
 
-    const shuffledDailies = [...dailyMissions].sort(() => 0.5 - Math.random());
-    for(let i = 0; i < 3; i++) {
+    const shuffledDailies = [...dailyMissionTemplates].sort(() => 0.5 - Math.random());
+    for(let i = 0; i < 3; i++) { // Assign 3 daily missions
         if (!shuffledDailies[i]) continue;
         const intelligentMission = generateIntelligentMission(shuffledDailies[i], stats);
         missionsToAssign.daily.push({
@@ -76,17 +78,18 @@ export function assignMissions(userId, userMissions, stats) {
         });
     }
 
-    if (weeklyMissions.length > 0) {
-        const weeklyTemplate = weeklyMissions[Math.floor(Math.random() * weeklyMissions.length)];
-        const intelligentWeekly = generateIntelligentMission(weeklyTemplate, stats);
-        missionsToAssign.weekly = {
+    const shuffledWeeklies = [...weeklyMissionTemplates].sort(() => 0.5 - Math.random());
+    for(let i = 0; i < 1; i++) { // Assign 1 weekly mission
+        if (!shuffledWeeklies[i]) continue;
+        const intelligentWeekly = generateIntelligentMission(shuffledWeeklies[i], stats);
+        missionsToAssign.weekly.push({
             id: intelligentWeekly.id,
             progress: 0,
             completed: false,
             collected: false,
             goal: intelligentWeekly.goal,
             reward: intelligentWeekly.reward
-        };
+        });
     }
     
     userMissions.set(userId, missionsToAssign);
@@ -162,7 +165,7 @@ export async function collectAllRewards(interaction, userId, data) {
     const activeMissions = userMissions.get(userId);
     if (!activeMissions) return;
 
-    const missionsToCollect = [...activeMissions.daily, activeMissions.weekly].filter(m => m && m.completed && !m.collected);
+    const missionsToCollect = [...activeMissions.daily, ...activeMissions.weekly].filter(m => m && m.completed && !m.collected);
     
     if (missionsToCollect.length === 0) {
         await interaction.followUp({ content: t('missions_collect_all_none'), ephemeral: true });
@@ -171,18 +174,18 @@ export async function collectAllRewards(interaction, userId, data) {
 
     let totalXp = 0;
     let totalCoins = 0;
-    let messages = [];
-
+    
     for (const missionProgress of missionsToCollect) {
         const result = await collectReward(interaction.user, missionProgress, data);
         totalXp += result.xp;
         totalCoins += result.coins;
-        messages.push(result.message)
     }
     
     await updateProfileImage(interaction.user, data);
-    // Após coletar, atualiza a exibição da lista de missões.
-    await postMissionList(interaction.message.thread, userId, 'daily', data);
+    
+    const userMissionInfo = missionMessageIds.get(userId);
+    const currentView = userMissionInfo ? userMissionInfo.currentView : 'daily';
+    await postMissionList(interaction.message.thread, userId, currentView, data);
     
     await interaction.followUp({ content: t('missions_collect_all_success', { xp: totalXp, coins: totalCoins }), ephemeral: true });
 }
@@ -200,7 +203,7 @@ export async function checkMissionCompletion(user, missionType, data, amount = 1
     if (!activeMissions) return;
 
     let profileNeedsUpdate = false;
-    const allMissions = [...activeMissions.daily, activeMissions.weekly].filter(Boolean);
+    const allMissions = [...activeMissions.daily, ...activeMissions.weekly].filter(Boolean);
 
     for (const missionProgress of allMissions) {
         if (missionProgress.completed) continue;
@@ -232,10 +235,11 @@ export async function checkMissionCompletion(user, missionType, data, amount = 1
 // Helper para gerar embeds de uma lista de missões
 function generateMissionEmbeds(missions, type, t) {
     if (!missions || missions.length === 0) {
-        return [new EmbedBuilder().setDescription(t('missions_no_missions_of_type', { type }))];
+        return [new EmbedBuilder().setDescription(t('missions_no_missions_of_type', { type: type === 'daily' ? 'diárias' : 'semanais' }))];
     }
     
-    return missions.map(missionProgress => {
+    const embeds = [];
+    for (const missionProgress of missions) {
         const missionDetails = missionPool.find(m => m.id === missionProgress.id);
         const reward = missionProgress.reward || missionDetails.reward;
 
@@ -261,14 +265,14 @@ function generateMissionEmbeds(missions, type, t) {
         } else if (missionProgress.collected) {
             embed.setFooter({ text: 'Recompensa coletada.' });
         }
-        
-        return embed;
-    });
+        embeds.push(embed);
+    }
+    return embeds;
 }
 
 
 export async function postMissionList(thread, userId, type, data, interaction = null) {
-    const { userMissions, userStats } = data;
+    const { userMissions, userStats, client } = data;
     const t = await getTranslator(userId, userStats);
 
     if (interaction) {
@@ -277,42 +281,60 @@ export async function postMissionList(thread, userId, type, data, interaction = 
     
     const activeMissions = userMissions.get(userId);
     const stats = userStats.get(userId);
-
-    // Busca ou cria a mensagem de controle
-    const messages = await thread.messages.fetch({ limit: 10 });
-    let controlMessage = messages.find(m => m.author.id === data.client.user.id && m.content.includes(t('missions_autocollect_description')));
     
-    // Constrói as fileiras de botões
-    const controlRow = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder().setCustomId(`mission_view_${userId}_daily`).setLabel(t('missions_view_daily_button')).setStyle(type === 'daily' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`mission_view_${userId}_weekly`).setLabel(t('missions_view_weekly_button')).setStyle(type === 'weekly' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`mission_collectall_${userId}`).setLabel(t('missions_collect_all_button')).setStyle(ButtonStyle.Success).setEmoji('🎉')
-        );
+    const userMissionInfo = missionMessageIds.get(userId) || { currentView: type };
+    userMissionInfo.currentView = type;
 
-    const autoCollectStatus = stats?.autoCollectMissions ? t('missions_autocollect_status_on') : t('missions_autocollect_status_off');
-    const autoCollectRow = new ActionRowBuilder()
-        .addComponents(
-             new ButtonBuilder().setCustomId(`mission_autocollect_${userId}`).setLabel(`${t('missions_autocollect_button')} (${autoCollectStatus})`).setStyle(ButtonStyle.Secondary)
-        );
+    // Build buttons
+    const viewButton = new ButtonBuilder()
+        .setCustomId(type === 'daily' ? `mission_view_${userId}_weekly` : `mission_view_${userId}_daily`)
+        .setLabel(type === 'daily' ? t('missions_view_weekly_button') : t('missions_view_daily_button'))
+        .setStyle(ButtonStyle.Primary);
+
+    const collectAllButton = new ButtonBuilder()
+        .setCustomId(`mission_collectall_${userId}`)
+        .setLabel(t('missions_collect_all_button'))
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('🎉');
         
-    if (controlMessage) {
-        await controlMessage.edit({ components: [controlRow, autoCollectRow] });
-    } else {
-        controlMessage = await thread.send({ content: t('missions_autocollect_description'), components: [controlRow, autoCollectRow] });
-    }
+    const autoCollectStatus = stats?.autoCollectMissions ? t('missions_autocollect_status_on') : t('missions_autocollect_status_off');
+    const autoCollectButton = new ButtonBuilder()
+        .setCustomId(`mission_autocollect_${userId}`)
+        .setLabel(`${t('missions_autocollect_button')} (${autoCollectStatus})`)
+        .setStyle(ButtonStyle.Secondary);
+        
+    const controlRow = new ActionRowBuilder().addComponents(viewButton, collectAllButton, autoCollectButton);
 
-    // Busca ou cria a mensagem para a lista de missões
-    let missionListMessage = messages.find(m => m.author.id === data.client.user.id && m.embeds.length > 0 && m.id !== controlMessage.id);
-    
-    const missionsToShow = (type === 'daily' ? activeMissions.daily : [activeMissions.weekly]).filter(Boolean);
+    // Get embeds for the current view
+    const missionsToShow = (type === 'daily' ? activeMissions.daily : activeMissions.weekly).filter(Boolean);
     const embeds = generateMissionEmbeds(missionsToShow, type, t);
 
-    if (missionListMessage) {
-        await missionListMessage.edit({ embeds: embeds.slice(0, 10) }); // Limita a 10 embeds por mensagem
-    } else {
-        await thread.send({ embeds: embeds.slice(0, 10) });
+    // Fetch or send messages
+    let controlMessage;
+    let listMessage;
+
+    if (userMissionInfo.controlMessageId) {
+        controlMessage = await thread.messages.fetch(userMissionInfo.controlMessageId).catch(() => null);
     }
+    if (userMissionInfo.listMessageId) {
+        listMessage = await thread.messages.fetch(userMissionInfo.listMessageId).catch(() => null);
+    }
+
+    if (controlMessage) {
+        await controlMessage.edit({ components: [controlRow] });
+    } else {
+        controlMessage = await thread.send({ components: [controlRow] });
+        userMissionInfo.controlMessageId = controlMessage.id;
+    }
+    
+    if (listMessage) {
+        await listMessage.edit({ embeds: embeds.slice(0, 10) });
+    } else {
+        listMessage = await thread.send({ embeds: embeds.slice(0, 10) });
+        userMissionInfo.listMessageId = listMessage.id;
+    }
+
+    missionMessageIds.set(userId, userMissionInfo);
 }
 
 
