@@ -107,11 +107,6 @@ client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
-
-    if (!userMissions.has(interaction.user.id) && userProfiles.has(interaction.user.id)) {
-        const stats = userStats.get(interaction.user.id);
-        assignMissions(interaction.user.id, userMissions, stats);
-    }
     
     try {
       await command.execute(interaction, { userStats, userProfiles, userItems, activeAuctions, userMissions, pendingRatings, clans, pendingInvites, client });
@@ -142,6 +137,8 @@ client.on(Events.InteractionCreate, async interaction => {
         await handleRating(interaction, raterId, ratedId, type, t);
     } else if (interaction.customId === 'shop_buy_button') {
         await handleBuyButton(interaction, t);
+    } else if (interaction.customId === 'shop_select_button') {
+        await interaction.reply({ content: t('shop_select_button_reply'), ephemeral: true });
     } else if (action === 'mission') {
         const [subAction, userId, missionId, missionCategory] = args;
         if (interaction.user.id !== userId) {
@@ -187,13 +184,11 @@ client.on(Events.InteractionCreate, async interaction => {
             
             await interaction.followUp({ content: t('profile_refreshed'), ephemeral: true });
         }
-    } else if (action === 'poll') {
-        const [subAction, pollId, optionIndex] = args;
-        if (subAction === 'vote') {
-            await handlePollVote(interaction, pollId, parseInt(optionIndex, 10), t);
-        }
-    } else if (action === 'suggestion') {
-        const voteType = args[0]; // 'approve' or 'reject'
+    } else if (action === 'poll' && args[0] === 'vote') {
+        const [_, pollId, optionIndex] = args;
+        await handlePollVote(interaction, pollId, parseInt(optionIndex, 10), t);
+    } else if (action === 'suggestion' && ['approve', 'reject'].includes(args[0])) {
+        const voteType = args[0];
         await handleSuggestionVote(interaction, voteType, t);
     } else if (action === 'milestone') {
         const [subAction, milestoneId, userId] = args;

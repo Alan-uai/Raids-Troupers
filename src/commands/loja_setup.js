@@ -17,13 +17,16 @@ function getNextUpdate(hours) {
 }
 
 function getShopItems(locale) {
-    if (!shopStorage.has(locale) || shopStorage.get(locale).lastUpdate < Date.now() - 3 * 60 * 60 * 1000) {
-        updateShopInventory(locale);
+    const rotationHours = 3;
+    const nextUpdateTime = getNextUpdate(rotationHours).getTime();
+    
+    if (!shopStorage.has(locale) || shopStorage.get(locale).nextUpdate <= Date.now()) {
+        updateShopInventory(locale, nextUpdateTime);
     }
     return shopStorage.get(locale).items;
 }
 
-function updateShopInventory(locale) {
+function updateShopInventory(locale, nextUpdateTime) {
     console.log(`Updating shop inventory for ${locale}...`);
     const now = new Date();
     let shopItems = [];
@@ -57,12 +60,12 @@ function updateShopInventory(locale) {
 
     shopStorage.set(locale, {
         items: shopItems,
-        lastUpdate: Date.now()
+        nextUpdate: nextUpdateTime,
     });
 }
 
 
-async function postOrUpdateShopMessage(client, t, channelId, locale) {
+async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems = true) {
     const shopChannel = await client.channels.fetch(channelId).catch(() => null);
     if (!shopChannel || shopChannel.type !== ChannelType.GuildText) {
         console.error(`Shop channel ${channelId} for locale ${locale} not found or is not a text channel.`);
@@ -70,79 +73,84 @@ async function postOrUpdateShopMessage(client, t, channelId, locale) {
     }
 
     const shopItems = getShopItems(locale);
+    const nextUpdate = getNextUpdate(3);
 
     const timerEmbed = new EmbedBuilder()
       .setColor('#3498DB')
-      .setDescription(t('shop_footer_rotation', { time: `<t:${Math.floor(getNextUpdate(3).getTime() / 1000)}:R>` }));
+      .setDescription(t('shop_footer_rotation', { time: `<t:${Math.floor(nextUpdate.getTime() / 1000)}:R>` }));
 
-    const embed = new EmbedBuilder()
-      .setColor('#FFA500')
-      .setTitle(t('shop_title'))
-      .setDescription(t('shop_description'))
-      .setTimestamp();
+    const messages = await shopChannel.messages.fetch({ limit: 10 }).catch(() => []);
+    const botMessages = messages.filter(m => m.author.id === client.user.id);
+    const mainMessage = botMessages.find(m => m.embeds[0]?.title === t('shop_title'));
+    const timerMessage = botMessages.find(m => m.embeds[0]?.description.includes(t('shop_footer_rotation_raw')));
 
-    if (shopItems.length === 0) {
-        embed.setDescription(t('shop_empty'));
-    } else {
-        shopItems.forEach(item => {
-            embed.addFields({
-                name: `${t(`item_${item.id}_name`) || item.name} - ${item.price} TC`,
-                value: `*${t(`item_${item.id}_description`) || item.description}*\n**${t('rarity')}:** ${item.rarity}`,
-                inline: false,
-            });
-        });
-    }
+    if (updateItems) {
+        const embed = new EmbedBuilder()
+          .setColor('#FFA500')
+          .setTitle(t('shop_title'))
+          .setDescription(t('shop_description'))
+          .setTimestamp();
 
-    const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId('shop_select_item')
-        .setPlaceholder(t('shop_select_placeholder'))
-        .setDisabled(shopItems.length === 0);
-
-    if (shopItems.length > 0) {
-         selectMenu.addOptions(
-            shopItems.map(item => ({
-                label: t(`item_${item.id}_name`) || item.name,
-                description: t('shop_select_item_desc', { price: item.price }),
-                value: item.id,
-            }))
-        );
-    } else {
-        // Discord API requires at least one option
-        selectMenu.addOptions([{ label: 'empty', value: 'empty' }]);
-    }
-    
-
-    const buyButton = new ButtonBuilder()
-        .setCustomId('shop_buy_button')
-        .setLabel(t('shop_buy_button_label'))
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('🛒')
-        .setDisabled(shopItems.length === 0);
-
-    const menuRow = new ActionRowBuilder().addComponents(selectMenu);
-    const buttonRow = new ActionRowBuilder().addComponents(buyButton);
-    const components = shopItems.length > 0 ? [menuRow, buttonRow] : [];
-
-    try {
-        const messages = await shopChannel.messages.fetch({ limit: 10 });
-        const botMessages = messages.filter(m => m.author.id === client.user.id);
-        const mainMessage = botMessages.first(); // Assumes the last message is the main one
-        const timerMessage = botMessages.last(); // Assumes the first message is the timer
-
-        if (mainMessage && timerMessage && botMessages.size >= 2) {
-             await timerMessage.edit({ embeds: [timerEmbed] });
-             await mainMessage.edit({ embeds: [embed], components });
+        if (shopItems.length === 0) {
+            embed.setDescription(t('shop_empty'));
         } else {
-            // If messages don't exist, clear old ones and send new ones
-            if(botMessages.size > 0) await shopChannel.bulkDelete(botMessages);
-            await shopChannel.send({ embeds: [timerEmbed] });
+            shopItems.forEach(item => {
+                embed.addFields({
+                    name: `${t(`item_${item.id}_name`) || item.name} - ${item.price} TC`,
+                    value: `*${t(`item_${item.id}_description`) || item.description}*\n**${t('rarity')}:** ${item.rarity}`,
+                    inline: false,
+                });
+            });
+        }
+
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId('shop_select_item')
+            .setPlaceholder(t('shop_select_placeholder'))
+            .setDisabled(shopItems.length === 0);
+
+        if (shopItems.length > 0) {
+             selectMenu.addOptions(
+                shopItems.map(item => ({
+                    label: t(`item_${item.id}_name`) || item.name,
+                    description: t('shop_select_item_desc', { price: item.price }),
+                    value: item.id,
+                }))
+            );
+        } else {
+            selectMenu.addOptions([{ label: 'empty', value: 'empty' }]);
+        }
+        
+        const buyButton = new ButtonBuilder()
+            .setCustomId('shop_buy_button')
+            .setLabel(t('shop_buy_button_label'))
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('🛒');
+            
+        const selectButton = new ButtonBuilder()
+            .setCustomId('shop_select_button')
+            .setLabel(t('shop_select_button_label'))
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🖱️');
+            
+        const menuRow = new ActionRowBuilder().addComponents(selectMenu);
+        const buttonRow = new ActionRowBuilder().addComponents(selectButton, buyButton);
+        const components = shopItems.length > 0 ? [menuRow, buttonRow] : [];
+        
+        if (mainMessage) {
+            await mainMessage.edit({ embeds: [embed], components });
+        } else {
             await shopChannel.send({ embeds: [embed], components });
         }
-        return { success: true, channelId };
-    } catch (error) {
-        console.error(`Failed to update or send shop message to ${channelId}:`, error);
-        return { success: false, channelId };
     }
+    
+    // Timer message handling
+    if (timerMessage) {
+        await timerMessage.edit({ embeds: [timerEmbed] });
+    } else {
+        await shopChannel.send({ embeds: [timerEmbed] });
+    }
+    
+    return { success: true, channelId };
 }
 
 
@@ -158,6 +166,7 @@ export default {
     
     await interaction.reply({ content: t_pt('shop_updating_message'), ephemeral: true });
     
+    // Initial post/update
     const ptResult = await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR');
     const enResult = await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US');
     
@@ -172,14 +181,22 @@ export default {
 
     await interaction.followUp({ content: feedback, ephemeral: true });
 
-    // Set interval to update shops periodically
-    // This should ideally be managed outside the command execution to avoid multiple intervals.
+    // Set interval to update item listings periodically
     if (!interaction.client.shopUpdateInterval) {
         interaction.client.shopUpdateInterval = setInterval(async () => {
-            console.log("Running periodic shop update...");
-            await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR');
-            await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US');
+            console.log("Running periodic shop item update...");
+            await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', true);
+            await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', true);
         }, 3 * 60 * 60 * 1000); // 3 hours
+    }
+    
+     // Set interval to update timers periodically
+    if (!interaction.client.shopTimerInterval) {
+        interaction.client.shopTimerInterval = setInterval(async () => {
+            console.log("Running periodic shop timer update...");
+            await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', false);
+            await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', false);
+        }, 60000); // 1 minute
     }
   },
   postOrUpdateShopMessage,

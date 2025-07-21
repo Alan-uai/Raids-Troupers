@@ -41,11 +41,16 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
         } catch (e) {
             console.error(`Failed to assign language role to ${member.displayName}:`, e);
         }
+        
+        // Atribui missões imediatamente
+        assignMissions(targetUser.id, userMissions, initialStats);
     }
+    
     if (!userItems.has(targetUser.id)) {
         const initialItems = { inventory: [], equippedGear: {}, equippedCosmetics: {} };
         userItems.set(targetUser.id, initialItems);
     }
+    
     if (!userMissions.has(targetUser.id)) {
         assignMissions(targetUser.id, userMissions, userStats.get(targetUser.id));
     }
@@ -95,10 +100,9 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
             const actionRow = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder().setCustomId(`profile_equip_${member.id}`).setLabel(t('equip_item_button')).setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
-                    new ButtonBuilder().setCustomId(`profile_class_${member.id}`).setLabel(t('choose_class_button')).setStyle(ButtonStyle.Secondary).setEmoji('⚔️'),
+                    new ButtonBuilder().setCustomId(`profile_class_${member.id}`).setLabel(t('classes_button')).setStyle(ButtonStyle.Secondary).setEmoji('⚔️'),
                     new ButtonBuilder().setCustomId(`profile_refresh_${member.id}`).setEmoji('🔁').setStyle(ButtonStyle.Success)
                 );
-            // No introductory text, just the buttons
             await channel.send({ components: [actionRow] });
 
             userProfiles.set(member.id, {
