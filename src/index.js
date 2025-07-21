@@ -121,31 +121,39 @@ client.on(Events.InteractionCreate, async interaction => {
       }
     }
   } else if (interaction.isButton()) {
-    const [action, ...args] = interaction.customId.split('_');
+    const customIdParts = interaction.customId.split('_');
+    const action = customIdParts[0];
 
     if (action === 'raid') {
-        const [subAction, ...raidArgs] = args;
+        const subAction = customIdParts[1];
+        const raidArgs = customIdParts.slice(2);
         if (subAction === 'controls') {
-            const [requesterId, raidId] = raidArgs;
-            await handleControlsButton(interaction, requesterId, raidId, t);
+            await handleControlsButton(interaction, raidArgs[0], raidArgs[1], t);
         } else {
             await handleRaidButton(interaction, subAction, raidArgs, t);
         }
-    } else if (action === 'auction' && args[0] === 'bid') {
+    } else if (action === 'auction' && customIdParts[1] === 'bid') {
         await interaction.reply({ content: t('auction_bid_button_reply'), ephemeral: true });
     } else if (action === 'rate') {
-        const [type, raterId, ratedId] = args;
+        const [type, raterId, ratedId] = customIdParts.slice(1);
         await handleRating(interaction, raterId, ratedId, type, t);
     } else if (interaction.customId === 'shop_buy_button') {
         await handleBuyButton(interaction, t);
     } else if (action === 'mission') {
-        const [subAction, userId, ...restArgs] = args;
+        const [subAction, userId, ...restArgs] = customIdParts.slice(1);
          if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
+        
+        const missionThread = interaction.message.thread || interaction.channel;
+        if (!missionThread) {
+            console.error("Could not determine mission thread from interaction.");
+            return;
+        }
+
         if (subAction === 'view') {
             const type = restArgs[0]; // 'daily' or 'weekly'
-            await postMissionList(interaction.message.thread, userId, type, { userMissions, userStats, client }, interaction);
+            await postMissionList(missionThread, userId, type, { userMissions, userStats, client }, interaction);
         } else if (subAction === 'collectall') {
             await collectAllRewards(interaction, userId, { userStats, userItems, userMissions, client, userProfiles, clans });
         } else if (subAction === 'autocollect') {
@@ -153,15 +161,16 @@ client.on(Events.InteractionCreate, async interaction => {
             if (stats) {
                 stats.autoCollectMissions = !stats.autoCollectMissions;
                 userStats.set(userId, stats);
+                // The current view type is now determined by the button that *was* there, so we swap it
                 const currentViewType = (interaction.message.components[0].components[0].customId.includes('weekly')) ? 'daily' : 'weekly';
-                await postMissionList(interaction.message.thread, userId, currentViewType, { userMissions, userStats, client }, interaction); // Refresh view
+                await postMissionList(missionThread, userId, currentViewType, { userMissions, userStats, client }, interaction); // Refresh view
             }
         } else if (subAction === 'collect') {
              const [missionId, missionCategory] = restArgs;
              await animateAndCollectReward(interaction, userId, missionId, missionCategory, { userStats, userItems, userMissions, client, userProfiles, clans });
         }
     } else if (action === 'profile') {
-        const [subAction, userId] = args;
+        const [subAction, userId] = customIdParts.slice(1);
          if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
@@ -186,15 +195,17 @@ client.on(Events.InteractionCreate, async interaction => {
             await interaction.followUp({ content: t('profile_refreshed'), ephemeral: true });
         }
     } else if (action === 'poll') {
-        const [_, voteAction, pollId, optionIndex] = interaction.customId.split('_');
+        const voteAction = customIdParts[1];
         if (voteAction === 'vote') {
-            await handlePollVote(interaction, pollId, parseInt(optionIndex, 10), t);
+            const pollId = customIdParts[2];
+            const optionIndex = parseInt(customIdParts[3], 10);
+            await handlePollVote(interaction, pollId, optionIndex, t);
         }
     } else if (action === 'suggestion') {
-        const voteType = args[0]; // 'approve' or 'reject'
+        const voteType = customIdParts[1]; // 'approve' or 'reject'
         await handleSuggestionVote(interaction, voteType, t);
     } else if (action === 'milestone') {
-        const [subAction, milestoneId, userId] = args;
+        const [subAction, milestoneId, userId] = customIdParts.slice(1);
         if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
@@ -205,25 +216,29 @@ client.on(Events.InteractionCreate, async interaction => {
 
 
   } else if (interaction.isStringSelectMenu()) {
-      const [action, ...args] = interaction.customId.split('_');
-      if (action === 'raid' && args[0] === 'kick') {
-          const [requesterId, raidId] = args;
+      const customIdParts = interaction.customId.split('_');
+      const action = customIdParts[0];
+
+      if (action === 'raid' && customIdParts[1] === 'kick') {
+          const requesterId = customIdParts[2];
+          const raidId = customIdParts[3];
           await handleRaidKick(interaction, requesterId, raidId, t);
-      } else if (action === 'rating' && args[0] === 'select') {
-          const [raterId] = args;
+      } else if (action === 'rating' && customIdParts[1] === 'select') {
+          const raterId = customIdParts[2];
           await handleRatingSelection(interaction, raterId, t);
       } else if (interaction.customId === 'shop_select_item') {
           userShopSelection.set(interaction.user.id, interaction.values[0]);
           await interaction.reply({ content: t('shop_item_selected'), ephemeral: true });
-      } else if (action === 'equip' && args[0] === 'select') {
-          const [_, userId] = args;
+      } else if (action === 'equip' && customIdParts[1] === 'select') {
+          const userId = customIdParts[2];
           if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
           }
           const itemId = interaction.values[0];
           await handleEquipSelection(interaction, userId, itemId, t);
-      } else if (action === 'milestone' && args[0] === 'select') {
-        const [_, milestoneId, userId] = args;
+      } else if (action === 'milestone' && customIdParts[1] === 'select') {
+        const milestoneId = customIdParts[2];
+        const userId = customIdParts[3];
         const selectedLevel = interaction.values[0];
         if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
