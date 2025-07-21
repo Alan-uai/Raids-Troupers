@@ -6,6 +6,9 @@ import { getTranslator } from './i18n.js';
 import { allItems } from './items.js';
 import { checkMilestoneCompletion } from './milestone-system.js';
 
+// Mapa para armazenar os IDs das mensagens das listas de missões (diárias/semanais)
+const missionMessageIds = new Map(); // userId -> { daily: messageId, weekly: messageId }
+
 function getDifficultyMultiplier(statValue) {
     if (statValue < 10) return 1;
     if (statValue < 50) return 1.2;
@@ -178,7 +181,8 @@ export async function collectAllRewards(interaction, userId, data) {
     }
     
     await updateProfileImage(interaction.user, data);
-    await postMissionList(interaction.message.thread, userId, 'daily', data); // Refresh the view
+    // Após coletar, atualiza a exibição da lista de missões.
+    await postMissionList(interaction.message.thread, userId, 'daily', data);
     
     await interaction.followUp({ content: t('missions_collect_all_success', { xp: totalXp, coins: totalCoins }), ephemeral: true });
 }
@@ -225,50 +229,22 @@ export async function checkMissionCompletion(user, missionType, data, amount = 1
     userMissions.set(userId, activeMissions);
 }
 
-
-export async function postMissionList(thread, userId, type, data, interaction = null) {
-    const { userMissions, userStats, client } = data;
-    const t = await getTranslator(userId, userStats);
-    
-    if (interaction) await interaction.deferUpdate();
-    
-    const messages = await thread.messages.fetch({ limit: 50 });
-    await Promise.all(messages.map(msg => msg.delete().catch(()=>{})));
-
-    const activeMissions = userMissions.get(userId);
-    const missionsToShow = (type === 'daily' ? activeMissions.daily : [activeMissions.weekly]).filter(Boolean);
-    const stats = userStats.get(userId);
-    
-    const controlRow = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder().setCustomId(`mission_view_${userId}_daily`).setLabel(t('missions_view_daily_button')).setStyle(type === 'daily' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`mission_view_${userId}_weekly`).setLabel(t('missions_view_weekly_button')).setStyle(type === 'weekly' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`mission_collectall_${userId}`).setLabel(t('missions_collect_all_button')).setStyle(ButtonStyle.Success).setEmoji('🎉')
-        );
-    
-    const autoCollectStatus = stats?.autoCollectMissions ? t('missions_autocollect_status_on') : t('missions_autocollect_status_off');
-    const autoCollectRow = new ActionRowBuilder()
-        .addComponents(
-             new ButtonBuilder().setCustomId(`mission_autocollect_${userId}`).setLabel(`${t('missions_autocollect_button')} (${autoCollectStatus})`).setStyle(ButtonStyle.Secondary)
-        );
-
-    await thread.send({ content: t('missions_autocollect_description'), components: [controlRow, autoCollectRow] });
-    
-    if (missionsToShow.length === 0) {
-        await thread.send({ content: t('missions_no_missions_of_type', { type }) });
-        return;
+// Helper para gerar embeds de uma lista de missões
+function generateMissionEmbeds(missions, type, t) {
+    if (!missions || missions.length === 0) {
+        return [new EmbedBuilder().setDescription(t('missions_no_missions_of_type', { type }))];
     }
-
-    for (const missionProgress of missionsToShow) {
+    
+    return missions.map(missionProgress => {
         const missionDetails = missionPool.find(m => m.id === missionProgress.id);
         const reward = missionProgress.reward || missionDetails.reward;
 
         let rewardText;
-        if(reward.item) {
+        if (reward.item) {
             const itemDetails = allItems.find(i => i.id === reward.item);
-            rewardText = itemDetails ? `Item: ${t(`item_${itemDetails.id}_name`)}` : 'Item Secreto';
+            rewardText = itemDetails ? `Item: **${t(`item_${itemDetails.id}_name`)}**` : '**Item Secreto**';
         } else {
-            rewardText = `${reward.xp} XP & ${reward.coins} TC`;
+            rewardText = `**${reward.xp || 0}** XP & **${reward.coins || 0}** TC`;
         }
 
         const embed = new EmbedBuilder()
@@ -285,8 +261,57 @@ export async function postMissionList(thread, userId, type, data, interaction = 
         } else if (missionProgress.collected) {
             embed.setFooter({ text: 'Recompensa coletada.' });
         }
+        
+        return embed;
+    });
+}
 
-        await thread.send({ embeds: [embed] });
+
+export async function postMissionList(thread, userId, type, data, interaction = null) {
+    const { userMissions, userStats } = data;
+    const t = await getTranslator(userId, userStats);
+
+    if (interaction) {
+        await interaction.deferUpdate();
+    }
+    
+    const activeMissions = userMissions.get(userId);
+    const stats = userStats.get(userId);
+
+    // Busca ou cria a mensagem de controle
+    const messages = await thread.messages.fetch({ limit: 10 });
+    let controlMessage = messages.find(m => m.author.id === data.client.user.id && m.content.includes(t('missions_autocollect_description')));
+    
+    // Constrói as fileiras de botões
+    const controlRow = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder().setCustomId(`mission_view_${userId}_daily`).setLabel(t('missions_view_daily_button')).setStyle(type === 'daily' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`mission_view_${userId}_weekly`).setLabel(t('missions_view_weekly_button')).setStyle(type === 'weekly' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`mission_collectall_${userId}`).setLabel(t('missions_collect_all_button')).setStyle(ButtonStyle.Success).setEmoji('🎉')
+        );
+
+    const autoCollectStatus = stats?.autoCollectMissions ? t('missions_autocollect_status_on') : t('missions_autocollect_status_off');
+    const autoCollectRow = new ActionRowBuilder()
+        .addComponents(
+             new ButtonBuilder().setCustomId(`mission_autocollect_${userId}`).setLabel(`${t('missions_autocollect_button')} (${autoCollectStatus})`).setStyle(ButtonStyle.Secondary)
+        );
+        
+    if (controlMessage) {
+        await controlMessage.edit({ components: [controlRow, autoCollectRow] });
+    } else {
+        controlMessage = await thread.send({ content: t('missions_autocollect_description'), components: [controlRow, autoCollectRow] });
+    }
+
+    // Busca ou cria a mensagem para a lista de missões
+    let missionListMessage = messages.find(m => m.author.id === data.client.user.id && m.embeds.length > 0 && m.id !== controlMessage.id);
+    
+    const missionsToShow = (type === 'daily' ? activeMissions.daily : [activeMissions.weekly]).filter(Boolean);
+    const embeds = generateMissionEmbeds(missionsToShow, type, t);
+
+    if (missionListMessage) {
+        await missionListMessage.edit({ embeds: embeds.slice(0, 10) }); // Limita a 10 embeds por mensagem
+    } else {
+        await thread.send({ embeds: embeds.slice(0, 10) });
     }
 }
 
@@ -313,5 +338,3 @@ async function updateProfileImage(user, data) {
         }
     }
 }
-
-    

@@ -5,19 +5,21 @@ import { allItems } from './items.js';
 const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
     const words = text.split(' ');
     let line = '';
+    let currentY = y;
     for (let n = 0; n < words.length; n++) {
         const testLine = line + words[n] + ' ';
         const metrics = context.measureText(testLine);
         const testWidth = metrics.width;
         if (testWidth > maxWidth && n > 0) {
-            context.fillText(line, x, y);
+            context.fillText(line, x, currentY);
             line = words[n] + ' ';
-            y += lineHeight;
+            currentY += lineHeight;
         } else {
             line = testLine;
         }
     }
-    context.fillText(line, x, y);
+    context.fillText(line, x, currentY);
+    return currentY; // Retorna a última posição Y usada
 };
 
 export async function generateProfileImage(member, stats, items, clans, t) {
@@ -159,12 +161,13 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     ctx.font = '16px sans-serif';
     ctx.fillStyle = '#B9BBBE';
     const roles = member.roles.cache
-        .filter(r => r.name !== '@everyone')
+        .filter(r => r.name !== '@everyone' && r.name !== 'limpo') // Adicionado filtro para 'limpo'
         .map(r => r.name)
         .join(', ');
-    wrapText(ctx, `${t('roles')}: ${roles || t('no_roles')}`, 50, height - 60, width - 100, 20);
+        
+    const rolesText = `${t('roles')}: ${roles || t('no_roles')}`;
+    wrapText(ctx, rolesText, 50, height - 80, width - 100, 20);
+
 
     return canvas.toBuffer('image/png');
 }
-
-    

@@ -96,17 +96,24 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
                 messageId: profileMessage.id
             });
             
-            const missionsThread = await channel.threads.create({ name: t('missions_thread_title'), autoArchiveDuration: 10080, reason: t('missions_thread_reason', { username: member.displayName }) });
-            await postMissionList(missionsThread, member.id, 'daily', { userMissions, userStats, client });
+            // Criação dos Tópicos Privados
+            const missionThread = await channel.threads.create({ name: t('missions_thread_title'), autoArchiveDuration: 10080, reason: t('missions_thread_reason', { username: member.displayName }) });
+            await postMissionList(missionThread, member.id, 'daily', { userMissions, userStats, client });
 
             const milestoneThread = await channel.threads.create({ name: t('milestones_thread_title'), autoArchiveDuration: 10080, reason: t('milestones_thread_reason', { username: member.displayName }) });
             for (const milestone of milestones) {
-                 const milestoneData = await createMilestoneEmbed(milestone, stats, userItems.get(userId), 'general', t);
+                 const statsForMilestone = userStats.get(member.id) || {};
+                 statsForMilestone.userId = member.id; // Garante que o userId está presente para os customIds
+                 const itemsForMilestone = userItems.get(member.id);
+                 const milestoneData = await createMilestoneEmbed(milestone, statsForMilestone, itemsForMilestone, 'general', t);
                  const message = await milestoneThread.send({ embeds: [milestoneData.embed], components: [milestoneData.row] });
-                 // Store message ID against milestone ID for easier updates
-                 stats.completedMilestones[milestone.id] = { ...(stats.completedMilestones[milestone.id] || {}), messageId: message.id };
+                 
+                 // Armazena o ID da mensagem para futuras atualizações
+                 const userStatsData = userStats.get(member.id);
+                 if (!userStatsData.completedMilestones) userStatsData.completedMilestones = {};
+                 userStatsData.completedMilestones[milestone.id] = { ...(userStatsData.completedMilestones[milestone.id] || {}), messageId: message.id };
+                 userStats.set(member.id, userStatsData);
             }
-             userStats.set(member.id, stats);
 
             const exclusiveShopThread = await channel.threads.create({ name: t('exclusive_shop_thread_title'), autoArchiveDuration: 10080, reason: t('exclusive_shop_thread_reason', { username: member.displayName }) });
             await exclusiveShopThread.send({ content: t('exclusive_shop_thread_description') });
@@ -115,10 +122,9 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
 
         } catch (error) {
             console.error(`Failed to create channel or profile for ${member.displayName}:`, error);
-            userStats.delete(member.id);
-            userItems.delete(member.id);
-            userMissions.delete(member.id);
-            await interaction.editReply({ content: t('profile_creation_error_generic'), ephemeral: true });
+            // Rollback simples em caso de erro para evitar perfis parciais
+            userProfiles.delete(member.id);
+            await interaction.editReply({ content: t('profile_creation_error_generic'), ephemeral: true }).catch(()=>{});
         }
 
     } else { 

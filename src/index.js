@@ -350,7 +350,7 @@ async function handleRaidButton(interaction, subAction, args, t) {
              const requesterMember = await interaction.guild.members.fetch(raidRequester.id).catch(() => null);
              const requesterT = await getTranslator(raidRequester.id, userStats);
 
-             currentThread = await originalRaidMessage.startThread({ name: requesterT('raid_thread_name', { username: requesterMember?.displayName || raidRequester.username }), autoArchiveDuration: 1440 }).catch(e => { console.error("Error creating thread:", e); return null; });
+             currentThread = await originalRaidMessage.startThread({ name: requesterT('raid_thread_name', { username: requesterMember?.displayName || raidRequester.username }), autoArchiveDuration: 10080 }).catch(e => { console.error("Error creating thread:", e); return null; });
              if (!currentThread) return;
 
              await currentThread.members.add(raidRequester.id).catch(e => console.error(`Failed to add leader ${raidRequester.id} to thread:`, e));
@@ -887,6 +887,8 @@ async function handleMilestoneInteraction(interaction, milestoneId, userId, sele
     if (!milestone || !stats) {
         return await interaction.followUp({ content: t('milestone_error_data'), ephemeral: true });
     }
+    
+    stats.userId = userId;
 
     const milestoneData = await createMilestoneEmbed(milestone, stats, items, selectedLevel, t);
     await interaction.message.edit({ embeds: [milestoneData.embed], components: [milestoneData.row] });
