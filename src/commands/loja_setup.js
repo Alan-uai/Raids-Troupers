@@ -171,7 +171,7 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
         });
     } 
     
-    if (!shopData.timerMessageId) { // Recreate if it was deleted or never existed
+    if (!shopData.timerMessageId && sentTimerMessage === null) { // Recreate if it was deleted or never existed
         const newTimerMessage = await shopChannel.send({ embeds: [timerEmbed] });
         shopData.timerMessageId = newTimerMessage.id;
     }
@@ -209,13 +209,14 @@ export default {
     await interaction.followUp({ content: feedback, ephemeral: true });
 
     // Set interval to update item listings periodically
-    if (!interaction.client.shopUpdateInterval) {
-        interaction.client.shopUpdateInterval = setInterval(async () => {
-            console.log("Running periodic shop item update...");
-            await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'pt-BR'), SHOP_CHANNEL_ID_PT, 'pt-BR', true).catch(e => console.error("Error updating PT items:", e));
-            await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'en-US'), SHOP_CHANNEL_ID_EN, 'en-US', true).catch(e => console.error("Error updating EN items:", e));
-        }, 3 * 60 * 60 * 1000); // 3 hours
+     if (interaction.client.shopUpdateInterval) {
+        clearInterval(interaction.client.shopUpdateInterval);
     }
+    interaction.client.shopUpdateInterval = setInterval(async () => {
+        console.log("Running periodic shop item update...");
+        await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'pt-BR'), SHOP_CHANNEL_ID_PT, 'pt-BR', true).catch(e => console.error("Error updating PT items:", e));
+        await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'en-US'), SHOP_CHANNEL_ID_EN, 'en-US', true).catch(e => console.error("Error updating EN items:", e));
+    }, 3 * 60 * 60 * 1000); // 3 hours
     
      // Clear any existing timer interval to prevent duplicates
     if (interaction.client.shopTimerInterval) {
@@ -230,3 +231,5 @@ export default {
   },
   postOrUpdateShopMessage,
 };
+
+    

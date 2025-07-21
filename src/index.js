@@ -21,7 +21,7 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { generateProfileImage } from './profile-generator.js';
 import { allItems } from './items.js';
-import { missions as missionPool } from './missions.js';
+import { missions as missionPool, missions } from './missions.js';
 import { milestones } from './milestones.js';
 import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList, animateAndCollectReward } from './mission-system.js';
 import { getTranslator } from './i18n.js';
@@ -145,7 +145,7 @@ client.on(Events.InteractionCreate, async interaction => {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
         
-        const missionThread = interaction.channel;
+        const missionThread = interaction.message?.thread || interaction.channel;
         if (!missionThread) {
             console.error("Could not determine mission thread from interaction.");
             return;
@@ -162,6 +162,7 @@ client.on(Events.InteractionCreate, async interaction => {
                 stats.autoCollectMissions = !stats.autoCollectMissions;
                 userStats.set(userId, stats);
                 const currentViewButton = interaction.message.components[0].components[0];
+                // Determine current view from the button that was NOT clicked
                 const currentViewType = currentViewButton.customId.includes('weekly') ? 'daily' : 'weekly';
                 await postMissionList(missionThread, userId, currentViewType, { userMissions, userStats, client }, interaction);
             }
@@ -209,8 +210,9 @@ client.on(Events.InteractionCreate, async interaction => {
           if (interaction.user.id !== userId) return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
           const milestone = milestones.find(m => m.id === milestoneId);
           if (milestone) {
+            const stats = userStats.get(userId);
             stats.userId = userId;
-            const milestoneData = await createMilestoneEmbed(milestone, userStats.get(userId), userItems.get(userId), 'general', t);
+            const milestoneData = await createMilestoneEmbed(milestone, stats, userItems.get(userId), 'general', t);
             if (milestoneData) {
                 await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
             }
@@ -241,7 +243,7 @@ client.on(Events.InteractionCreate, async interaction => {
           const itemId = interaction.values[0];
           await handleEquipSelection(interaction, userId, itemId, t);
       } else if (action === 'milestone' && customIdParts[1] === 'select') {
-        const [, , milestoneId, userId] = customIdParts;
+        const [,, milestoneId, userId] = customIdParts;
         if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
@@ -1069,7 +1071,5 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
 
 client.login(process.env.DISCORD_TOKEN);
-
-
 
     
