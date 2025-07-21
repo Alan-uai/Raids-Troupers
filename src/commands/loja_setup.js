@@ -31,9 +31,11 @@ function updateShopInventory(locale, nextUpdateTime) {
     const now = new Date();
     let shopItems = [];
 
+    const yearDay = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
     const hour = now.getUTCHours();
+    
     // Lógica para itens raros/lendários/místicos baseada no tempo
-    if (now.getFullYear() > 2024 && now.getMonth() === 0 && now.getDate() === 1) { // 1º de Janeiro do ano seguinte
+    if (yearDay === 1) { // 1º de Janeiro
         const kardecPool = allItems.filter(i => i.source === 'shop' && i.rarity === 'Kardec');
         if (kardecPool.length > 0) shopItems.push(kardecPool[Math.floor(Math.random() * kardecPool.length)]);
     }
@@ -64,6 +66,15 @@ function updateShopInventory(locale, nextUpdateTime) {
     });
 }
 
+function formatTime(ms) {
+    if (ms <= 0) return '00:00:00';
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 
 async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems = true) {
     const shopChannel = await client.channels.fetch(channelId).catch(() => null);
@@ -74,10 +85,11 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
 
     const shopItems = getShopItems(locale);
     const nextUpdate = getNextUpdate(3);
+    const timeRemaining = nextUpdate.getTime() - Date.now();
 
     const timerEmbed = new EmbedBuilder()
       .setColor('#3498DB')
-      .setDescription(t('shop_footer_rotation', { time: `<t:${Math.floor(nextUpdate.getTime() / 1000)}:R>` }));
+      .setDescription(t('shop_footer_rotation', { time: formatTime(timeRemaining) }));
 
     const messages = await shopChannel.messages.fetch({ limit: 10 }).catch(() => []);
     const botMessages = messages.filter(m => m.author.id === client.user.id);
@@ -120,25 +132,30 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
             selectMenu.addOptions([{ label: 'empty', value: 'empty' }]);
         }
         
-        const buyButton = new ButtonBuilder()
-            .setCustomId('shop_buy_button')
-            .setLabel(t('shop_buy_button_label'))
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('🛒');
-            
-        const selectButton = new ButtonBuilder()
-            .setCustomId('shop_select_button')
-            .setLabel(t('shop_select_button_label'))
-            .setStyle(ButtonStyle.Primary)
-            .setEmoji('🖱️');
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('shop_select_button')
+                    .setLabel(t('shop_select_button_label'))
+                    .setStyle(ButtonStyle.Primary)
+                    .setEmoji('🖱️'),
+                new ButtonBuilder()
+                    .setCustomId('shop_buy_button')
+                    .setLabel(t('shop_buy_button_label'))
+                    .setStyle(ButtonStyle.Success)
+                    .setEmoji('🛒')
+            );
             
         const menuRow = new ActionRowBuilder().addComponents(selectMenu);
-        const buttonRow = new ActionRowBuilder().addComponents(selectButton, buyButton);
-        const components = shopItems.length > 0 ? [menuRow, buttonRow] : [];
+        const components = shopItems.length > 0 ? [menuRow, row] : [];
         
         if (mainMessage) {
             await mainMessage.edit({ embeds: [embed], components });
         } else {
+            // Se a mensagem principal não existe, limpa mensagens antigas do bot para começar do zero
+            for (const msg of botMessages.values()) {
+                await msg.delete().catch(() => {});
+            }
             await shopChannel.send({ embeds: [embed], components });
         }
     }
@@ -196,7 +213,7 @@ export default {
             console.log("Running periodic shop timer update...");
             await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', false);
             await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', false);
-        }, 60000); // 1 minute
+        }, 5000); // 5 seconds
     }
   },
   postOrUpdateShopMessage,
