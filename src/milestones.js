@@ -60,9 +60,9 @@ export const milestones = [
     { 
       id: 'loyal_member', type: 'STAY_LOYAL', stat: 'daysInClan',
       tiers: [
-        { level: 1, goal: 7 }, { level: 2, goal: 15 }, { level: 3, goal: 30 }, { level: 4, goal: 60 },
-        { level: 5, goal: 90 }, { level: 6, goal: 180 }, { level: 7, goal: 270 }, { level: 8, goal: 365 },
-        { level: 9, goal: 500 }, { level: 10, goal: 730 }
+        { level: 1, goal: 3 }, { level: 2, goal: 7 }, { level: 3, goal: 14 }, { level: 4, goal: 21 },
+        { level: 5, goal: 30 }, { level: 6, goal: 40 }, { level: 7, goal: 50 }, { level: 8, goal: 60 },
+        { level: 9, goal: 70 }, { level: 10, goal: 73 }
       ] 
     },
     // 8. Colecionador de Raridades

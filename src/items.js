@@ -20,9 +20,91 @@ export const rarities = {
   KARDEC: 'Kardec'
 };
 
-const missionItem = (id, name, description, rarity) => ({
-    id, name, description, rarity, type: 'gear', source: 'mission'
+const createItems = (rarity, count, itemType, descriptions) => {
+    const items = [];
+    for (let i = 1; i <= count; i++) {
+        const { name, desc } = descriptions[i-1];
+        items.push({
+            id: `${rarity.toLowerCase().replace(/ /g, '_')}_${itemType}_${i}`,
+            name,
+            description: desc,
+            rarity: rarities[rarity.toUpperCase().replace(/ /g, '_')],
+            type: itemType,
+            source: 'mission'
+        });
+    }
+    return items;
+};
+
+// Templates for item names and descriptions
+const gearTemplates = {
+    arma: ["Lâmina", "Adaga", "Espada", "Machado", "Maça", "Cajado", "Arco", "Besta", "Pistola", "Canhão"],
+    capacete: ["Elmo", "Capacete", "Tiara", "Coroa", "Chapéu", "Gorro", "Capuz", "Máscara"],
+    luva: ["Manoplas", "Luvas", "Braçadeiras"],
+    bota: ["Grevas", "Botas", "Sapatos", "Coturnos"],
+    casaco: ["Peitoral", "Armadura", "Manto", "Casaco", "Robe", "Couraça"],
+    cinto: ["Cinto", "Faixa", "Cinturão"],
+    colar: ["Amuleto", "Colar", "Gargantilha"],
+    minisaia: ["Kilt", "Saia", "Tanga de Batalha"]
+};
+
+const cosmeticTemplates = {
+    fundo: ["Paisagem", "Cenário", "Vista", "Plano de Fundo"],
+    borda_avatar: ["Aura", "Moldura", "Borda", "Círculo"],
+    titulo: ["Título", "Epíteto", "Alcunha", "Denominação"]
+};
+
+const adjectives = ["Esquecido", "Brilhante", "Sombrio", "Antigo", "Místico", "Celestial", "Infernal", "Arcano", "Rúnico", "Quebrado", "Reforjado", "Sagrado", "Profano", "Glacial", "Vulcânico", "Etéreo", "Fantasma", "Dourado", "Prateado", "Obsidiana", "Tempestade", "Sussurrante"];
+const places = ["da Perdição", "de Valhalla", "do Abismo", "da Aurora", "do Crepúsculo", "de Atlântida", "do Vazio", "da Coragem", "do Desespero", "da Esperança"];
+const concepts = ["da Alma", "do Tempo", "do Espaço", "da Morte", "da Vida", "do Destino", "da Loucura", "da Sabedoria", "do Poder"];
+
+function generateRandomName(base) {
+    return `${base} ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${places[Math.floor(Math.random() * places.length)]}`;
+}
+function generateRandomDesc(name) {
+    return `Um item lendário conhecido como ${name}, imbuído com o poder ${concepts[Math.floor(Math.random() * concepts.length)]}.`;
+}
+
+// Generate 25 gear + 25 cosmetic items for each rarity
+const allGeneratedItems = [];
+
+Object.values(rarities).forEach(rarityName => {
+    if (rarityName === rarities.KARDEC) return;
+
+    // 25 Gear Items
+    for (let i = 0; i < 25; i++) {
+        const gearTypeKeys = Object.keys(gearTemplates);
+        const randomType = gearTypeKeys[Math.floor(Math.random() * gearTypeKeys.length)];
+        const randomBase = gearTemplates[randomType][Math.floor(Math.random() * gearTemplates[randomType].length)];
+        const name = generateRandomName(randomBase);
+        allGeneratedItems.push({
+            id: `${rarityName.toLowerCase().replace(/ /g, '_')}_gear_${i}`,
+            name: name,
+            description: generateRandomDesc(name),
+            type: randomType,
+            rarity: rarityName,
+            source: 'mission'
+        });
+    }
+
+    // 25 Cosmetic Items
+    for (let i = 0; i < 25; i++) {
+        const cosmeticTypeKeys = Object.keys(cosmeticTemplates);
+        const randomType = cosmeticTypeKeys[Math.floor(Math.random() * cosmeticTypeKeys.length)];
+        const randomBase = cosmeticTemplates[randomType][Math.floor(Math.random() * cosmeticTemplates[randomType].length)];
+        const name = generateRandomName(randomBase);
+        allGeneratedItems.push({
+            id: `${rarityName.toLowerCase().replace(/ /g, '_')}_cosmetic_${i}`,
+            name: name,
+            description: generateRandomDesc(name),
+            type: randomType,
+            url: randomType === 'titulo' ? null : 'https://i.pinimg.com/originals/3a/0c/a6/3a0ca6840b784a3d6d53205763261a29.gif', // Placeholder URL
+            rarity: rarityName,
+            source: 'mission'
+        });
+    }
 });
+
 
 export const allItems = [
   // =================================
@@ -94,79 +176,21 @@ export const allItems = [
   },
 
   // =================================
-  // ===== Recompensas de Missão =====
+  // ===== Itens de Raridade Kardec ====
   // =================================
-
-  // Mais que Comum
-  missionItem('mqc_anel_simples', 'Anel Simples', 'Um anel simples, sem propriedades especiais.', rarities.MAIS_QUE_COMUM),
-  missionItem('mqc_pocao_fraca', 'Poção Fraca', 'Recupera uma pequena quantidade de vida.', rarities.MAIS_QUE_COMUM),
-  ...Array.from({ length: 23 }, (_, i) => missionItem(`mqc_item_${i+1}`, `Bugiganga Comum ${i+1}`, 'Um item mais que comum, encontrado facilmente.', rarities.MAIS_QUE_COMUM)),
-
-  // Comum
-  missionItem('com_espada_comum', 'Espada Comum', 'Uma espada básica, porém confiável.', rarities.COMUM),
-  missionItem('com_escudo_madeira', 'Escudo de Madeira', 'Oferece proteção mínima.', rarities.COMUM),
-  missionItem('com_botas_couro', 'Botas de Couro', 'Botas de couro padrão.', rarities.COMUM),
-  ...Array.from({ length: 22 }, (_, i) => missionItem(`com_item_${i+1}`, `Tranqueira Comum ${i+1}`, 'Um item comum, mas útil.', rarities.COMUM)),
-
-  // Incomum
-  missionItem('inc_adaga_ferro', 'Adaga de Ferro', 'Uma adaga de ferro, melhor que nada.', rarities.INCOMUM),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`inc_item_${i+1}`, `Artefato Incomum ${i+1}`, 'Um item incomum com certo potencial.', rarities.INCOMUM)),
-
-  // Raro
-  missionItem('rar_elmo_aco', 'Elmo de Aço', 'Um elmo de aço resistente.', rarities.RARO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`rar_item_${i+1}`, `Relíquia Rara ${i+1}`, 'Um item raro, difícil de encontrar.', rarities.RARO)),
-
-  // Mais que Raro
-  missionItem('mqr_peitoral_runico', 'Peitoral Rúnico', 'Um peitoral com runas de proteção.', rarities.MAIS_QUE_RARO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`mqr_item_${i+1}`, `Tesouro Raro ${i+1}`, 'Um item notavelmente raro e valioso.', rarities.MAIS_QUE_RARO)),
-
-  // Ultra Raro
-  missionItem('ulr_grevas_velocidade', 'Grevas da Velocidade', 'Aumenta a velocidade de movimento.', rarities.ULTRA_RARO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`ulr_item_${i+1}`, `Joia Ultra Rara ${i+1}`, 'Um item de raridade excepcional.', rarities.ULTRA_RARO)),
-
-  // Menos que Lendário
-  missionItem('mql_amuleto_pre_lendario', 'Amuleto Pré-Lendário', 'Um amuleto de grande poder.', rarities.MENOS_QUE_LENDARIO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`mql_item_${i+1}`, `Fragmento Lendário ${i+1}`, 'Um item que beira a lenda.', rarities.MENOS_QUE_LENDARIO)),
-
-  // Lendário
-  missionItem('len_espada_excalibur', 'Espada Excalibur', 'A lendária espada do poder.', rarities.LENDARIO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`len_item_${i+1}`, `Herança Lendária ${i+1}`, 'Um item digno de lendas.', rarities.LENDARIO)),
-
-  // Mais que Lendário
-  missionItem('mql2_coroa_sol', 'Coroa do Sol', 'Uma coroa que brilha como o sol.', rarities.MAIS_QUE_LENDARIO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`mql2_item_${i+1}`, `Dádiva Lendária ${i+1}`, 'Um item que supera as lendas.', rarities.MAIS_QUE_LENDARIO)),
-
-  // Ultra Lendário
-  missionItem('ull_armadura_celestial', 'Armadura Celestial', 'Forjada nas estrelas.', rarities.ULTRA_LENDARIO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`ull_item_${i+1}`, `Epopeia Lendária ${i+1}`, 'Um item de poderio ultra lendário.', rarities.ULTRA_LENDARIO)),
-
-  // Menos que Místico
-  missionItem('mqm_essencia_mistica', 'Essência Mística', 'Um frasco com pura magia.', rarities.MENOS_QUE_MISTICO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`mqm_item_${i+1}`, `Sussurro Místico ${i+1}`, 'Um item que prenuncia o poder místico.', rarities.MENOS_QUE_MISTICO)),
-
-  // Místico
-  missionItem('mis_cajado_arcanjo', 'Cajado do Arcanjo', 'Um cajado com poder divino.', rarities.MISTICO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`mis_item_${i+1}`, `Manifestação Mística ${i+1}`, 'Um item de pura essência mística.', rarities.MISTICO)),
-
-  // Mais que Místico
-  missionItem('mqm2_manto_infinito', 'Manto do Infinito', 'Um manto tecido com o próprio tempo.', rarities.MAIS_QUE_MISTICO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`mqm2_item_${i+1}`, `Paradoxo Místico ${i+1}`, 'Um item que transcende a magia conhecida.', rarities.MAIS_QUE_MISTICO)),
-
-  // Ultra Místico
-  missionItem('ulm_olho_realidade', 'O Olho da Realidade', 'Permite ver além do véu.', rarities.ULTRA_MISTICO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`ulm_item_${i+1}`, `Singularidade Mística ${i+1}`, 'Um item de poder quase absoluto.', rarities.ULTRA_MISTICO)),
+  { id: 'kardec_luva', name: 'Luvas do Vazio de Kardec', description: 'Canalizam o poder do nada absoluto.', type: 'luva', rarity: rarities.KARDEC, source: 'mission' },
+  { id: 'kardec_coroa', name: 'Coroa da Onisciência de Kardec', description: 'Concede vislumbres de todas as realidades.', type: 'capacete', rarity: rarities.KARDEC, source: 'mission' },
+  { id: 'kardec_casaco', name: 'Sobretudo das Sombras de Kardec', description: 'Tecido com a própria escuridão entre as estrelas.', type: 'casaco', rarity: rarities.KARDEC, source: 'mission' },
+  { id: 'kardec_cinto', name: 'Fivela da Singularidade de Kardec', description: 'Dobra o espaço e o tempo ao seu redor.', type: 'cinto', rarity: rarities.KARDEC, source: 'mission' },
+  { id: 'kardec_bota', name: 'Botas do Caminhante de Kardec', description: 'Pisam em todos os caminhos e em nenhum.', type: 'bota', rarity: rarities.KARDEC, source: 'mission' },
+  { id: 'kardec_calca', name: 'Calça Cargo do Paradoxo de Kardec', description: 'Seus bolsos contêm infinitos universos.', type: 'minisaia', rarity: rarities.KARDEC, source: 'mission' }, // Usando minisaia como tipo base para calças
+  // Cosméticos Kardec
+  { id: 'kardec_fundo', name: 'Fundo: Coração do Abismo', description: 'Um gradiente sangrento e pulsante.', url: 'https://i.pinimg.com/originals/85/4c/3b/854c3b75a661614b876a4b8f36214578.gif', type: 'background', rarity: rarities.KARDEC, source: 'mission' },
+  { id: 'kardec_titulo', name: 'Título: A Entidade', description: 'Sua presença transcende a compreensão mortal.', url: null, type: 'title', rarity: rarities.KARDEC, source: 'mission' },
+  { id: 'kardec_borda', name: 'Borda: Fúria Neon', description: 'Uma borda rosa choque que grita poder.', url: 'https://i.pinimg.com/originals/c9/1a/87/c91a87265e337198a287a176839441d8.gif', type: 'avatar_border', rarity: rarities.KARDEC, source: 'mission' },
   
-  // Mais que Ultra Místico
-  missionItem('mqum_fragmento_criacao', 'Fragmento da Criação', 'Um pedaço do universo primordial.', rarities.MAIS_QUE_ULTRA_MISTICO),
-  ...Array.from({ length: 24 }, (_, i) => missionItem(`mqum_item_${i+1}`, `Eco do Big Bang ${i+1}`, 'Um item que ressoa com a criação.', rarities.MAIS_QUE_ULTRA_MISTICO)),
-
-  // Kardec
-  {
-    id: 'aura_kardec',
-    name: 'Aura de Kardec',
-    description: 'A manifestação do poder absoluto. Concede um cargo exclusivo no servidor.',
-    type: 'cosmetic',
-    rarity: rarities.KARDEC,
-    source: 'mission'
-  }
+  // =================================
+  // ===== Recompensas de Missão (Geradas) =====
+  // =================================
+  ...allGeneratedItems
 ];
