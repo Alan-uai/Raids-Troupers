@@ -1,6 +1,8 @@
 // src/milestones.js
 import { rarities } from './items.js';
 
+const rarityOrder = Object.values(rarities).filter(r => r !== rarities.KARDEC);
+
 export const milestones = [
     // 1. Raids Helded
     { 
@@ -68,18 +70,11 @@ export const milestones = [
     // 8. Colecionador de Raridades
     {
       id: 'rarity_collector', type: 'COLLECT_RARITIES', stat: { name: 'rarityCollector' }, // Stat is complex, handled in system
-      tiers: [
-        { level: 1, goal: 1, rarity: rarities.MAIS_QUE_COMUM },
-        { level: 2, goal: 1, rarity: rarities.COMUM },
-        { level: 3, goal: 1, rarity: rarities.INCOMUM },
-        { level: 4, goal: 1, rarity: rarities.RARO },
-        { level: 5, goal: 1, rarity: rarities.MAIS_QUE_RARO },
-        { level: 6, goal: 1, rarity: rarities.ULTRA_RARO },
-        { level: 7, goal: 1, rarity: rarities.MENOS_QUE_LENDARIO },
-        { level: 8, goal: 1, rarity: rarities.LENDARIO },
-        { level: 9, goal: 1, rarity: rarities.MAIS_QUE_LENDARIO },
-        { level: 10, goal: 1, rarity: rarities.ULTRA_LENDARIO }
-      ],
+      tiers: rarityOrder.map((rarity, index) => ({
+          level: index + 1,
+          goal: 1,
+          rarity: rarity
+      })),
       secret_tier: {
         goal: 1, 
         rarity: rarities.KARDEC
@@ -105,10 +100,14 @@ export const milestones = [
             level_req: 500
         }
     },
-    // 10. (Placeholder)
+    // 10. (Previously Placeholder) Battle Strategist
     { 
-      id: 'placeholder_2', type: 'PLACEHOLDER', stat: 'placeholder',
-      tiers: [ { level: 1, goal: 9999 } ]
+      id: 'battle_strategist', type: 'BATTLE_STRATEGIST', stat: 'battleStrategist',
+      tiers: [
+        { level: 1, goal: 5 }, { level: 2, goal: 10 }, { level: 3, goal: 20 }, { level: 4, goal: 35 },
+        { level: 5, goal: 50 }, { level: 6, goal: 75 }, { level: 7, goal: 100 }, { level: 8, goal: 150 },
+        { level: 9, goal: 200 }, { level: 10, goal: 250 }
+      ]
     },
     // 11. Secret Milestone (Unlocks after completing all others)
     {

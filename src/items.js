@@ -36,7 +36,8 @@ const gearTypes = {
 const cosmeticTypes = {
     fundo: ["Paisagem", "Cenário", "Vista", "Plano de Fundo"],
     borda_avatar: ["Aura", "Moldura", "Borda", "Círculo"],
-    titulo: ["Título", "Epíteto", "Alcunha", "Denominação"]
+    titulo: ["Título", "Epíteto", "Alcunha", "Denominação"],
+    progressbar: ["Barra de Progresso", "Medidor de XP", "Indicador de Nível"]
 };
 
 const adjectives = ["Esquecido", "Brilhante", "Sombrio", "Antigo", "Místico", "Celestial", "Infernal", "Arcano", "Rúnico", "Quebrado", "Reforjado", "Sagrado", "Profano", "Glacial", "Vulcânico", "Etéreo", "Fantasma", "Dourado", "Prateado", "Obsidiana", "Tempestade", "Sussurrante"];
@@ -92,7 +93,8 @@ standardRarities.forEach((rarityName, rarityIndex) => {
                 name: fullName,
                 description: generateRandomDesc(fullName),
                 type: typeKey,
-                url: typeKey === 'titulo' ? null : 'https://i.pinimg.com/originals/3a/0c/a6/3a0ca6840b784a3d6d53205763261a29.gif', // Placeholder URL
+                // Placeholder URL for visual cosmetics, can be replaced with actual assets
+                url: typeKey === 'titulo' ? null : `https://placehold.co/800x500/000000/FFFFFF.png?text=${encodeURIComponent(fullName)}`,
                 rarity: rarityName,
                 source: 'mission'
             });
@@ -103,71 +105,52 @@ standardRarities.forEach((rarityName, rarityIndex) => {
 
 export const allItems = [
   // =================================
-  // ===== Itens da Loja Principal =====
+  // ===== Itens da Loja (pool para rotação) =====
   // =================================
   {
-    id: 'fundo_neon',
-    name: 'Fundo Neon City',
-    description: 'Um fundo animado e vibrante de uma cidade à noite.',
-    price: 500,
-    url: 'https://i.pinimg.com/originals/b5/a4/6c/b5a46c3b583f819ed9551a37c446538b.gif',
-    type: 'fundo',
-    rarity: rarities.COMUM,
-    source: 'shop'
+    id: 'fundo_neon_shop', name: 'Fundo Neon City', description: 'Um fundo animado e vibrante de uma cidade à noite.',
+    price: 500, url: 'https://i.pinimg.com/originals/b5/a4/6c/b5a46c3b583f819ed9551a37c446538b.gif',
+    type: 'fundo', rarity: rarities.COMUM, source: 'shop'
   },
   {
-    id: 'fundo_floresta',
-    name: 'Fundo Floresta Mística',
-    description: 'Uma floresta encantada com luzes místicas.',
-    price: 500,
-    url: 'https://i.pinimg.com/originals/ef/d6/1f/efd61f1f505e6e85744837a7605d33a1.gif',
-    type: 'fundo',
-    rarity: rarities.COMUM,
-    source: 'shop'
+    id: 'fundo_floresta_shop', name: 'Fundo Floresta Mística', description: 'Uma floresta encantada com luzes místicas.',
+    price: 500, url: 'https://i.pinimg.com/originals/ef/d6/1f/efd61f1f505e6e85744837a7605d33a1.gif',
+    type: 'fundo', rarity: rarities.COMUM, source: 'shop'
   },
   {
-    id: 'fundo_espaco',
-    name: 'Fundo Espaço Sideral',
-    description: 'Viaje pelo cosmos com esta visão galáctica.',
-    price: 750,
-    url: 'https://i.pinimg.com/originals/a0/a7/92/a0a792c636f1cda8b1a4577889f41f4f.gif',
-    type: 'fundo',
-    rarity: rarities.INCOMUM,
-    source: 'shop'
+    id: 'fundo_espaco_shop', name: 'Fundo Espaço Sideral', description: 'Viaje pelo cosmos com esta visão galáctica.',
+    price: 750, url: 'https://i.pinimg.com/originals/a0/a7/92/a0a792c636f1cda8b1a4577889f41f4f.gif',
+    type: 'fundo', rarity: rarities.INCOMUM, source: 'shop'
+  },
+   {
+    id: 'progressbar_classic_green', name: 'Barra de Progresso: Verde Clássico', description: 'Uma barra de progresso simples e verde.',
+    price: 250, type: 'progressbar', rarity: rarities.COMUM, source: 'shop'
+  },
+  {
+    id: 'elmo_ferro_shop', name: 'Elmo de Ferro', description: 'Um elmo de ferro batido, simples e funcional.',
+    price: 400, type: 'cabeça', rarity: rarities.COMUM, source: 'shop', bonus: 0.5
+  },
+  {
+    id: 'luvas_couro_shop', name: 'Luvas de Couro Reforçado', description: 'Luvas que oferecem firmeza e proteção.',
+    price: 350, type: 'mãos', rarity: rarities.COMUM, source: 'shop', bonus: 0.4
   },
   
   // =================================
   // ====== Itens Raros (Leilão) =======
   // =================================
   {
-    id: 'fundo_lendario_dragao',
-    name: 'Fundo Lendário: Covil do Dragão',
-    description: 'Um fundo lendário mostrando o covil de um dragão majestoso.',
-    min_bid: 2000,
-    url: 'https://i.pinimg.com/originals/7b/25/f8/7b25f8b9e671f5407d7fb0f88219c8f2.gif',
-    type: 'fundo',
-    rarity: rarities.LENDARIO,
-    source: 'auction'
+    id: 'fundo_lendario_dragao', name: 'Fundo Lendário: Covil do Dragão', description: 'Um fundo lendário mostrando o covil de um dragão majestoso.',
+    min_bid: 2000, url: 'https://i.pinimg.com/originals/7b/25/f8/7b25f8b9e671f5407d7fb0f88219c8f2.gif',
+    type: 'fundo', rarity: rarities.LENDARIO, source: 'auction'
   },
   {
-    id: 'borda_avatar_fogo',
-    name: 'Borda de Avatar: Chamas Eternas',
-    description: 'Uma borda de avatar animada com chamas que nunca se apagam.',
-    min_bid: 1500,
-    url: 'https://i.pinimg.com/originals/a4/1c/b3/a41cb3325a756b14f856429f5f68b356.gif',
-    type: 'borda_avatar',
-    rarity: rarities.RARO,
-    source: 'auction'
+    id: 'borda_avatar_fogo', name: 'Borda de Avatar: Chamas Eternas', description: 'Uma borda de avatar animada com chamas que nunca se apagam.',
+    min_bid: 1500, url: 'https://i.pinimg.com/originals/a4/1c/b3/a41cb3325a756b14f856429f5f68b356.gif',
+    type: 'borda_avatar', rarity: rarities.RARO, source: 'auction'
   },
   {
-    id: 'titulo_pioneiro',
-    name: 'Título: Pioneiro da Tropa',
-    description: 'Um título para aqueles que estiveram aqui desde o começo.',
-    min_bid: 1000,
-    url: null,
-    type: 'titulo',
-    rarity: rarities.MAIS_QUE_RARO,
-    source: 'auction'
+    id: 'titulo_pioneiro', name: 'Título: Pioneiro da Tropa', description: 'Um título para aqueles que estiveram aqui desde o começo.',
+    min_bid: 1000, url: null, type: 'titulo', rarity: rarities.MAIS_QUE_RARO, source: 'auction'
   },
 
   // =================================
@@ -185,16 +168,18 @@ export const allItems = [
   { id: 'kardec_fundo', name: 'Fundo: Coração do Abismo', description: 'Um gradiente sangrento e pulsante.', url: 'https://i.pinimg.com/originals/85/4c/3b/854c3b75a661614b876a4b8f36214578.gif', type: 'fundo', rarity: rarities.KARDEC, source: 'mission' },
   { id: 'kardec_titulo', name: 'Título: A Entidade', description: 'Sua presença transcende a compreensão mortal.', url: null, type: 'titulo', rarity: rarities.KARDEC, source: 'mission' },
   { id: 'kardec_borda', name: 'Borda: Fúria Neon', description: 'Uma borda rosa choque que grita poder.', url: 'https://i.pinimg.com/originals/c9/1a/87/c91a87265e337198a287a176839441d8.gif', type: 'borda_avatar', rarity: rarities.KARDEC, source: 'mission' },
+  { id: 'kardec_progressbar', name: 'Barra de Progresso: Fúria Neon', description: 'Uma barra de progresso com um gradiente roxo neon.', type: 'progressbar', rarity: rarities.KARDEC, source: 'mission' },
+  
   
   // =================================
-  // ===== Recompensas de Missão (Geradas) =====
+  // ===== Itens Gerados (Missões) =====
   // =================================
   ...allGeneratedItems
 ];
 
 // Helper para verificar se um item é cosmético
 export function isCosmetic(item) {
-    return ['fundo', 'borda_avatar', 'titulo'].includes(item.type);
+    return ['fundo', 'borda_avatar', 'titulo', 'progressbar'].includes(item.type);
 }
 
 // Helper para verificar se um item é de equipamento

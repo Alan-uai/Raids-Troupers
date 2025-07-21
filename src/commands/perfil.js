@@ -27,7 +27,7 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
             level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, 
             kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, 
             autoCollectMissions: false, completedMilestones: {}, clanJoinDate: null, daysInClan: 0,
-            classLevels: {}
+            classLevels: {}, lastClassUsedInRaid: null, battleStrategist: 0, auctionsWon: 0, mentoredPlayers: 0,
         };
         userStats.set(targetUser.id, initialStats);
         
@@ -94,18 +94,14 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
             
             const profileMessage = await channel.send({ files: [attachment] });
 
-            const profileActionsEmbed = new EmbedBuilder()
-                .setColor('#2c2f33')
-                .setTitle(t('profile_actions_title'))
-                .setDescription(t('profile_actions_description'));
-
             const actionRow = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder().setCustomId(`profile_equip_${member.id}`).setLabel(t('equip_item_button')).setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
-                    new ButtonBuilder().setCustomId(`profile_class_${member.id}`).setLabel(t('choose_class_button')).setStyle(ButtonStyle.Secondary).setEmoji('⚔️')
+                    new ButtonBuilder().setCustomId(`profile_class_${member.id}`).setLabel(t('choose_class_button')).setStyle(ButtonStyle.Secondary).setEmoji('⚔️'),
+                    new ButtonBuilder().setCustomId(`profile_refresh_${member.id}`).setEmoji('🔁').setStyle(ButtonStyle.Success)
                 );
 
-            await channel.send({ embeds: [profileActionsEmbed], components: [actionRow] });
+            await channel.send({ components: [actionRow] });
 
             userProfiles.set(member.id, {
                 channelId: channel.id,

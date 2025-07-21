@@ -1,26 +1,14 @@
 import { createCanvas, loadImage } from 'canvas';
 import { classes } from './classes.js';
-import { allItems, isGear } from './items.js';
+import { allItems } from './items.js';
 
-const wrapText = (context, text, x, y, maxWidth, lineHeight) => {
-    const words = text.split(' ');
-    let line = '';
-    let currentY = y;
-    for (let n = 0; n < words.length; n++) {
-        const testLine = line + words[n] + ' ';
-        const metrics = context.measureText(testLine);
-        const testWidth = metrics.width;
-        if (testWidth > maxWidth && n > 0) {
-            context.fillText(line, x, currentY);
-            line = words[n] + ' ';
-            currentY += lineHeight;
-        } else {
-            line = testLine;
-        }
-    }
-    context.fillText(line, x, currentY);
-    return currentY; // Retorna a última posição Y usada
-};
+function drawStat(ctx, label, value, x, y, valueXOffset) {
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillStyle = '#CCCCCC';
+    ctx.fillText(label, x, y);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(value, x + valueXOffset, y);
+}
 
 export async function generateProfileImage(member, stats, items, clans, t) {
     const width = 800;
@@ -34,37 +22,38 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     const backgroundId = equippedCosmetics.fundo;
     const titleId = equippedCosmetics.titulo;
     const borderId = equippedCosmetics.borda_avatar;
+    const progressbarId = equippedCosmetics.progressbar;
 
     const backgroundItem = allItems.find(i => i.id === backgroundId);
     const titleItem = allItems.find(i => i.id === titleId);
     const borderItem = allItems.find(i => i.id === borderId);
+    const progressbarItem = allItems.find(i => i.id === progressbarId);
     
-
-    // Fundo
+    // 1. Background Layer
     if (backgroundItem && backgroundItem.url && backgroundItem.url.startsWith('http')) {
         try {
             const background = await loadImage(backgroundItem.url);
             ctx.drawImage(background, 0, 0, width, height);
         } catch (e) {
             console.error("Failed to load custom background, using default.", e);
-            ctx.fillStyle = '#2C2F33';
-            ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = '#18191C'; ctx.fillRect(0, 0, width, height);
         }
     } else {
-        ctx.fillStyle = '#2C2F33';
-        ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = '#18191C'; ctx.fillRect(0, 0, width, height);
     }
     
-    // Overlay semi-transparente para legibilidade
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(15, 15, width - 30, height - 30);
-    
-    // Avatar e Borda
+    // 2. Semi-transparent Overlay for Readability
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.roundRect(20, 20, width - 40, height - 40, 15);
+    ctx.fill();
+
+    // 3. Main Header (Avatar, Name, Title, Class)
     const avatarURL = member.user.displayAvatarURL({ extension: 'png', size: 256 });
     const avatar = await loadImage(avatarURL);
     const avatarSize = 128;
     const avatarX = 50;
-    const avatarY = 40;
+    const avatarY = 45;
+    
     ctx.save();
     ctx.beginPath();
     ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2, true);
@@ -73,99 +62,83 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     ctx.drawImage(avatar, avatarX, avatarY, avatarSize, avatarSize);
     ctx.restore();
 
-    // Carrega e desenha a borda se equipada
     if (borderItem && borderItem.url) {
         try {
             const border = await loadImage(borderItem.url);
-            ctx.drawImage(border, avatarX - 16, avatarY - 16, avatarSize + 32, avatarSize + 32); // Ajuste o posicionamento e tamanho conforme necessário
-        } catch (e) {
-            console.error("Failed to load avatar border.", e);
-        }
+            ctx.drawImage(border, avatarX - 16, avatarY - 16, avatarSize + 32, avatarSize + 32);
+        } catch (e) { console.error("Failed to load avatar border.", e); }
     }
 
-
-    // Nome de usuário e Tag do Clã
+    const nameX = avatarX + avatarSize + 20;
+    
     ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 36px sans-serif';
+    let nameText = member.displayName;
     if (stats.clanId && clans) {
         const clan = Array.from(clans.values()).find(c => c.id === stats.clanId);
         if (clan) {
-            ctx.font = 'bold 32px sans-serif';
-            const clanTag = `[${clan.tag}]`;
-            const nameX = avatarX + avatarSize + 25;
-            const nameY = avatarY + 55;
-            
-            ctx.fillStyle = '#AAAAAA';
-            const tagWidth = ctx.measureText(clanTag).width;
-            ctx.fillText(clanTag, nameX, nameY);
-
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillText(member.displayName, nameX + tagWidth + 10, nameY);
-        } else {
-            ctx.font = 'bold 36px sans-serif';
-            ctx.fillText(member.displayName, avatarX + avatarSize + 25, avatarY + 55);
+            nameText = `[${clan.tag}] ${member.displayName}`;
         }
-    } else {
-        ctx.font = 'bold 36px sans-serif';
-        ctx.fillText(member.displayName, avatarX + avatarSize + 25, avatarY + 55);
     }
+    ctx.fillText(nameText, nameX, avatarY + 45);
 
-    // Título
     if (titleItem) {
-        ctx.font = 'italic 20px sans-serif';
-        ctx.fillStyle = '#FFD700'; // Gold color for the title
-        ctx.fillText(t(`item_${titleItem.id}_name`) || titleItem.name, avatarX + avatarSize + 25, avatarY + 80);
+        ctx.font = 'italic 24px sans-serif';
+        ctx.fillStyle = '#FFD700';
+        ctx.fillText(t(`item_${titleItem.id}_name`) || titleItem.name, nameX, avatarY + 80);
     }
 
-    // Classe
     if (stats.class) {
         const userClass = classes.find(c => c.id === stats.class);
         if (userClass) {
-            ctx.font = 'bold 24px sans-serif';
+            ctx.font = 'bold 26px sans-serif';
             ctx.fillStyle = userClass.color || '#D2AC47';
-            ctx.fillText(`${userClass.icon} ${t(`class_${userClass.id}_name`)}`, avatarX + avatarSize + 25, avatarY + 115);
+            ctx.fillText(`${userClass.icon} ${t(`class_${userClass.id}_name`)}`, nameX, avatarY + 115);
         }
     }
 
-    // Estatísticas
-    const statsY = 220;
-    const statsX = 50;
-    const col2X = 300;
-    const col3X = 550;
-    const statsSpacing = 35;
-    const valueOffsetX = 160;
-
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillStyle = '#FFFFFF';
-    
-    // Coluna 1
-    ctx.fillText(t('level'), statsX, statsY);
-    ctx.fillText(String(stats.level || 1), statsX + valueOffsetX, statsY);
-    
+    // 4. XP Bar
+    const xpY = 200;
+    const barHeight = 25;
+    const barWidth = width - 100;
+    const barX = 50;
     const xpToLevelUp = 100 * (stats.level || 1);
-    ctx.fillText(t('xp'), statsX, statsY + statsSpacing);
-    ctx.fillText(`${stats.xp || 0} / ${xpToLevelUp}`, statsX + valueOffsetX, statsY + statsSpacing);
+    const xpPercent = Math.min((stats.xp || 0) / xpToLevelUp, 1);
     
-    ctx.fillText(t('troup_coins'), statsX, statsY + statsSpacing * 2);
-    ctx.fillText(String(stats.coins || 0), statsX + valueOffsetX, statsY + statsSpacing * 2);
+    ctx.fillStyle = '#2C2F33'; // Bar background
+    ctx.roundRect(barX, xpY, barWidth, barHeight, 12);
+    ctx.fill();
 
-    // Coluna 2
-    ctx.fillText(t('raids_created'), col2X, statsY);
-    ctx.fillText(String(stats.raidsCreated || 0), col2X + valueOffsetX, statsY);
-
-    ctx.fillText(t('raids_helped'), col2X, statsY + statsSpacing);
-    ctx.fillText(String(stats.raidsHelped || 0), col2X + valueOffsetX, statsY + statsSpacing);
+    if (xpPercent > 0) {
+        if (progressbarItem?.rarity === 'Kardec') {
+            const gradient = ctx.createLinearGradient(barX, 0, barX + (barWidth * xpPercent), 0);
+            gradient.addColorStop(0, '#ff00ff'); // Hot pink
+            gradient.addColorStop(1, '#4b0082'); // Indigo/dark purple
+            ctx.fillStyle = gradient;
+        } else if (progressbarItem?.url && progressbarItem.url.includes('#')) {
+             ctx.fillStyle = progressbarItem.url; // Use color hex from URL if present
+        } else {
+             ctx.fillStyle = '#39FF14'; // Default Green
+        }
+        ctx.roundRect(barX, xpY, barWidth * xpPercent, barHeight, 12);
+        ctx.fill();
+    }
     
-    ctx.fillText(t('reputation'), col2X, statsY + statsSpacing * 2);
-    ctx.fillText(`👍 ${stats.reputation || 0}`, col2X + valueOffsetX, statsY + statsSpacing * 2);
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    const xpText = `LVL ${stats.level || 1} | ${stats.xp || 0} / ${xpToLevelUp} XP`;
+    const textMetrics = ctx.measureText(xpText);
+    ctx.fillText(xpText, barX + (barWidth / 2) - (textMetrics.width / 2), xpY + 18);
+
+
+    // 5. Stats Grid
+    const statsY = 280;
+    const statsXCol1 = 50;
+    const statsXCol2 = 300;
+    const statsXCol3 = 550;
+    const statsSpacing = 45;
+    const valueOffset = 180;
     
-    // Coluna 3
-    ctx.fillText(t('kicked_others'), col3X, statsY);
-    ctx.fillText(String(stats.kickedOthers || 0), col3X + valueOffsetX, statsY);
-
-    ctx.fillText(t('was_kicked'), col3X, statsY + statsSpacing);
-    ctx.fillText(String(stats.wasKicked || 0), col3X + valueOffsetX, statsY + statsSpacing);
-
-    // XP Bônus
     let totalXPBonus = 0;
     if (equippedGear) {
         for (const gearId of Object.values(equippedGear)) {
@@ -175,23 +148,43 @@ export async function generateProfileImage(member, stats, items, clans, t) {
             }
         }
     }
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillStyle = '#39FF14'; // Verde neon para o bônus
-    ctx.fillText(t('xp_bonus'), col3X, statsY + statsSpacing * 2);
-    ctx.fillText(`+${totalXPBonus.toFixed(2)}%`, col3X + valueOffsetX, statsY + statsSpacing * 2);
 
+    drawStat(ctx, t('troup_coins'), String(stats.coins || 0), statsXCol1, statsY, valueOffset);
+    drawStat(ctx, t('raids_created'), String(stats.raidsCreated || 0), statsXCol2, statsY, valueOffset);
+    drawStat(ctx, t('kicked_others'), String(stats.kickedOthers || 0), statsXCol3, statsY, valueOffset);
+
+    drawStat(ctx, t('reputation'), `👍 ${stats.reputation || 0}`, statsXCol1, statsY + statsSpacing, valueOffset);
+    drawStat(ctx, t('raids_helped'), String(stats.raidsHelped || 0), statsXCol2, statsY + statsSpacing, valueOffset);
+    drawStat(ctx, t('was_kicked'), String(stats.wasKicked || 0), statsXCol3, statsY + statsSpacing, valueOffset);
     
-    // Cargos
+    ctx.fillStyle = '#39FF14'; // Special color for bonus
+    ctx.fillText(t('xp_bonus'), statsXCol1, statsY + statsSpacing * 2);
+    ctx.fillText(`+${totalXPBonus.toFixed(2)}%`, statsXCol1 + valueOffset, statsY + statsSpacing * 2);
+
+    // 6. Roles
     ctx.font = '16px sans-serif';
     ctx.fillStyle = '#B9BBBE';
     const roles = member.roles.cache
-        .filter(r => r.name !== '@everyone' && r.name !== 'limpo')
+        .filter(r => r.name !== '@everyone' && r.name !== 'Br' && r.name !== 'En')
         .map(r => r.name)
+        .slice(0, 10) // Limit roles displayed
         .join(', ');
         
     const rolesText = `${t('roles')}: ${roles || t('no_roles')}`;
-    wrapText(ctx, rolesText, 50, height - 80, width - 100, 20);
-
+    ctx.fillText(rolesText, 50, height - 35, width - 100);
 
     return canvas.toBuffer('image/png');
+}
+
+CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+  if (w < 2 * r) r = w / 2;
+  if (h < 2 * r) r = h / 2;
+  this.beginPath();
+  this.moveTo(x+r, y);
+  this.arcTo(x+w, y,   x+w, y+h, r);
+  this.arcTo(x+w, y+h, x,   y+h, r);
+  this.arcTo(x,   y+h, x,   y,   r);
+  this.arcTo(x,   y,   x+w, y,   r);
+  this.closePath();
+  return this;
 }

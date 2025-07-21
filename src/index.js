@@ -22,7 +22,7 @@ import { generateProfileImage } from './profile-generator.js';
 import { allItems } from './items.js';
 import { missions as missionPool } from './missions.js';
 import { milestones } from './milestones.js';
-import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList } from './mission-system.js';
+import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList, animateAndCollectReward } from './mission-system.js';
 import { getTranslator } from './i18n.js';
 import lojaSetup from './commands/loja_setup.js';
 import clanEnquete from './commands/clan_enquete.js';
@@ -143,12 +143,12 @@ client.on(Events.InteractionCreate, async interaction => {
     } else if (interaction.customId === 'shop_buy_button') {
         await handleBuyButton(interaction, t);
     } else if (action === 'mission') {
-        const [subAction, userId, ...rest] = args;
+        const [subAction, userId, missionId, missionCategory] = args;
         if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
         if (subAction === 'view') {
-            const type = rest[0]; // 'daily' or 'weekly'
+            const type = args[2]; // 'daily' or 'weekly'
             await postMissionList(interaction.message.thread, userId, type, { userMissions, userStats, client }, interaction);
         } else if (subAction === 'collectall') {
             await collectAllRewards(interaction, userId, { userStats, userItems, userMissions, client, userProfiles, clans });
@@ -159,6 +159,8 @@ client.on(Events.InteractionCreate, async interaction => {
                 userStats.set(userId, stats);
                 await postMissionList(interaction.message.thread, userId, 'daily', { userMissions, userStats, client }, interaction); // Refresh view
             }
+        } else if (subAction === 'collect') {
+             await animateAndCollectReward(interaction, userId, missionId, missionCategory, { userStats, userItems, userMissions, client, userProfiles, clans });
         }
     } else if (action === 'profile') {
         const [subAction, userId] = args;
@@ -169,6 +171,21 @@ client.on(Events.InteractionCreate, async interaction => {
             await handleEquipButton(interaction, userId, t);
         } else if (subAction === 'class') {
              await interaction.client.commands.get('classes').execute(interaction, { userStats });
+        } else if (subAction === 'refresh') {
+            await interaction.deferUpdate();
+            const member = await interaction.guild.members.fetch(userId);
+            const stats = userStats.get(userId);
+            const items = userItems.get(userId);
+            const profileInfo = userProfiles.get(userId);
+            
+            const profileImageBuffer = await generateProfileImage(member, stats, items, clans, t);
+            const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
+            
+            const profileChannel = await client.channels.fetch(profileInfo.channelId);
+            const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
+            await profileMessage.edit({ files: [attachment] });
+            
+            await interaction.followUp({ content: t('profile_refreshed'), ephemeral: true });
         }
     } else if (action === 'poll') {
         const [subAction, pollId, optionIndex] = args;
@@ -255,6 +272,7 @@ async function checkAuctionEnd() {
     const stats = userStats.get(winnerId);
     if(stats){
         stats.coins -= winningBid;
+        stats.auctionsWon = (stats.auctionsWon || 0) + 1;
         userStats.set(winnerId, stats);
     }
 
@@ -270,6 +288,8 @@ async function checkAuctionEnd() {
     finalEmbed.setFooter({text: t('auction_winner_footer')});
     
     if (auctionMessage) await auctionMessage.edit({ embeds: [finalEmbed], components: [] });
+    
+    await checkMissionCompletion(winnerUser, 'AUCTION_WON', { userStats, userMissions, client, userProfiles, userItems, clans });
 
     try {
         await winnerUser.send({ content: winnerT('auction_winner_dm', { itemName: winnerT(`item_${item.id}_name`) || item.name, bid: winningBid }) });
@@ -436,6 +456,8 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
     await thread.send(t('raid_started_by_leader'));
     const members = await thread.members.fetch();
     const participants = [];
+    
+    const leaderStats = userStats.get(requesterId);
 
     for (const member of members.values()) {
         const user = client.users.cache.get(member.id);
@@ -443,12 +465,12 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
         participants.push(user);
         
         const userT = await getTranslator(user.id, userStats);
-
+        const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR', autoCollectMissions: false };
+        const items = userItems.get(user.id) || { inventory: [], equippedGear: {}, equippedCosmetics: {} };
+        
+        let leveledUp = false;
+        
         if (user.id !== requesterId) {
-            const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR', autoCollectMissions: false };
-            const items = userItems.get(user.id) || { inventory: [], equippedGear: {}, equippedCosmetics: {} };
-            
-            // Calculate XP Bonus
             let xpBonusPercent = 0;
             if (items.equippedGear) {
                 for (const gearId of Object.values(items.equippedGear)) {
@@ -468,7 +490,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
             stats.coins += coinsGained;
 
             let xpToLevelUp = 100 * stats.level;
-            let leveledUp = false;
+            const previousLevel = stats.level;
             while (stats.xp >= xpToLevelUp) {
                 stats.level += 1;
                 stats.xp -= xpToLevelUp;
@@ -476,15 +498,30 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
                 leveledUp = true;
             }
             if(leveledUp) {
+                // Check for Mentor de Elite milestone
+                if(leaderStats && leaderStats.level >= 20 && previousLevel < 10 && stats.level >= 10){
+                   leaderStats.mentoredPlayers = (leaderStats.mentoredPlayers || 0) + 1;
+                   await checkMissionCompletion(client.users.cache.get(requesterId), 'MENTOR_PLAYER', { userStats, userMissions, client, userProfiles, userItems, clans });
+                }
+
                  try {
                     await user.send({ content: userT('level_up_notification', { level: stats.level }) });
                 } catch(e) {
                     await thread.send({ content: userT('level_up_notification_public', { userId: user.id, level: stats.level }) });
                 }
             }
-            userStats.set(user.id, stats);
-            await checkMissionCompletion(user, 'RAID_HELPED', { userStats, userMissions, client, userProfiles, userItems, clans });
         }
+        
+        // Update Battle Strategist milestone for the leader
+        if (leaderStats?.class && leaderStats.class !== leaderStats.lastClassUsedInRaid) {
+             leaderStats.battleStrategist = (leaderStats.battleStrategist || 0) + 1;
+             await checkMissionCompletion(client.users.cache.get(requesterId), 'BATTLE_STRATEGIST', { userStats, userMissions, client, userProfiles, userItems, clans });
+        }
+        if(leaderStats?.class) leaderStats.lastClassUsedInRaid = leaderStats.class;
+        
+        userStats.set(user.id, stats);
+        await checkMissionCompletion(user, 'RAID_HELPED', { userStats, userMissions, client, userProfiles, userItems, clans });
+
 
         const guildMember = await interaction.guild.members.fetch(user.id).catch(() => null);
         if (voiceChannel && raidState?.get(user.id) && guildMember?.voice.channelId !== voiceChannel.id) {
@@ -724,7 +761,7 @@ async function handleEquipButton(interaction, userId, t) {
 
     const equippableItems = inventory
         .map(id => allItems.find(item => item.id === id))
-        .filter(item => item && (item.type === 'fundo' || item.type === 'titulo' || item.type === 'borda_avatar' || item.bonus));
+        .filter(item => item && (item.type === 'fundo' || item.type === 'titulo' || item.type === 'borda_avatar' || item.type === 'progressbar' || item.bonus));
 
     if (equippableItems.length === 0) {
         return await interaction.reply({ content: t('equip_no_equippable_items'), ephemeral: true });
@@ -765,7 +802,7 @@ async function handleEquipSelection(interaction, userId, itemId, t) {
     let replyMessage = '';
     const itemDisplayName = t(`item_${itemToEquip.id}_name`) || itemToEquip.name;
 
-    if (['fundo', 'titulo', 'borda_avatar'].includes(itemToEquip.type)) {
+    if (['fundo', 'titulo', 'borda_avatar', 'progressbar'].includes(itemToEquip.type)) {
         items.equippedCosmetics[itemToEquip.type] = itemToEquip.id;
         replyMessage = t('equip_cosmetic_success', { itemType: t(`item_type_${itemToEquip.type}`), itemName: itemDisplayName });
     } else if (itemToEquip.bonus) {

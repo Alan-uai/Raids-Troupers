@@ -107,7 +107,7 @@ async function collectReward(user, missionProgress, data) {
 
     const stats = userStats.get(userId);
     if (reward.item) {
-        const items = userItems.get(userId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default', equippedBorder: null };
+        const items = userItems.get(userId) || { inventory: [], equippedGear: {}, equippedCosmetics: {} };
         items.inventory.push(reward.item);
         userItems.set(userId, items);
         const itemDetails = allItems.find(i => i.id === reward.item);
@@ -233,9 +233,9 @@ export async function checkMissionCompletion(user, missionType, data, amount = 1
 }
 
 // Helper para gerar embeds de uma lista de missões
-function generateMissionEmbeds(missions, type, t) {
+function generateMissionEmbeds(missions, category, userId, t) {
     if (!missions || missions.length === 0) {
-        return [new EmbedBuilder().setDescription(t('missions_no_missions_of_type', { type: type === 'daily' ? 'diárias' : 'semanais' }))];
+        return [new EmbedBuilder().setDescription(t('missions_no_missions_of_type', { type: category }))];
     }
     
     const embeds = [];
@@ -250,6 +250,18 @@ function generateMissionEmbeds(missions, type, t) {
         } else {
             rewardText = `**${reward.xp || 0}** XP & **${reward.coins || 0}** TC`;
         }
+        
+        const row = new ActionRowBuilder();
+        const collectButton = new ButtonBuilder()
+            .setCustomId(`mission_collect_${userId}_${missionProgress.id}_${category}`)
+            .setLabel(t('missions_collect_button'))
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(!missionProgress.completed || missionProgress.collected);
+            
+        if(missionProgress.collected) {
+            collectButton.setLabel(t('missions_collected_button')).setStyle(ButtonStyle.Secondary);
+        }
+        row.addComponents(collectButton);
 
         const embed = new EmbedBuilder()
             .setTitle(t(`mission_${missionDetails.id}_title`))
@@ -258,21 +270,22 @@ function generateMissionEmbeds(missions, type, t) {
             .addFields(
                 { name: t('progress'), value: `${missionProgress.progress} / ${missionProgress.goal}`, inline: true },
                 { name: t('reward'), value: rewardText, inline: true }
-            );
+            )
+            .setAuthor({name: missionProgress.id}); // Store ID here for retrieval
 
         if (missionProgress.completed && !missionProgress.collected) {
            embed.setFooter({ text: 'Pronto para coletar!' });
         } else if (missionProgress.collected) {
             embed.setFooter({ text: 'Recompensa coletada.' });
         }
-        embeds.push(embed);
+        embeds.push({embed, row});
     }
     return embeds;
 }
 
 
 export async function postMissionList(thread, userId, type, data, interaction = null) {
-    const { userMissions, userStats, client } = data;
+    const { userMissions, userStats } = data;
     const t = await getTranslator(userId, userStats);
 
     if (interaction) {
@@ -282,12 +295,16 @@ export async function postMissionList(thread, userId, type, data, interaction = 
     const activeMissions = userMissions.get(userId);
     const stats = userStats.get(userId);
     
-    const userMissionInfo = missionMessageIds.get(userId) || { currentView: type };
-    userMissionInfo.currentView = type;
+    // Clear existing messages from the bot in the thread
+    const messages = await thread.messages.fetch({ limit: 50 });
+    const botMessages = messages.filter(m => m.author.id === data.client.user.id);
+    if(botMessages.size > 0) {
+       await thread.bulkDelete(botMessages).catch(e => console.error("Failed to bulk delete messages:", e));
+    }
 
     // Build buttons
     const viewButton = new ButtonBuilder()
-        .setCustomId(type === 'daily' ? `mission_view_${userId}_weekly` : `mission_view_${userId}_daily`)
+        .setCustomId(`mission_view_${userId}_${type === 'daily' ? 'weekly' : 'daily'}`)
         .setLabel(type === 'daily' ? t('missions_view_weekly_button') : t('missions_view_daily_button'))
         .setStyle(ButtonStyle.Primary);
 
@@ -304,37 +321,92 @@ export async function postMissionList(thread, userId, type, data, interaction = 
         .setStyle(ButtonStyle.Secondary);
         
     const controlRow = new ActionRowBuilder().addComponents(viewButton, collectAllButton, autoCollectButton);
+    await thread.send({ components: [controlRow] });
 
     // Get embeds for the current view
     const missionsToShow = (type === 'daily' ? activeMissions.daily : activeMissions.weekly).filter(Boolean);
-    const embeds = generateMissionEmbeds(missionsToShow, type, t);
+    const missionEmbeds = generateMissionEmbeds(missionsToShow, type, userId, t);
 
-    // Fetch or send messages
-    let controlMessage;
-    let listMessage;
-
-    if (userMissionInfo.controlMessageId) {
-        controlMessage = await thread.messages.fetch(userMissionInfo.controlMessageId).catch(() => null);
+    for (const {embed, row} of missionEmbeds) {
+        await thread.send({ embeds: [embed], components: [row] });
     }
-    if (userMissionInfo.listMessageId) {
-        listMessage = await thread.messages.fetch(userMissionInfo.listMessageId).catch(() => null);
-    }
+}
 
-    if (controlMessage) {
-        await controlMessage.edit({ components: [controlRow] });
-    } else {
-        controlMessage = await thread.send({ components: [controlRow] });
-        userMissionInfo.controlMessageId = controlMessage.id;
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function strikeThrough(text) {
+    let final = '';
+    for(const char of text) {
+        final += `~~${char}~~`;
+    }
+    return final;
+}
+
+export async function animateAndCollectReward(interaction, userId, missionId, missionCategory, data) {
+    const { userMissions, userStats, client } = data;
+    const t = await getTranslator(userId, userStats);
+
+    await interaction.deferUpdate();
+
+    const activeMissions = userMissions.get(userId);
+    const missionsList = activeMissions[missionCategory];
+    const missionProgress = missionsList.find(m => m.id === missionId);
+
+    if (!missionProgress || !missionProgress.completed || missionProgress.collected) {
+        return interaction.followUp({ content: t('mission_reward_collect_error_ephemeral'), ephemeral: true });
     }
     
-    if (listMessage) {
-        await listMessage.edit({ embeds: embeds.slice(0, 10) });
-    } else {
-        listMessage = await thread.send({ embeds: embeds.slice(0, 10) });
-        userMissionInfo.listMessageId = listMessage.id;
+    const missionMessage = interaction.message;
+    const originalEmbed = EmbedBuilder.from(missionMessage.embeds[0]);
+
+    // Phase 1: Animation
+    const fieldsToAnimate = ['title', 'description'];
+    const maxLen = Math.max(...fieldsToAnimate.map(f => originalEmbed.data[f]?.length || 0));
+
+    let rewardDisplayMessage;
+
+    for (let i = 1; i <= maxLen; i++) {
+        const tempEmbed = EmbedBuilder.from(originalEmbed);
+        tempEmbed.setColor('#FF0000'); // Change to red during animation
+        
+        let title = originalEmbed.data.title || '';
+        let desc = originalEmbed.data.description || '';
+
+        tempEmbed.setTitle('~~' + title.substring(0, i) + '~~' + title.substring(i));
+        tempEmbed.setDescription('~~' + desc.substring(0, i) + '~~' + desc.substring(i));
+        
+        // Update reward text and spawn/update the reward display embed
+        let rewardField = tempEmbed.data.fields.find(f => f.name === t('reward'));
+        if (rewardField) {
+            const rewardValue = rewardField.value;
+            const xpMatch = rewardValue.match(/(\d+)\s*XP/);
+            const tcMatch = rewardValue.match(/(\d+)\s*TC/);
+
+            if (xpMatch && !rewardDisplayMessage) {
+                 rewardDisplayMessage = await interaction.channel.send({ embeds: [new EmbedBuilder().setColor('#FFFF00').setDescription(`+ ${xpMatch[0]}`)] });
+            }
+            if (tcMatch && rewardDisplayMessage && rewardDisplayMessage.embeds[0].description.includes('XP')) {
+                await rewardDisplayMessage.edit({ embeds: [new EmbedBuilder().setColor('#FFFF00').setDescription(`${rewardDisplayMessage.embeds[0].description} & ${tcMatch[0]}`)] });
+            }
+        }
+
+
+        await missionMessage.edit({ embeds: [tempEmbed], components: [] });
+        await sleep(75); // animation speed
     }
 
-    missionMessageIds.set(userId, userMissionInfo);
+    // Phase 2: Collect and Cleanup
+    await collectReward(interaction.user, missionProgress, data);
+    await updateProfileImage(interaction.user, data);
+
+    await sleep(2000); // wait 2 seconds
+
+    await missionMessage.delete();
+    if(rewardDisplayMessage) await rewardDisplayMessage.delete();
+
+    await interaction.followUp({ content: t('mission_reward_collected_ephemeral', { missionName: originalEmbed.data.title }), ephemeral: true });
 }
 
 
@@ -348,7 +420,7 @@ async function updateProfileImage(user, data) {
             const t = await getTranslator(userId, userStats);
             const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
             const member = await profileChannel.guild.members.fetch(userId);
-            const items = userItems.get(userId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default', equippedBorder: null };
+            const items = userItems.get(userId) || { inventory: [], equippedGear: {}, equippedCosmetics: {} };
             const stats = userStats.get(userId) || {};
             
             const newProfileImageBuffer = await generateProfileImage(member, stats, items, clans, t);
