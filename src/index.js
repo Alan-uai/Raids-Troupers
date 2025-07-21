@@ -943,7 +943,9 @@ async function handleMilestoneInteraction(interaction, milestoneId, userId, sele
     stats.userId = userId;
 
     const milestoneData = await createMilestoneEmbed(milestone, stats, items, selectedLevel, t);
-    await interaction.message.edit({ embeds: [milestoneData.embed], components: [milestoneData.row] });
+    if (interaction.message && milestoneData) {
+        await interaction.message.edit({ embeds: [milestoneData.embed], components: [milestoneData.row] });
+    }
 }
 
 

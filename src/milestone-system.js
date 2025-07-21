@@ -133,7 +133,7 @@ export async function createMilestoneEmbed(milestone, stats, itemStats, view, t)
         row.addComponents(selectMenu);
     } else {
         const isSecretView = view === 'secret';
-        const tier = isSecretView ? milestone.secret_tier : milestone.tiers.find(t => t.level === parseInt(view, 10));
+        const tier = isSecretView ? milestone.secret_tier : milestone.tiers.find(t => String(t.level) === view);
 
         if (tier) {
             embed.setDescription(t(`milestone_${milestone.id}_description`));
@@ -144,6 +144,7 @@ export async function createMilestoneEmbed(milestone, stats, itemStats, view, t)
             if (milestone.id === 'rarity_collector') {
                  statPath = { name: 'rarityCollector', rarity: isSecretView ? rarities.KARDEC : tier.rarity };
                  goalText = `1 item ${isSecretView ? rarities.KARDEC : tier.rarity}`;
+                 goal = 1;
             }
              if (milestone.id === 'versatility_master') {
                 statPath = { name: 'versatilityMaster', level: tier.level_req };

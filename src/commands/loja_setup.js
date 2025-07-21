@@ -5,7 +5,7 @@ import { getTranslator } from '../i18n.js';
 
 const SHOP_CHANNEL_ID_PT = '1396416240263630868';
 const SHOP_CHANNEL_ID_EN = '1396725532913303612';
-const shopStorage = new Map(); // Armazenará os itens atualmente na loja para cada localidade
+const shopStorage = new Map(); // Armazenará os itens e mensagens da loja para cada localidade
 
 function getNextUpdate(hours) {
     const now = new Date();
@@ -24,7 +24,7 @@ function getShopItems(locale) {
     if (!shopStorage.has(locale) || shopStorage.get(locale).nextUpdate <= Date.now()) {
         updateShopInventory(locale, nextUpdateTime);
     }
-    return shopStorage.get(locale).items;
+    return shopStorage.get(locale)?.items || [];
 }
 
 function updateShopInventory(locale, nextUpdateTime) {
@@ -33,20 +33,19 @@ function updateShopInventory(locale, nextUpdateTime) {
     let shopItems = [];
 
     const yearDay = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
-    const hour = now.getUTCHours();
     
     // Lógica para itens raros/lendários/místicos baseada no tempo
-    if (yearDay === 1) { // 1º de Janeiro
+    if (yearDay === 1) { // 1º de Janeiro (Ano Novo)
         const kardecPool = allItems.filter(i => i.source === 'shop' && i.rarity === 'Kardec');
         if (kardecPool.length > 0) shopItems.push(kardecPool[Math.floor(Math.random() * kardecPool.length)]);
     }
-    else if (hour % 24 === 0) { // A cada 24h
+    else if (now.getUTCHours() % 24 < 3) { // A cada 24h, nas primeiras 3h do ciclo
         const mythicPool = allItems.filter(i => i.source === 'shop' && i.rarity.includes('Místico'));
         if (mythicPool.length > 0) shopItems.push(mythicPool[Math.floor(Math.random() * mythicPool.length)]);
-    } else if (hour % 12 === 0) { // A cada 12h
+    } else if (now.getUTCHours() % 12 < 3) { // A cada 12h
         const legendaryPool = allItems.filter(i => i.source === 'shop' && i.rarity.includes('Lendário'));
         if (legendaryPool.length > 0) shopItems.push(legendaryPool[Math.floor(Math.random() * legendaryPool.length)]);
-    } else if (hour % 6 === 0) { // A cada 6h
+    } else if (now.getUTCHours() % 6 < 3) { // A cada 6h
         const rarePool = allItems.filter(i => i.source === 'shop' && i.rarity.includes('Raro'));
         if (rarePool.length > 0) shopItems.push(rarePool[Math.floor(Math.random() * rarePool.length)]);
     }
@@ -61,10 +60,8 @@ function updateShopInventory(locale, nextUpdateTime) {
         }
     }
 
-    shopStorage.set(locale, {
-        items: shopItems,
-        nextUpdate: nextUpdateTime,
-    });
+    const currentData = shopStorage.get(locale) || {};
+    shopStorage.set(locale, { ...currentData, items: shopItems, nextUpdate: nextUpdateTime });
 }
 
 function formatTime(ms) {
@@ -84,20 +81,20 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
         return { success: false, channelId };
     }
 
-    const shopItems = getShopItems(locale);
-    const nextUpdate = getNextUpdate(3);
-    const timeRemaining = nextUpdate.getTime() - Date.now();
+    let shopData = shopStorage.get(locale) || {};
 
-    const timerEmbed = new EmbedBuilder()
-      .setColor('#3498DB')
-      .setDescription(t('shop_footer_rotation', { time: formatTime(timeRemaining) }));
-
-    const messages = await shopChannel.messages.fetch({ limit: 10 }).catch(() => []);
-    const botMessages = messages.filter(m => m.author.id === client.user.id);
-    const mainMessage = botMessages.find(m => m.embeds[0]?.title === t('shop_title'));
-    const timerMessage = botMessages.find(m => m.embeds[0]?.description.includes(t('shop_footer_rotation_raw')));
+    // Fetch existing messages if not cached
+    if (updateItems || !shopData.mainMessageId || !shopData.timerMessageId) {
+        const messages = await shopChannel.messages.fetch({ limit: 10 }).catch(() => []);
+        const botMessages = messages.filter(m => m.author.id === client.user.id);
+        const mainMessage = botMessages.find(m => m.embeds[0]?.title === t('shop_title'));
+        const timerMessage = botMessages.find(m => m.embeds[0]?.description?.includes(t('shop_footer_rotation_raw')));
+        shopData.mainMessageId = mainMessage?.id;
+        shopData.timerMessageId = timerMessage?.id;
+    }
 
     if (updateItems) {
+        const shopItems = getShopItems(locale);
         const embed = new EmbedBuilder()
           .setColor('#FFA500')
           .setTitle(t('shop_title'))
@@ -133,41 +130,56 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
             selectMenu.addOptions([{ label: 'empty', value: 'empty' }]);
         }
         
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('shop_select_button')
-                    .setLabel(t('shop_select_button_label'))
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('🖱️'),
-                new ButtonBuilder()
-                    .setCustomId('shop_buy_button')
-                    .setLabel(t('shop_buy_button_label'))
-                    .setStyle(ButtonStyle.Success)
-                    .setEmoji('🛒')
-            );
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('shop_buy_button')
+                .setLabel(t('shop_buy_button_label'))
+                .setStyle(ButtonStyle.Success)
+                .setEmoji('🛒')
+        );
             
         const menuRow = new ActionRowBuilder().addComponents(selectMenu);
         const components = shopItems.length > 0 ? [menuRow, row] : [];
         
-        if (mainMessage) {
-            await mainMessage.edit({ embeds: [embed], components });
+        let sentMainMessage;
+        if (shopData.mainMessageId) {
+            sentMainMessage = await shopChannel.messages.fetch(shopData.mainMessageId).catch(() => null);
+        }
+        
+        if (sentMainMessage) {
+            await sentMainMessage.edit({ embeds: [embed], components });
         } else {
             // Se a mensagem principal não existe, limpa mensagens antigas do bot para começar do zero
-            for (const msg of botMessages.values()) {
-                await msg.delete().catch(() => {});
-            }
-            await shopChannel.send({ embeds: [embed], components });
+            const messagesToDelete = (await shopChannel.messages.fetch({ limit: 50 }).catch(() => [])).filter(m => m.author.id === client.user.id);
+            if (messagesToDelete.size > 0) await shopChannel.bulkDelete(messagesToDelete).catch(() => {});
+            const newMainMessage = await shopChannel.send({ embeds: [embed], components });
+            shopData.mainMessageId = newMainMessage.id;
         }
     }
     
     // Timer message handling
-    if (timerMessage) {
-        await timerMessage.edit({ embeds: [timerEmbed] });
+    const nextUpdate = getNextUpdate(3);
+    const timeRemaining = nextUpdate.getTime() - Date.now();
+    const timerEmbed = new EmbedBuilder()
+      .setColor('#3498DB')
+      .setDescription(t('shop_footer_rotation', { time: formatTime(timeRemaining) }));
+
+    let sentTimerMessage;
+    if(shopData.timerMessageId) {
+        sentTimerMessage = await shopChannel.messages.fetch(shopData.timerMessageId).catch(() => null);
+    }
+
+    if (sentTimerMessage) {
+        await sentTimerMessage.edit({ embeds: [timerEmbed] }).catch(e => {
+            console.error(`Failed to edit timer message for ${locale}, it might have been deleted.`, e.message);
+            shopData.timerMessageId = null; // Mark as deleted
+        });
     } else {
-        await shopChannel.send({ embeds: [timerEmbed] });
+        const newTimerMessage = await shopChannel.send({ embeds: [timerEmbed] });
+        shopData.timerMessageId = newTimerMessage.id;
     }
     
+    shopStorage.set(locale, shopData);
     return { success: true, channelId };
 }
 
@@ -203,16 +215,16 @@ export default {
     if (!interaction.client.shopUpdateInterval) {
         interaction.client.shopUpdateInterval = setInterval(async () => {
             console.log("Running periodic shop item update...");
-            await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', true);
-            await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', true);
+            await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'pt-BR'), SHOP_CHANNEL_ID_PT, 'pt-BR', true).catch(e => console.error("Error updating PT items:", e));
+            await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'en-US'), SHOP_CHANNEL_ID_EN, 'en-US', true).catch(e => console.error("Error updating EN items:", e));
         }, 3 * 60 * 60 * 1000); // 3 hours
     }
     
      // Set interval to update timers periodically
     if (!interaction.client.shopTimerInterval) {
         interaction.client.shopTimerInterval = setInterval(async () => {
-            await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', false).catch(e => console.error("Error updating PT timer:", e));
-            await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', false).catch(e => console.error("Error updating EN timer:", e));
+            await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'pt-BR'), SHOP_CHANNEL_ID_PT, 'pt-BR', false).catch(e => console.error("Error updating PT timer:", e));
+            await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'en-US'), SHOP_CHANNEL_ID_EN, 'en-US', false).catch(e => console.error("Error updating EN timer:", e));
         }, 1000); // 1 second
     }
   },
