@@ -161,9 +161,8 @@ client.on(Events.InteractionCreate, async interaction => {
             if (stats) {
                 stats.autoCollectMissions = !stats.autoCollectMissions;
                 userStats.set(userId, stats);
-                // The current view type is now determined by the button that *was* there, so we swap it
                 const currentViewType = (interaction.message.components[0].components[0].customId.includes('weekly')) ? 'daily' : 'weekly';
-                await postMissionList(missionThread, userId, currentViewType, { userMissions, userStats, client }, interaction); // Refresh view
+                await postMissionList(missionThread, userId, currentViewType, { userMissions, userStats, client }, interaction);
             }
         } else if (subAction === 'collect') {
              const [missionId, missionCategory] = restArgs;

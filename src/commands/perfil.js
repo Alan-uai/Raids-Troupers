@@ -43,7 +43,7 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
         }
         
         // Atribui missões imediatamente
-        assignMissions(targetUser.id, userMissions, initialStats);
+        assignMissions(targetUser.id, userMissions, userStats.get(targetUser.id));
     }
     
     if (!userItems.has(targetUser.id)) {

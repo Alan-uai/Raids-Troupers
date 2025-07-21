@@ -83,17 +83,14 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
 
     let shopData = shopStorage.get(locale) || {};
 
-    // Fetch existing messages if not cached
-    if (updateItems || !shopData.mainMessageId || !shopData.timerMessageId) {
+    if (updateItems) {
         const messages = await shopChannel.messages.fetch({ limit: 10 }).catch(() => []);
         const botMessages = messages.filter(m => m.author.id === client.user.id);
         const mainMessage = botMessages.find(m => m.embeds[0]?.title === t('shop_title'));
         const timerMessage = botMessages.find(m => m.embeds[0]?.description?.includes(t('shop_footer_rotation_raw')));
         shopData.mainMessageId = mainMessage?.id;
         shopData.timerMessageId = timerMessage?.id;
-    }
 
-    if (updateItems) {
         const shopItems = getShopItems(locale);
         const embed = new EmbedBuilder()
           .setColor('#FFA500')
@@ -116,66 +113,37 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
         const selectMenu = new StringSelectMenuBuilder()
             .setCustomId('shop_select_item')
             .setPlaceholder(t('shop_select_placeholder'))
-            .setDisabled(shopItems.length === 0);
-
-        if (shopItems.length > 0) {
-             selectMenu.addOptions(
+            .setDisabled(shopItems.length === 0)
+            .addOptions(
+                shopItems.length > 0 ?
                 shopItems.map(item => ({
                     label: t(`item_${item.id}_name`) || item.name,
                     description: t('shop_select_item_desc', { price: item.price }),
                     value: item.id,
-                }))
+                })) : [{ label: 'empty', value: 'empty' }]
             );
-        } else {
-            selectMenu.addOptions([{ label: 'empty', value: 'empty' }]);
-        }
-        
-        const row = new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder()
-                .setCustomId('shop_select_item')
-                .setPlaceholder(t('shop_select_placeholder'))
-                .setDisabled(shopItems.length === 0)
-                .addOptions(
-                    shopItems.length > 0 ?
-                    shopItems.map(item => ({
-                        label: t(`item_${item.id}_name`) || item.name,
-                        description: t('shop_select_item_desc', { price: item.price }),
-                        value: item.id,
-                    })) : [{ label: 'empty', value: 'empty' }]
-                ),
-            new ButtonBuilder()
-                .setCustomId('shop_buy_button')
-                .setLabel(t('shop_buy_button_label'))
-                .setStyle(ButtonStyle.Success)
-                .setEmoji('🛒')
-                .setDisabled(shopItems.length === 0)
-        );
+
+        const buyButton = new ButtonBuilder()
+            .setCustomId('shop_buy_button')
+            .setLabel(t('shop_buy_button_label'))
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('🛒')
+            .setDisabled(shopItems.length === 0);
             
-        const components = shopItems.length > 0 ? [row] : [];
-        
+        const row = new ActionRowBuilder().addComponents(selectMenu, buyButton);
+            
         let sentMainMessage;
         if (shopData.mainMessageId) {
             sentMainMessage = await shopChannel.messages.fetch(shopData.mainMessageId).catch(() => null);
         }
         
         if (sentMainMessage) {
-            await sentMainMessage.edit({ embeds: [embed], components });
+            await sentMainMessage.edit({ embeds: [embed], components: [row] });
         } else {
-            // Se a mensagem principal não existe, limpa mensagens antigas do bot para começar do zero
             const messagesToDelete = (await shopChannel.messages.fetch({ limit: 50 }).catch(() => [])).filter(m => m.author.id === client.user.id);
             if (messagesToDelete.size > 0) await shopChannel.bulkDelete(messagesToDelete).catch(() => {});
             
-            // Post timer message first
-            const nextUpdateForTimer = getNextUpdate(3);
-            const timeRemainingForTimer = nextUpdateForTimer.getTime() - Date.now();
-            const timerEmbed = new EmbedBuilder()
-              .setColor('#3498DB')
-              .setDescription(t('shop_footer_rotation', { time: formatTime(timeRemainingForTimer) }));
-            const newTimerMessage = await shopChannel.send({ embeds: [timerEmbed] });
-            shopData.timerMessageId = newTimerMessage.id;
-            
-            // Then post main shop message
-            const newMainMessage = await shopChannel.send({ embeds: [embed], components });
+            const newMainMessage = await shopChannel.send({ embeds: [embed], components: [row] });
             shopData.mainMessageId = newMainMessage.id;
         }
     }
@@ -197,7 +165,7 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
             console.error(`Failed to edit timer message for ${locale}, it might have been deleted.`, e.message);
             shopData.timerMessageId = null; // Mark as deleted
         });
-    } else if(!updateItems) { // Only create if not already handled during initial post
+    } else {
         const newTimerMessage = await shopChannel.send({ embeds: [timerEmbed] });
         shopData.timerMessageId = newTimerMessage.id;
     }
@@ -219,9 +187,9 @@ export default {
     
     await interaction.reply({ content: t_pt('shop_updating_message'), ephemeral: true });
     
-    // Initial post/update
-    const ptResult = await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR');
-    const enResult = await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US');
+    // Initial post/update of item listings
+    const ptResult = await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', true);
+    const enResult = await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', true);
     
     let feedback = '';
     if (ptResult.success && enResult.success) {
@@ -243,13 +211,16 @@ export default {
         }, 3 * 60 * 60 * 1000); // 3 hours
     }
     
-     // Set interval to update timers periodically
-    if (!interaction.client.shopTimerInterval) {
-        interaction.client.shopTimerInterval = setInterval(async () => {
-            await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'pt-BR'), SHOP_CHANNEL_ID_PT, 'pt-BR', false).catch(e => console.error("Error updating PT timer:", e));
-            await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'en-US'), SHOP_CHANNEL_ID_EN, 'en-US', false).catch(e => console.error("Error updating EN timer:", e));
-        }, 1000); // 1 second
+     // Clear any existing timer interval to prevent duplicates
+    if (interaction.client.shopTimerInterval) {
+        clearInterval(interaction.client.shopTimerInterval);
     }
+    
+     // Set interval to update timers periodically
+    interaction.client.shopTimerInterval = setInterval(async () => {
+        await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'pt-BR'), SHOP_CHANNEL_ID_PT, 'pt-BR', false).catch(e => console.error("Error updating PT timer:", e));
+        await postOrUpdateShopMessage(interaction.client, await getTranslator(null, null, 'en-US'), SHOP_CHANNEL_ID_EN, 'en-US', false).catch(e => console.error("Error updating EN timer:", e));
+    }, 1000); // 1 second
   },
   postOrUpdateShopMessage,
 };
