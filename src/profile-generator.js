@@ -15,6 +15,20 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     const height = 500; 
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
+
+    // Helper function for rounded rectangles, now safely inside the scope
+    ctx.roundRect = function (x, y, w, h, r) {
+        if (w < 2 * r) r = w / 2;
+        if (h < 2 * r) r = h / 2;
+        this.beginPath();
+        this.moveTo(x + r, y);
+        this.arcTo(x + w, y, x + w, y + h, r);
+        this.arcTo(x + w, y + h, x, y + h, r);
+        this.arcTo(x, y + h, x, y, r);
+        this.arcTo(x, y, x + w, y, r);
+        this.closePath();
+        return this;
+    }
     
     const equippedCosmetics = items?.equippedCosmetics || {};
     const equippedGear = items?.equippedGear || {};
@@ -174,17 +188,4 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     ctx.fillText(rolesText, 50, height - 35, width - 100);
 
     return canvas.toBuffer('image/png');
-}
-
-CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
-  if (w < 2 * r) r = w / 2;
-  if (h < 2 * r) r = h / 2;
-  this.beginPath();
-  this.moveTo(x+r, y);
-  this.arcTo(x+w, y,   x+w, y+h, r);
-  this.arcTo(x+w, y+h, x,   y+h, r);
-  this.arcTo(x,   y+h, x,   y,   r);
-  this.arcTo(x,   y,   x+w, y,   r);
-  this.closePath();
-  return this;
 }
