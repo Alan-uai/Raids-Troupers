@@ -1,3 +1,4 @@
+
 // src/milestone-system.js
 import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getTranslator } from './i18n.js';
@@ -98,19 +99,19 @@ export async function checkMilestoneCompletion(user, data) {
     const milestoneThread = profileChannel.threads.cache.find(th => th.name === t('milestones_thread_title'));
     if (!milestoneThread) return;
 
+    const guild = milestoneThread.guild;
     let allMilestonesCompleted = true;
 
     for (const milestone of milestones) {
-        // Skip secret milestone in normal check unless conditions are met later
         if (milestone.id === 'secret_mastery') continue;
 
         const currentProgress = getStatValue(stats, itemStats, milestone.stat);
-        const lastKnownProgress = stats.completedMilestones[milestone.id]?.progress || 0;
         
         let newlyCompletedTier = null;
         for (const tier of milestone.tiers) {
-            if (currentProgress >= tier.goal && lastKnownProgress < tier.goal) {
-                newlyCompletedTier = tier; // This is the latest tier they just passed
+            const lastKnownProgressForTier = stats.completedMilestones[milestone.id]?.[`tier_${tier.level}_progress`] || 0;
+            if (currentProgress >= tier.goal && lastKnownProgressForTier < tier.goal) {
+                newlyCompletedTier = tier; 
             }
         }
         
@@ -120,13 +121,9 @@ export async function checkMilestoneCompletion(user, data) {
 
         if (newlyCompletedTier) {
             await milestoneThread.send({ content: t('milestone_completed_notification', { username: user.username, milestoneName: `${t(`milestone_${milestone.id}_title`)} Nível ${newlyCompletedTier.level}` }) });
+            stats.completedMilestones[milestone.id] = { ...stats.completedMilestones[milestone.id], [`tier_${newlyCompletedTier.level}_progress`]: currentProgress };
         }
         
-        // Update progress and message
-        stats.completedMilestones[milestone.id] = {
-            ...stats.completedMilestones[milestone.id],
-            progress: currentProgress
-        };
         const messageId = stats.completedMilestones[milestone.id]?.messageId;
         if(messageId){
             const messageToUpdate = await milestoneThread.messages.fetch(messageId).catch(()=>null);
@@ -140,14 +137,52 @@ export async function checkMilestoneCompletion(user, data) {
     
     // Check for secret milestone
     const secretMilestone = milestones.find(m => m.id === 'secret_mastery');
-    if (allMilestonesCompleted && !stats.completedMilestones[secretMilestone.id]?.messageId) {
-        stats.userId = userId; // Ensure userId is present for embed creation
-        const secretMilestoneData = await createMilestoneEmbed(secretMilestone, stats, itemStats, 'general', t);
-        const message = await milestoneThread.send({ embeds: [secretMilestoneData.embed], components: [secretMilestoneData.row] });
-        stats.completedMilestones[secretMilestone.id] = {
-            ...stats.completedMilestones[secretMilestone.id],
-            messageId: message.id
-        };
+    if (allMilestonesCompleted) {
+        if (!stats.completedMilestones[secretMilestone.id]?.messageId) {
+            stats.userId = userId;
+            const secretMilestoneData = await createMilestoneEmbed(secretMilestone, stats, itemStats, 'general', t);
+            const message = await milestoneThread.send({ embeds: [secretMilestoneData.embed], components: [secretMilestoneData.row] });
+            stats.completedMilestones[secretMilestone.id] = { ...stats.completedMilestones[secretMilestone.id], messageId: message.id };
+        }
+        
+        // Check for secret milestone tier completion and role assignment
+        const secretProgress = getStatValue(stats, itemStats, secretMilestone.stat);
+        let newlyCompletedSecretTier = null;
+        for (const tier of secretMilestone.tiers) {
+            const lastKnownProgressForTier = stats.completedMilestones[secretMilestone.id]?.[`tier_${tier.level}_progress`] || 0;
+            if (secretProgress >= tier.goal && lastKnownProgressForTier < tier.goal) {
+                newlyCompletedSecretTier = tier;
+            }
+        }
+        
+        if (newlyCompletedSecretTier) {
+             await milestoneThread.send({ content: t('milestone_completed_notification', { username: user.username, milestoneName: `${t(`milestone_${secretMilestone.id}_title`)} Nível ${newlyCompletedSecretTier.level}` }) });
+             stats.completedMilestones[secretMilestone.id] = { ...stats.completedMilestones[secretMilestone.id], [`tier_${newlyCompletedSecretTier.level}_progress`]: secretProgress };
+
+             // --- Role Logic ---
+             const roleName = `${t(`milestone_${secretMilestone.id}_title`)} ${newlyCompletedSecretTier.level}`;
+             let role = guild.roles.cache.find(r => r.name === roleName);
+             if (!role) {
+                 try {
+                     role = await guild.roles.create({ name: roleName, color: '#FFD700', hoist: true, reason: `Conquista do marco secreto por ${user.tag}`});
+                 } catch (e) {
+                     console.error(`Failed to create secret milestone role: ${roleName}`, e);
+                 }
+             }
+             if (role) {
+                 const member = await guild.members.fetch(userId);
+                 await member.roles.add(role);
+
+                 // Remove previous tier role if it exists
+                 if (newlyCompletedSecretTier.level > 1) {
+                     const prevRoleName = `${t(`milestone_${secretMilestone.id}_title`)} ${newlyCompletedSecretTier.level - 1}`;
+                     const prevRole = guild.roles.cache.find(r => r.name === prevRoleName);
+                     if (prevRole) {
+                         await member.roles.remove(prevRole);
+                     }
+                 }
+             }
+        }
     }
 
     userStats.set(userId, stats);
