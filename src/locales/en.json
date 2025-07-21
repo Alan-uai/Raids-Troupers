@@ -1,5 +1,6 @@
 
 {
+    "not_for_you": "This interaction is not for you!",
     "command_error": "Error executing this command!",
     "unknown_user": "Unknown User",
     "leader": "Leader",
@@ -109,6 +110,7 @@
     "milestone_clan_leader_description": "Create and lead your own clan.",
     "milestone_auctions_won_title": "Auction Tycoon",
     "milestone_auctions_won_description": "Win auctions for rare items.",
+    "milestone_completed_notification": "🎉 Milestone Completed! Congratulations, {username}, for achieving **{milestoneName}**!",
 
     "clan_command_not_in_clan": "❌ You are not in a clan to use this command.",
     "clan_command_not_leader": "❌ Only the clan leader can use this command.",
@@ -203,6 +205,7 @@
     "equip_border_success": "✅ You have equipped the **{itemName}** border! Your profile has been updated.",
     "equip_cannot_equip_type": "❌ This type of item cannot be equipped directly.",
     "equip_item_button": "Equip Item",
+    "choose_class_button": "Choose Class",
     "equip_no_equippable_items": "❌ You don't have any equippable items in your inventory.",
     "equip_select_placeholder": "Select an item to equip",
     "equip_select_prompt": "Choose an item from your inventory to equip:",
@@ -244,8 +247,7 @@
     "mission_completed_notification": "🏅 Mission Completed! You finished \"{description}\" and earned {xp} XP and {coins} TC!",
     "mission_reward_item_notification": "🏅 Mission Completed! You finished \"{description}\" and received the item: **{itemName}**!",
     "level_up_from_mission": "🎉 Congratulations! You've leveled up to level {level} by completing a mission!",
-    "daily_missions_thread_title": "Daily Missions",
-    "weekly_mission_thread_title": "Weekly Mission",
+    "missions_thread_title": "Missions",
     "missions_thread_reason": "Private thread for {username}'s missions.",
     "missions_autocollect_button": "Toggle Auto-Collect",
     "missions_autocollect_description": "Enable automatic reward collection for completed daily missions.",
@@ -253,12 +255,18 @@
     "missions_autocollect_status_on": "ON",
     "missions_autocollect_status_off": "OFF",
     "missions_collect_button": "Collect",
+    "missions_collect_all_button": "Collect All",
     "missions_collected_button": "Collected",
     "missions_collect_error_not_found": "❌ Could not find this mission.",
     "missions_collect_error_not_complete": "❌ This mission is not yet complete.",
     "missions_collect_error_already_collected": "❌ You have already collected the reward for this mission.",
     "missions_collect_success": "✅ Reward collected! You received {xp} XP and {coins} TC.",
     "missions_collect_success_item": "✅ Reward collected! You received the item: **{itemName}**!",
+    "missions_collect_all_success": "✅ All available rewards collected! Total gains: {xp} XP, {coins} TC.",
+    "missions_collect_all_none": "You have no rewards to collect at the moment.",
+    "missions_view_daily_button": "Daily",
+    "missions_view_weekly_button": "Weekly",
+    "missions_no_missions_of_type": "There are no {type} missions active at the moment.",
 
     "milestones_thread_title": "Milestones",
     "milestones_thread_reason": "Private thread for {username}'s milestones.",
@@ -350,6 +358,8 @@
     "profile_creation_error_category": "Error: The profile category channel was not found. Please contact an administrator.",
     "profile_creation_success": "✅ Your profile and private channel have been successfully created! You can see it here: <#{channelId}>",
     "profile_creation_error_generic": "An unexpected error occurred while creating your profile.",
+    "profile_actions_title": "Profile Actions",
+    "profile_actions_description": "Use the buttons below to interact with your profile.",
 
     "update_announcement_title": "📢 Bot Update Announcement!",
     "update_announcement_intro": "Hello, @everyone! The bot has received a major update with many new features and improvements. Here's what's new:",
@@ -377,7 +387,20 @@
     "poll_author": "Poll created by {username}",
     "poll_ended_or_invalid": "This poll is no longer valid or has ended.",
     "poll_already_voted_same": "You have already voted for this option.",
-    "poll_vote_success": "✅ Your vote has been successfully recorded!"
+    "poll_vote_success": "✅ Your vote has been successfully recorded!",
+
+    "suggestion_from": "Suggestion from {username}",
+    "suggestion_title": "New Suggestion",
+    "suggestion_approve_button": "Approve",
+    "suggestion_reject_button": "Reject",
+    "suggestion_success": "✅ Your suggestion has been sent to the <#{channelId}> channel!",
+    "suggestion_error": "❌ An error occurred while trying to send your suggestion.",
+    "suggestion_already_voted": "You have already voted on this suggestion.",
+    "suggestion_deleted_low_votes": "The suggestion was automatically deleted due to receiving 5 rejection votes without any approval.",
+    "suggestion_vote_success": "✅ Thank you for your vote! You earned 20 XP and 10 TC.",
+    "search_suggestions_not_found": "No suggestions found with this tag.",
+    "search_suggestions_title": "Top Suggestions for Tag: {tag}",
+    "search_suggestions_error": "An error occurred while searching for suggestions."
 }
 
     

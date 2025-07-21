@@ -48,7 +48,7 @@ export default {
                 .setAuthor({ name: t('clan_summon_embed_author', { username: interaction.user.username }), iconURL: interaction.user.displayAvatarURL() })
                 .setTimestamp();
             
-            await clanChannel.send({ content: '@everyone', embeds: [embed] });
+            await clanChannel.send({ content: `<@&${clan.roleId}>`, embeds: [embed] });
             
             await interaction.reply({ content: t('clan_summon_success', { channelId: clan.channelId }), ephemeral: true });
 

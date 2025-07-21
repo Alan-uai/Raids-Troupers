@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { generateProfileImage } from './profile-generator.js';
 import { allItems } from './items.js';
 import { missions as missionPool } from './missions.js';
-import { assignMissions, checkMissionCompletion, collectReward } from './mission-system.js';
+import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList } from './mission-system.js';
 import { getTranslator } from './i18n.js';
 import lojaSetup from './commands/loja_setup.js';
 import clanEnquete from './commands/clan_enquete.js';
@@ -55,39 +55,40 @@ const userMissions = new Map();
 const clans = new Map();
 const pendingInvites = new Map();
 const userShopSelection = new Map();
+const suggestionVotes = new Map();
 const pollVotes = clanEnquete.pollVotes;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const commandsPath = path.join(__dirname, 'commands');
-const allFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-const commandFiles = allFiles.filter(file => !file.endsWith('.data.js'));
-const dataFiles = new Set(allFiles.filter(file => file.endsWith('.data.js')).map(file => file.replace('.data.js', '')));
+function getAllCommandFiles(dir) {
+    let files = [];
+    const items = fs.readdirSync(dir, { withFileTypes: true });
+    for (const item of items) {
+        if (item.isDirectory()) {
+            files = [...files, ...getAllCommandFiles(path.join(dir, item.name))];
+        } else if (item.name.endsWith('.js') && !item.name.endsWith('.data.js')) {
+            files.push(path.join(dir, item.name));
+        }
+    }
+    return files;
+}
+
+const commandFiles = getAllCommandFiles(commandsPath);
 
 for (const file of commandFiles) {
-    const filePath = path.join(commandsPath, file);
-    const commandName = file.replace('.js', '');
-
     try {
-        const commandModule = await import(filePath);
-        let commandData;
+        const commandModule = await import(path.resolve(file).replace(/\\/g, '/'));
+        const command = commandModule.default;
 
-        if (dataFiles.has(commandName)) {
-            const dataFilePath = path.join(commandsPath, `${commandName}.data.js`);
-            const dataModule = await import(dataFilePath);
-            commandData = dataModule.data;
+        if (command && 'data' in command && 'execute' in command) {
+            client.commands.set(command.data.name, command);
         } else {
-            commandData = commandModule.default.data;
-        }
-
-        if (commandData) {
-            client.commands.set(commandData.name, commandModule.default);
-        } else {
-             console.log(`[WARNING] The command at ${filePath} is missing a "data" property.`);
+            console.log(`[WARNING] The command at ${file} is missing a required "data" or "execute" property.`);
         }
     } catch (error) {
-        console.error(`Error loading command at ${filePath}:`, error);
+        console.error(`Error loading command at ${file}:`, error);
     }
 }
 
@@ -142,22 +143,31 @@ client.on(Events.InteractionCreate, async interaction => {
         await handleBuyButton(interaction, t);
     } else if (action === 'mission') {
         const [subAction, userId, ...rest] = args;
-        if (subAction === 'collect') {
-             if (args[1] === 'weekly') {
-                await handleWeeklyMissionCollect(interaction, userId);
-            }
-        } else if (subAction === 'autocollect') {
-            await handleAutoCollectToggle(interaction, userId);
+        if (subAction === 'view') {
+            const type = rest[0]; // 'daily' or 'weekly'
+            await postMissionList(interaction.message.thread, userId, type, { userMissions, userStats }, interaction);
+        } else if (subAction === 'collectall') {
+            await collectAllRewards(interaction, userId, { userStats, userItems, userMissions, client, userProfiles, clans });
         }
-    } else if (action === 'equip' && args[0] === 'item') {
-        const [_, userId] = args;
-        await handleEquipButton(interaction, userId, t);
+    } else if (action === 'profile') {
+        const [subAction, userId] = args;
+         if (interaction.user.id !== userId) {
+            return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
+        }
+        if(subAction === 'equip') {
+            await handleEquipButton(interaction, userId, t);
+        } else if (subAction === 'class') {
+             await interaction.client.commands.get('classes').execute(interaction, { userStats });
+        }
     } else if (action === 'poll') {
         const [subAction, pollId, optionIndex] = args;
         if (subAction === 'vote') {
             await handlePollVote(interaction, pollId, parseInt(optionIndex, 10), t);
         }
+    } else if (action === 'suggestion') {
+        await handleSuggestionVote(interaction, action, args, t);
     }
+
 
   } else if (interaction.isStringSelectMenu()) {
       const [action, ...args] = interaction.customId.split('_');
@@ -173,7 +183,7 @@ client.on(Events.InteractionCreate, async interaction => {
       } else if (action === 'equip' && args[0] === 'select') {
           const [_, userId] = args;
           if (interaction.user.id !== userId) {
-            return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
+            return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
           }
           const itemId = interaction.values[0];
           await handleEquipSelection(interaction, userId, itemId, t);
@@ -657,52 +667,9 @@ async function handleBuyButton(interaction, t) {
     await interaction.editReply({ content: t('buy_interaction_success', { itemName: t(`item_${itemToBuy.id}_name`), balance: stats.coins }) });
 }
 
-async function handleWeeklyMissionCollect(interaction, userId) {
-    if (interaction.user.id !== userId) {
-        return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
-    }
-    await interaction.deferUpdate();
-
-    const t = await getTranslator(userId, userStats);
-    const missions = userMissions.get(userId);
-    const weeklyMission = missions?.weekly;
-    if (!weeklyMission) return;
-
-    const missionDetails = missionPool.find(m => m.id === weeklyMission.id);
-
-    if (!missionDetails) {
-        return await interaction.followUp({ content: t('missions_collect_error_not_found'), ephemeral: true });
-    }
-    if (weeklyMission.progress < missionDetails.goal) {
-        return await interaction.followUp({ content: t('missions_collect_error_not_complete'), ephemeral: true });
-    }
-    if (weeklyMission.collected) {
-        return await interaction.followUp({ content: t('missions_collect_error_already_collected'), ephemeral: true });
-    }
-    
-    const data = { userStats, userMissions, userItems, client, userProfiles, clans };
-    await collectReward(interaction.user, weeklyMission, data, interaction, 'weekly');
-}
-
-async function handleAutoCollectToggle(interaction, userId) {
-    if (interaction.user.id !== userId) {
-        return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
-    }
-    const t = await getTranslator(userId, userStats);
-    const stats = userStats.get(userId);
-
-    if (stats) {
-        stats.autoCollectMissions = !stats.autoCollectMissions;
-        userStats.set(userId, stats);
-
-        const status = stats.autoCollectMissions ? t('missions_autocollect_status_on') : t('missions_autocollect_status_off');
-        await interaction.reply({ content: t('missions_autocollect_toggled', { status }), ephemeral: true });
-    }
-}
-
 async function handleEquipButton(interaction, userId, t) {
     if (interaction.user.id !== userId) {
-        return await interaction.reply({ content: 'This is not for you!', ephemeral: true });
+        return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
     }
 
     const userItemsData = userItems.get(userId);
@@ -801,14 +768,12 @@ async function handlePollVote(interaction, pollId, optionIndex, t) {
         if (previousVoteIndex === optionIndex) {
             return interaction.reply({ content: t('poll_already_voted_same'), ephemeral: true });
         }
-        // Remove o voto antigo antes de adicionar o novo
         pollData.counts[previousVoteIndex]--;
     }
 
     pollData.voters.set(userId, optionIndex);
     pollData.counts[optionIndex]++;
 
-    // Atualiza a mensagem da enquete com a nova contagem
     const pollMessage = await interaction.channel.messages.fetch(pollId);
     if (!pollMessage) return;
 
@@ -834,6 +799,60 @@ async function handlePollVote(interaction, pollId, optionIndex, t) {
     await pollMessage.edit({ embeds: [newEmbed], components: newRows });
     await interaction.reply({ content: t('poll_vote_success'), ephemeral: true });
 }
+
+async function handleSuggestionVote(interaction, action, args, t) {
+    const messageId = interaction.message.id;
+    const userId = interaction.user.id;
+    const voteType = args[0]; // approve or reject
+
+    const userLastVote = suggestionVotes.get(userId);
+    if (userLastVote && userLastVote[messageId]) {
+        return interaction.reply({ content: t('suggestion_already_voted'), ephemeral: true });
+    }
+
+    await interaction.deferUpdate();
+
+    const embed = EmbedBuilder.from(interaction.message.embeds[0]);
+    const votesField = embed.data.fields.find(f => f.name === 'Votos');
+    
+    const approveMatch = votesField.value.match(/Aprovar: (\d+)/);
+    const rejectMatch = votesField.value.match(/Reprovar: (\d+)/);
+
+    let approves = approveMatch ? parseInt(approveMatch[1], 10) : 0;
+    let rejects = rejectMatch ? parseInt(rejectMatch[1], 10) : 0;
+
+    if (voteType === 'approve') {
+        approves++;
+    } else if (voteType === 'reject') {
+        rejects++;
+    }
+
+    if (rejects >= 5 && approves === 0) {
+        await interaction.message.delete();
+        await interaction.followUp({ content: t('suggestion_deleted_low_votes'), ephemeral: true });
+        return;
+    }
+
+    embed.setFields(
+        ...embed.data.fields.filter(f => f.name !== 'Votos'),
+        { name: 'Votos', value: `Aprovar: ${approves}\nReprovar: ${rejects}`, inline: true }
+    );
+    
+    await interaction.message.edit({ embeds: [embed] });
+
+    if (!suggestionVotes.has(userId)) {
+        suggestionVotes.set(userId, {});
+    }
+    suggestionVotes.get(userId)[messageId] = true;
+
+    const stats = userStats.get(userId) || { level: 1, xp: 0, coins: 0 };
+    stats.xp += 20;
+    stats.coins += 10;
+    userStats.set(userId, stats);
+
+    await interaction.followUp({ content: t('suggestion_vote_success'), ephemeral: true });
+}
+
 
 client.on(Events.MessageCreate, async message => {
   if (message.author.bot || !message.mentions.has(client.user.id)) return;
@@ -910,8 +929,9 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
                 type: ChannelType.GuildText,
                 parent: category,
                 permissionOverwrites: [
-                    { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                    { id: newMember.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory], deny: [PermissionsBitField.Flags.SendMessages] },
+                     { id: interaction.guild.id, deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.CreatePublicThreads, PermissionsBitField.Flags.CreatePrivateThreads, PermissionsBitField.Flags.SendMessagesInThreads] },
+                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory] },
+                    { id: interaction.client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ManageThreads] }
                 ],
             });
 
@@ -947,5 +967,3 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
-
-    

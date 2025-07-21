@@ -1,5 +1,6 @@
 
 {
+    "not_for_you": "Esta interação não é para você!",
     "command_error": "Erro ao executar o comando!",
     "unknown_user": "Usuário Desconhecido",
     "leader": "Líder",
@@ -109,6 +110,7 @@
     "milestone_clan_leader_description": "Crie e lidere seu próprio clã.",
     "milestone_auctions_won_title": "Magnata dos Leilões",
     "milestone_auctions_won_description": "Vença leilões de itens raros.",
+    "milestone_completed_notification": "🎉 Marco Concluído! Parabéns, {username}, por alcançar **{milestoneName}**!",
     
     "clan_command_not_in_clan": "❌ Você não está em um clã para usar este comando.",
     "clan_command_not_leader": "❌ Apenas o líder do clã pode usar este comando.",
@@ -203,6 +205,7 @@
     "equip_border_success": "✅ Você equipou a borda **{itemName}**! Seu perfil foi atualizado.",
     "equip_cannot_equip_type": "❌ Este tipo de item não pode ser equipado diretamente.",
     "equip_item_button": "Equipar Item",
+    "choose_class_button": "Escolher Classe",
     "equip_no_equippable_items": "❌ Você não possui itens equipáveis no seu inventário.",
     "equip_select_placeholder": "Selecione um item para equipar",
     "equip_select_prompt": "Escolha um item do seu inventário para equipar:",
@@ -244,8 +247,7 @@
     "mission_completed_notification": "🏅 Missão Concluída! Você completou \"{description}\" e ganhou {xp} XP e {coins} TC!",
     "mission_reward_item_notification": "🏅 Missão Concluída! Você completou \"{description}\" e recebeu o item: **{itemName}**!",
     "level_up_from_mission": "🎉 Parabéns! Você subiu para o nível {level} ao completar uma missão!",
-    "daily_missions_thread_title": "Missões Diárias",
-    "weekly_mission_thread_title": "Missão Semanal",
+    "missions_thread_title": "Missões",
     "missions_thread_reason": "Tópico privado para as missões de {username}.",
     "missions_autocollect_button": "Alternar Coleta Automática",
     "missions_autocollect_description": "Ative para coletar as recompensas de missões diárias concluídas automaticamente.",
@@ -253,12 +255,18 @@
     "missions_autocollect_status_on": "LIGADO",
     "missions_autocollect_status_off": "DESLIGADO",
     "missions_collect_button": "Coletar",
+    "missions_collect_all_button": "Coletar Tudo",
     "missions_collected_button": "Coletado",
     "missions_collect_error_not_found": "❌ Não foi possível encontrar esta missão.",
     "missions_collect_error_not_complete": "❌ Esta missão ainda não está completa.",
     "missions_collect_error_already_collected": "❌ Você já coletou a recompensa desta missão.",
     "missions_collect_success": "✅ Recompensa coletada! Você recebeu {xp} XP e {coins} TC.",
     "missions_collect_success_item": "✅ Recompensa coletada! Você recebeu o item: **{itemName}**!",
+    "missions_collect_all_success": "✅ Todas as recompensas disponíveis foram coletadas! Ganhos totais: {xp} XP, {coins} TC.",
+    "missions_collect_all_none": "Você não tem recompensas para coletar no momento.",
+    "missions_view_daily_button": "Diárias",
+    "missions_view_weekly_button": "Semanais",
+    "missions_no_missions_of_type": "Não há missões {type} ativas no momento.",
 
     "milestones_thread_title": "Marcos",
     "milestones_thread_reason": "Tópico privado para os marcos de {username}.",
@@ -350,6 +358,8 @@
     "profile_creation_error_category": "Erro: A categoria de perfis não foi encontrada. Por favor, contate um administrador.",
     "profile_creation_success": "✅ Seu perfil e canal privado foram criados com sucesso! Você pode vê-lo aqui: <#{channelId}>",
     "profile_creation_error_generic": "Ocorreu um erro inesperado ao criar seu perfil.",
+    "profile_actions_title": "Ações de Perfil",
+    "profile_actions_description": "Use os botões abaixo para interagir com seu perfil.",
 
     "update_announcement_title": "📢 Anúncio de Atualização do Bot!",
     "update_announcement_intro": "Olá, @everyone! O bot recebeu uma grande atualização com muitas novidades e melhorias. Confiram o que mudou:",
@@ -377,6 +387,19 @@
     "poll_author": "Enquete criada por {username}",
     "poll_ended_or_invalid": "Esta enquete não é mais válida ou já terminou.",
     "poll_already_voted_same": "Você já votou nesta opção.",
-    "poll_vote_success": "✅ Seu voto foi registrado com sucesso!"
+    "poll_vote_success": "✅ Seu voto foi registrado com sucesso!",
+
+    "suggestion_from": "Sugestão de {username}",
+    "suggestion_title": "Nova Sugestão",
+    "suggestion_approve_button": "Aprovar",
+    "suggestion_reject_button": "Reprovar",
+    "suggestion_success": "✅ Sua sugestão foi enviada para o canal <#{channelId}>!",
+    "suggestion_error": "❌ Ocorreu um erro ao tentar enviar sua sugestão.",
+    "suggestion_already_voted": "Você já votou nesta sugestão.",
+    "suggestion_deleted_low_votes": "A sugestão foi apagada automaticamente por receber 5 votos de reprovação sem nenhuma aprovação.",
+    "suggestion_vote_success": "✅ Obrigado pelo seu voto! Você ganhou 20 XP e 10 TC.",
+    "search_suggestions_not_found": "Nenhuma sugestão encontrada com esta tag.",
+    "search_suggestions_title": "Top Sugestões para a Tag: {tag}",
+    "search_suggestions_error": "Ocorreu um erro ao buscar as sugestões."
 }
     

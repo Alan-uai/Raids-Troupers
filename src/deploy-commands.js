@@ -1,8 +1,5 @@
 // src/deploy-commands.js
 
-// Este script é usado para registrar/atualizar os slash commands
-// do seu bot no Discord. Execute `npm run deploy` para usá-lo.
-
 import { REST, Routes } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
@@ -12,23 +9,33 @@ import { fileURLToPath } from 'node:url';
 dotenv.config();
 
 const commands = [];
-const processedCommandNames = new Set(); // To track processed commands and avoid duplicates
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const commandsPath = path.join(__dirname, 'commands');
 
-// Get all .js files, including .data.js files initially
-const allJsFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+// Função para ler todos os arquivos .js de um diretório recursivamente
+function getAllCommandFiles(dir) {
+    let files = [];
+    const items = fs.readdirSync(dir, { withFileTypes: true });
+    for (const item of items) {
+        if (item.isDirectory()) {
+            files = [...files, ...getAllCommandFiles(path.join(dir, item.name))];
+        } else if (item.name.endsWith('.js')) {
+            files.push(path.join(dir, item.name));
+        }
+    }
+    return files;
+}
 
-for (const file of allJsFiles) {
-    const filePath = path.join(commandsPath, file);
-    const commandName = file.replace('.js', ''); // e.g., 'equipar' or 'equipar.data'
-    const baseCommandName = commandName.replace('.data', ''); // e.g., 'equipar'
+const commandFiles = getAllCommandFiles(commandsPath);
+const processedCommandNames = new Set(); // Para rastrear comandos e evitar duplicatas
+
+for (const file of commandFiles) {
+    // Extrai o nome base do comando (ex: 'equipar' de 'equipar.js' ou 'equipar.data.js')
+    const baseCommandName = path.basename(file, '.js').replace('.data', '');
 
     if (processedCommandNames.has(baseCommandName)) {
-        // This command (or its data file) has already been processed
-        continue;
+        continue; // Já processou este comando (ou seu arquivo .data)
     }
 
     const dataFilePath = path.join(commandsPath, `${baseCommandName}.data.js`);
@@ -36,25 +43,27 @@ for (const file of allJsFiles) {
 
     try {
         if (fs.existsSync(dataFilePath)) {
-            // Prioritize loading from the .data.js file if it exists
-            const dataModule = await import(dataFilePath);
-            commandData = dataModule.data;
+            // Prioriza o .data.js se ele existir
+            const { data } = await import(path.resolve(dataFilePath).replace(/\\/g, '/'));
+            commandData = data;
         } else if (!file.endsWith('.data.js')) {
-            // If no .data.js exists, and it's a regular .js file, load from it
-            const commandModule = await import(filePath);
+            // Se não, carrega do arquivo de comando principal
+            const commandModule = await import(path.resolve(file).replace(/\\/g, '/'));
             commandData = commandModule.data || (commandModule.default && commandModule.default.data);
         }
-        
+
         if (commandData) {
             commands.push(commandData.toJSON());
-            processedCommandNames.add(baseCommandName); // Mark this command as processed
-        } else if (!file.endsWith('.data.js')) { // Only warn for main command files without data
-            console.log(`[AVISO] O arquivo de comando em ${filePath} está faltando a propriedade "data" ou está malformado.`);
+            processedCommandNames.add(baseCommandName);
+            console.log(`[SUCESSO] Comando "${baseCommandName}" carregado de ${file}`);
+        } else if (!file.endsWith('.data.js')) {
+            console.log(`[AVISO] O arquivo de comando em ${file} está faltando a propriedade "data".`);
         }
     } catch (error) {
-        console.error(`[ERRO] Falha ao carregar os dados do comando de ${filePath}:`, error);
+        console.error(`[ERRO] Falha ao carregar o comando de ${file}:`, error);
     }
 }
+
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 

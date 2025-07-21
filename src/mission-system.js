@@ -3,7 +3,7 @@ import { generateProfileImage } from './profile-generator.js';
 import { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getTranslator } from './i18n.js';
 import { allItems } from './items.js';
-import { milestones, checkMilestoneCompletion } from './milestones.js';
+import { checkMilestoneCompletion } from './milestones.js';
 
 function getDifficultyMultiplier(statValue) {
     if (statValue < 10) return 1;
@@ -30,12 +30,15 @@ function generateIntelligentMission(missionTemplate, stats) {
     statValue = statMap[newMission.type] || 0;
 
     const multiplier = getDifficultyMultiplier(statValue);
-    newMission.goal = Math.max(1, Math.ceil(newMission.goal * multiplier));
-
-    if (stats.level > 10 && Math.random() < 0.2) { // 20% de chance para missões com itens raros
-        const rareItemPool = allItems.filter(i => i.source === 'mission' && ['RARO', 'MAIS_QUE_RARO', 'ULTRA_RARO', 'MENOS_QUE_LENDARIO'].includes(i.rarity));
-        if(rareItemPool.length > 0) {
-            newMission.reward = { item: rareItemPool[Math.floor(Math.random() * rareItemPool.length)].id };
+    
+    if(newMission.goal) newMission.goal = Math.max(1, Math.ceil(newMission.goal * multiplier));
+    if(newMission.reward.xp) newMission.reward.xp = Math.ceil(newMission.reward.xp * multiplier);
+    if(newMission.reward.coins) newMission.reward.coins = Math.ceil(newMission.reward.coins * multiplier);
+    
+    if (newMission.category === 'weekly') {
+        const itemRewardPool = allItems.filter(i => i.source === 'mission' && ['INCOMUM', 'RARO', 'MAIS_QUE_RARO'].includes(i.rarity));
+        if(itemRewardPool.length > 0) {
+            newMission.reward.item = itemRewardPool[Math.floor(Math.random() * itemRewardPool.length)].id;
         }
     }
     
@@ -44,7 +47,7 @@ function generateIntelligentMission(missionTemplate, stats) {
 
 
 export function assignMissions(userId, userMissions, stats) {
-    if (userMissions.has(userId)) return;
+    if (userMissions.has(userId) && userMissions.get(userId)?.daily?.length > 0) return;
 
     const dailyMissions = missionPool.filter(m => m.category === 'daily');
     const weeklyMissions = missionPool.filter(m => m.category === 'weekly');
@@ -62,7 +65,8 @@ export function assignMissions(userId, userMissions, stats) {
             progress: 0,
             completed: false,
             collected: false,
-            messageId: null
+            goal: intelligentMission.goal,
+            reward: intelligentMission.reward
         });
     }
 
@@ -74,7 +78,6 @@ export function assignMissions(userId, userMissions, stats) {
             progress: 0,
             completed: false,
             collected: false,
-            messageId: null,
             goal: intelligentWeekly.goal,
             reward: intelligentWeekly.reward
         };
@@ -84,37 +87,30 @@ export function assignMissions(userId, userMissions, stats) {
     console.log(`Assigned initial intelligent missions to ${userId}`);
 }
 
-export async function collectReward(user, missionProgress, data, interaction, type) {
-    const { userStats, userItems, client, clans } = data;
+async function collectReward(user, missionProgress, data) {
+    const { userStats, userItems } = data;
     const userId = user.id;
     const t = await getTranslator(userId, userStats);
 
     const missionDetails = missionPool.find(m => m.id === missionProgress.id);
-    if (missionProgress.collected) return;
+    const reward = missionProgress.reward || missionDetails.reward;
+    let rewardMessage = '';
 
-    missionProgress.collected = true;
     const stats = userStats.get(userId);
-    const reward = missionDetails.reward;
-    let replyMessage = '';
-
     if (reward.item) {
         const items = userItems.get(userId) || { inventory: [], equippedBackground: 'default', equippedTitle: 'default', equippedBorder: null };
         items.inventory.push(reward.item);
         userItems.set(userId, items);
         const itemDetails = allItems.find(i => i.id === reward.item);
         const itemName = t(`item_${itemDetails.id}_name`);
-        replyMessage = t('missions_collect_success_item', { itemName });
+        rewardMessage = t('missions_collect_success_item', { itemName });
+
         if (itemDetails.rarity === 'Kardec') {
-            const guild = interaction.guild;
+            const guild = data.client.guilds.cache.first();
             let role = guild.roles.cache.find(r => r.name === 'Kardec');
             if (!role) {
                 try {
-                    role = await guild.roles.create({
-                        name: 'Kardec',
-                        color: '#FF0000',
-                        hoist: true,
-                        reason: 'Role for owners of Kardec-rarity items.'
-                    });
+                    role = await guild.roles.create({ name: 'Kardec', color: '#FF0000', hoist: true, reason: 'Kardec rarity item owner.' });
                 } catch(e) { console.error("Failed to create Kardec role:", e); }
             }
             if (role) {
@@ -122,45 +118,63 @@ export async function collectReward(user, missionProgress, data, interaction, ty
                 await member.roles.add(role).catch(e => console.error(`Failed to add Kardec role to ${userId}:`, e));
             }
         }
-
     } else {
-        stats.xp += reward.xp;
-        stats.coins += reward.coins;
-        replyMessage = t('missions_collect_success', { xp: reward.xp, coins: reward.coins });
+        stats.xp += reward.xp || 0;
+        stats.coins += reward.coins || 0;
+        rewardMessage = t('missions_collect_success', { xp: reward.xp || 0, coins: reward.coins || 0 });
     }
-    
+
+    missionProgress.collected = true;
+
     let leveledUp = false;
     if (stats.xp) {
-        const xpToLevelUp = 100 * stats.level;
+        let xpToLevelUp = 100 * stats.level;
         while (stats.xp >= xpToLevelUp) {
             stats.level += 1;
             stats.xp -= xpToLevelUp;
+            xpToLevelUp = 100 * stats.level;
             leveledUp = true;
         }
     }
-
     userStats.set(userId, stats);
-
-    try {
-        const dmMessage = leveledUp 
-            ? `${replyMessage}\n${t('level_up_from_mission', { level: stats.level })}`
-            : replyMessage;
-        await user.send(dmMessage);
-    } catch (e) {
-        console.log(`Could not DM user ${user.id} about mission completion/level up.`);
-    }
-
-    if (type === 'weekly') {
-        const button = ButtonBuilder.from(interaction.message.components[0].components[0])
-            .setDisabled(true)
-            .setLabel(t('missions_collected_button'))
-            .setStyle(ButtonStyle.Secondary);
-        const row = new ActionRowBuilder().addComponents(button);
-        await interaction.message.edit({ components: [row] });
+    
+    if (leveledUp) {
+       rewardMessage += `\n${t('level_up_from_mission', { level: stats.level })}`;
     }
     
-    // Also update the profile image to reflect new stats
-    await updateProfileImage(user, data);
+    return { xp: reward.xp || 0, coins: reward.coins || 0, message: rewardMessage };
+}
+
+export async function collectAllRewards(interaction, userId, data) {
+    if (interaction.user.id !== userId) {
+        return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
+    }
+    await interaction.deferReply({ ephemeral: true });
+    
+    const { userMissions } = data;
+    const t = await getTranslator(userId, data.userStats);
+    const activeMissions = userMissions.get(userId);
+    if (!activeMissions) return;
+
+    const missionsToCollect = [...activeMissions.daily, activeMissions.weekly].filter(m => m && m.completed && !m.collected);
+    
+    if (missionsToCollect.length === 0) {
+        return await interaction.editReply({ content: t('missions_collect_all_none') });
+    }
+
+    let totalXp = 0;
+    let totalCoins = 0;
+
+    for (const missionProgress of missionsToCollect) {
+        const result = await collectReward(interaction.user, missionProgress, data);
+        totalXp += result.xp;
+        totalCoins += result.coins;
+    }
+    
+    await updateProfileImage(interaction.user, data);
+    await postMissionList(interaction.message.thread, userId, 'daily', data); // Refresh the view
+    
+    await interaction.editReply({ content: t('missions_collect_all_success', { xp: totalXp, coins: totalCoins }) });
 }
 
 
@@ -185,19 +199,14 @@ export async function checkMissionCompletion(user, missionType, data, amount = 1
 
         if (missionDetails && missionDetails.type === missionType) {
             missionProgress.progress += amount;
-            profileNeedsUpdate = true; // Progress changed
-
-            if (missionProgress.progress >= missionDetails.goal) {
+            
+            if (missionProgress.progress >= missionProgress.goal) {
                 missionProgress.completed = true;
-
+                profileNeedsUpdate = true;
                 const stats = userStats.get(userId);
                 if (stats?.autoCollectMissions && missionDetails.category === 'daily') {
-                    await collectReward(user, missionProgress, data, null, 'daily');
+                    await collectReward(user, missionProgress, data);
                 }
-                
-                await updateMissionMessage(user, missionProgress, data);
-            } else {
-                await updateMissionMessage(user, missionProgress, data);
             }
         }
     }
@@ -210,56 +219,64 @@ export async function checkMissionCompletion(user, missionType, data, amount = 1
     userMissions.set(userId, activeMissions);
 }
 
-async function updateMissionMessage(user, missionProgress, data) {
-    const { userStats, client } = data;
-    const t = await getTranslator(user.id, userStats);
-    const missionDetails = missionPool.find(m => m.id === missionProgress.id);
-    if (!missionDetails) return;
 
-    try {
-        const profileInfo = data.userProfiles.get(user.id);
-        if (!profileInfo || !missionProgress.messageId) return;
-        
-        const profileChannel = await client.channels.fetch(profileInfo.channelId);
-        
-        const threadName = missionDetails.category === 'daily' 
-            ? t('daily_missions_thread_title')
-            : t('weekly_mission_thread_title');
+export async function postMissionList(thread, userId, type, data, interaction = null) {
+    const { userMissions, userStats } = data;
+    const t = await getTranslator(userId, userStats);
+    
+    if (interaction) await interaction.deferUpdate();
+    
+    const messages = await thread.messages.fetch({ limit: 50 });
+    await Promise.all(messages.map(msg => msg.delete().catch(()=>{})));
 
-        const missionThread = profileChannel.threads.cache.find(th => th.name === threadName);
-        if (!missionThread) return;
+    const activeMissions = userMissions.get(userId);
+    const missionsToShow = (type === 'daily' ? activeMissions.daily : [activeMissions.weekly]).filter(Boolean);
+    
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder().setCustomId(`mission_view_${userId}_daily`).setLabel(t('missions_view_daily_button')).setStyle(type === 'daily' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`mission_view_${userId}_weekly`).setLabel(t('missions_view_weekly_button')).setStyle(type === 'weekly' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`mission_collectall_${userId}`).setLabel(t('missions_collect_all_button')).setStyle(ButtonStyle.Success).setEmoji('🎉')
+        );
 
-        const missionMessage = await missionThread.messages.fetch(missionProgress.messageId).catch(() => null);
-        if (!missionMessage) return;
+    await thread.send({ components: [row] });
+    
+    if (missionsToShow.length === 0) {
+        await thread.send({ content: t('missions_no_missions_of_type', { type }) });
+        return;
+    }
+
+    for (const missionProgress of missionsToShow) {
+        const missionDetails = missionPool.find(m => m.id === missionProgress.id);
+        const reward = missionProgress.reward || missionDetails.reward;
 
         let rewardText;
-        if(missionDetails.reward.item) {
-            rewardText = `Item: ${t(`item_${missionDetails.reward.item}_name`)}`;
+        if(reward.item) {
+            const itemDetails = allItems.find(i => i.id === reward.item);
+            rewardText = itemDetails ? `Item: ${t(`item_${itemDetails.id}_name`)}` : 'Item Secreto';
         } else {
-            rewardText = `${missionDetails.reward.xp} XP & ${missionDetails.reward.coins} TC`;
-        }
-        
-        const newEmbed = EmbedBuilder.from(missionMessage.embeds[0])
-            .setFields({ name: t('progress'), value: `${missionProgress.progress} / ${missionDetails.goal}`, inline: true}, { name: t('reward'), value: rewardText, inline: true});
-        
-        let newComponents = [];
-        if (missionDetails.category === 'weekly') {
-            const newButton = ButtonBuilder.from(missionMessage.components[0].components[0]);
-            const isComplete = missionProgress.progress >= missionDetails.goal;
-            newButton.setDisabled(!isComplete || missionProgress.collected);
-            if (missionProgress.collected) {
-                newButton.setLabel(t('missions_collected_button')).setStyle(ButtonStyle.Secondary);
-            }
-            const newRow = new ActionRowBuilder().addComponents(newButton);
-            newComponents.push(newRow);
+            rewardText = `${reward.xp} XP & ${reward.coins} TC`;
         }
 
-        await missionMessage.edit({ embeds: [newEmbed], components: newComponents });
+        const embed = new EmbedBuilder()
+            .setTitle(t(`mission_${missionDetails.id}_title`))
+            .setDescription(t(`mission_${missionDetails.id}_description`))
+            .setColor(missionProgress.completed ? '#2ECC71' : '#3498DB')
+            .addFields(
+                { name: t('progress'), value: `${missionProgress.progress} / ${missionProgress.goal}`, inline: true },
+                { name: t('reward'), value: rewardText, inline: true }
+            );
 
-    } catch (error) {
-        console.error(`Failed to update mission message for ${user.id} and mission ${missionProgress.id}:`, error);
+        if (missionProgress.completed && !missionProgress.collected) {
+           embed.setFooter({ text: 'Pronto para coletar!' });
+        } else if (missionProgress.collected) {
+            embed.setFooter({ text: 'Recompensa coletada.' });
+        }
+
+        await thread.send({ embeds: [embed] });
     }
 }
+
 
 async function updateProfileImage(user, data) {
     const { client, userProfiles, userStats, userItems, clans } = data;
