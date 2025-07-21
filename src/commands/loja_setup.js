@@ -1,3 +1,4 @@
+
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField, StringSelectMenuBuilder } from 'discord.js';
 import { allItems } from '../items.js';
 import { getTranslator } from '../i18n.js';
@@ -210,10 +211,9 @@ export default {
      // Set interval to update timers periodically
     if (!interaction.client.shopTimerInterval) {
         interaction.client.shopTimerInterval = setInterval(async () => {
-            console.log("Running periodic shop timer update...");
-            await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', false);
-            await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', false);
-        }, 5000); // 5 seconds
+            await postOrUpdateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', false).catch(e => console.error("Error updating PT timer:", e));
+            await postOrUpdateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', false).catch(e => console.error("Error updating EN timer:", e));
+        }, 1000); // 1 second
     }
   },
   postOrUpdateShopMessage,
