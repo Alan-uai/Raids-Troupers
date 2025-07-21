@@ -85,10 +85,25 @@ export const milestones = [
         rarity: rarities.KARDEC
       }
     },
-    // 9. (Placeholder)
-    { 
-      id: 'placeholder_1', type: 'PLACEHOLDER', stat: 'placeholder',
-      tiers: [ { level: 1, goal: 9999 } ]
+    // 9. Mestre da Versatilidade
+    {
+        id: 'versatility_master', type: 'MASTER_CLASSES', stat: { name: 'versatilityMaster' },
+        tiers: [
+            { level: 1, goal: 1, level_req: 10 },
+            { level: 2, goal: 2, level_req: 15 },
+            { level: 3, goal: 3, level_req: 20 },
+            { level: 4, goal: 4, level_req: 25 },
+            { level: 5, goal: 5, level_req: 30 },
+            { level: 6, goal: 6, level_req: 35 },
+            { level: 7, goal: 6, level_req: 40 },
+            { level: 8, goal: 6, level_req: 45 },
+            { level: 9, goal: 6, level_req: 50 },
+            { level: 10, goal: 6, level_req: 100 }
+        ],
+        secret_tier: {
+            goal: 6,
+            level_req: 500
+        }
     },
     // 10. (Placeholder)
     { 

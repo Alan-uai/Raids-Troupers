@@ -5,11 +5,11 @@ import { getTranslator } from '../i18n.js';
 const SHOP_CHANNEL_ID_PT = '1396416240263630868';
 const SHOP_CHANNEL_ID_EN = '1396725532913303612';
 
-async function updateShopMessage(client, t, channelId) {
+async function updateShopMessage(client, t, channelId, locale) {
     const shopChannel = await client.channels.fetch(channelId).catch(() => null);
     if (!shopChannel || shopChannel.type !== ChannelType.GuildText) {
-        console.error(`Shop channel ${channelId} not found or is not a text channel.`);
-        return;
+        console.error(`Shop channel ${channelId} for locale ${locale} not found or is not a text channel.`);
+        return { success: false, channelId };
     }
 
     const shopItems = allItems.filter(item => item.source === 'shop');
@@ -58,8 +58,10 @@ async function updateShopMessage(client, t, channelId) {
         } else {
             await shopChannel.send({ embeds: [embed], components: [row, buttonRow] });
         }
+        return { success: true, channelId };
     } catch (error) {
         console.error(`Failed to update or send shop message to ${channelId}:`, error);
+        return { success: false, channelId };
     }
 }
 
@@ -72,17 +74,26 @@ export default {
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
   async execute(interaction) {
     const t_pt = await getTranslator(interaction.user.id, null, 'pt-BR');
-    const t_en = await getTranslator(interaction.user.id, null, 'en-US');
     
     await interaction.reply({ content: t_pt('shop_updating_message'), ephemeral: true });
 
     // Update Portuguese Shop
-    await updateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT);
+    const t_en = await getTranslator(interaction.user.id, null, 'en-US');
+    const ptResult = await updateShopMessage(interaction.client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR');
     
     // Update English Shop
-    await updateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN);
+    const enResult = await updateShopMessage(interaction.client, t_en, SHOP_CHANNEL_ID_EN, 'en-US');
     
-    await interaction.followUp({ content: t_pt('shop_updated_all'), ephemeral: true });
+    let feedback = '';
+    if (ptResult.success && enResult.success) {
+        feedback = t_pt('shop_updated_all');
+    } else {
+        feedback = 'Houve problemas ao atualizar as lojas:\n';
+        if (!ptResult.success) feedback += `- Falha ao atualizar a loja PT-BR no canal <#${ptResult.channelId}>.\n`;
+        if (!enResult.success) feedback += `- Falha ao atualizar a loja EN-US no canal <#${enResult.channelId}>.`;
+    }
+
+    await interaction.followUp({ content: feedback, ephemeral: true });
   },
   updateShopMessage, 
 };

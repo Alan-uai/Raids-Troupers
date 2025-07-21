@@ -99,8 +99,6 @@ for (const file of commandFiles) {
 client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
   setInterval(checkAuctionEnd, 15000);
-  const t = await getTranslator(null, null, 'pt-BR');
-  lojaSetup.updateShopMessage(client, t);
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -958,12 +956,24 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
     }
 });
 
-const PROFILE_CATEGORY_ID_EVENT = '1395589412661887068';
-
 client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-    // This event is complex and might be triggered a lot. 
-    // It's generally better to have a command for profile creation
-    // than to rely on role updates which can be noisy and error-prone.
+    const oldStats = userStats.get(newMember.id);
+    if (!oldStats || !oldStats.class) return;
+
+    // Se o nível mudou, atualize o nível da classe
+    if (oldMember.level !== newMember.level) {
+        if (!oldStats.classLevels) oldStats.classLevels = {};
+        
+        const currentClass = oldStats.class;
+        const currentClassLevel = oldStats.classLevels[currentClass] || 0;
+        
+        if (newMember.level > currentClassLevel) {
+            oldStats.classLevels[currentClass] = newMember.level;
+            userStats.set(newMember.id, oldStats);
+            await checkMilestoneCompletion(newMember.user, { userStats, userItems: userItems, client, userProfiles, clans });
+        }
+    }
 });
+
 
 client.login(process.env.DISCORD_TOKEN);

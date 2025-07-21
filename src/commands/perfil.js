@@ -26,7 +26,8 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
         const initialStats = { 
             level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, 
             kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, 
-            autoCollectMissions: false, completedMilestones: {}, clanJoinDate: null, daysInClan: 0
+            autoCollectMissions: false, completedMilestones: {}, clanJoinDate: null, daysInClan: 0,
+            classLevels: {}
         };
         userStats.set(targetUser.id, initialStats);
         
