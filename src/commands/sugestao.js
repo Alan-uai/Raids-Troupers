@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } from 'discord.js';
 import { getTranslator } from '../i18n.js';
 
 export default {
@@ -13,7 +13,7 @@ export default {
                 .setRequired(true))
         .addStringOption(option =>
             option.setName('tags')
-                .setDescription('Adicione tags para categorizar (ex: comando, clã, perfil).')
+                .setDescription('Adicione tags para categorizar (ex: comando, jogo, perfil).')
                 .setDescriptionLocalizations({ "en-US": "Add tags to categorize (e.g., command, clan, profile)." })
                 .setRequired(false)),
     async execute(interaction) {
@@ -25,7 +25,11 @@ export default {
         await interaction.deferReply({ ephemeral: true });
 
         try {
-            const channel = await interaction.client.channels.fetch(suggestionChannelId);
+            const channel = await interaction.client.channels.fetch(suggestionChannelId).catch(() => null);
+
+            if (!channel || channel.type !== ChannelType.GuildForum) {
+              return await interaction.editReply({ content: 'Canal de sugestões inválido. Deve ser um canal de fórum.', ephemeral: true });
+            }
 
             const embed = new EmbedBuilder()
                 .setColor('#3498DB')
@@ -53,7 +57,13 @@ export default {
                         .setEmoji('👎')
                 );
 
-            await channel.send({ embeds: [embed], components: [row] });
+            await channel.threads.create({
+              name: `Sugestão de ${interaction.user.username.substring(0, 80)}`,
+              message: {
+                embeds: [embed],
+                components: [row]
+              }
+            });
 
             await interaction.editReply({ content: t('suggestion_success', { channelId: suggestionChannelId }), ephemeral: true });
 

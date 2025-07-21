@@ -2,7 +2,7 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 import { getTranslator } from '../i18n.js';
 
 // Mapa para rastrear quem já votou em qual enquete
-const pollVotes = new Map();
+export const pollVotes = new Map();
 
 export default {
     data: new SlashCommandBuilder()
