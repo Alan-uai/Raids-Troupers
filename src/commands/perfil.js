@@ -26,7 +26,7 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
         const initialStats = { 
             level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, 
             kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, 
-            autoCollectMissions: false, completedMilestones: {}, guidedTroop: 0, daysInClan: 0, mentoredPlayers: 0, auctionsWon: 0, clanJoinDate: null
+            autoCollectMissions: false, completedMilestones: {}, clanJoinDate: null, daysInClan: 0
         };
         userStats.set(targetUser.id, initialStats);
     }
@@ -106,18 +106,19 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
 
             const milestoneThread = await channel.threads.create({ name: t('milestones_thread_title'), autoArchiveDuration: 10080, reason: t('milestones_thread_reason', { username: member.displayName }) });
             for (const milestone of milestones) {
-                 if (milestone.id === 'secret_mastery') continue;
+                 if (milestone.id === 'secret_mastery' || milestone.type === 'PLACEHOLDER') continue;
                  const statsForMilestone = userStats.get(member.id) || {};
                  statsForMilestone.userId = member.id; // Garante que o userId está presente para os customIds
                  const itemsForMilestone = userItems.get(member.id);
                  const milestoneData = await createMilestoneEmbed(milestone, statsForMilestone, itemsForMilestone, 'general', t);
-                 const message = await milestoneThread.send({ embeds: [milestoneData.embed], components: [milestoneData.row] });
-                 
-                 // Armazena o ID da mensagem para futuras atualizações
-                 const userStatsData = userStats.get(member.id);
-                 if (!userStatsData.completedMilestones) userStatsData.completedMilestones = {};
-                 userStatsData.completedMilestones[milestone.id] = { ...(userStatsData.completedMilestones[milestone.id] || {}), messageId: message.id };
-                 userStats.set(member.id, userStatsData);
+                 if(milestoneData) {
+                    const message = await milestoneThread.send({ embeds: [milestoneData.embed], components: [milestoneData.row] });
+                    // Armazena o ID da mensagem para futuras atualizações
+                    const userStatsData = userStats.get(member.id);
+                    if (!userStatsData.completedMilestones) userStatsData.completedMilestones = {};
+                    userStatsData.completedMilestones[milestone.id] = { ...(userStatsData.completedMilestones[milestone.id] || {}), messageId: message.id };
+                    userStats.set(member.id, userStatsData);
+                 }
             }
 
             const exclusiveShopThread = await channel.threads.create({ name: t('exclusive_shop_thread_title'), autoArchiveDuration: 10080, reason: t('exclusive_shop_thread_reason', { username: member.displayName }) });

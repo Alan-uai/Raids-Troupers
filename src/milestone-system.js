@@ -3,9 +3,35 @@
 import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getTranslator } from './i18n.js';
 import { milestones } from './milestones.js';
+import { allItems } from './items.js';
 
 function getStatValue(stats, itemStats, statPath) {
     if (!stats) return 0;
+    
+    // Handle special stat paths like for rarity_collector
+    if (typeof statPath === 'object' && statPath.name === 'rarityCollector') {
+        const inventory = itemStats?.inventory || [];
+        if (inventory.length === 0) return 0;
+
+        const rarityCounts = {};
+        statPath.rarities.forEach(r => { rarityCounts[r] = 0; });
+
+        inventory.forEach(itemId => {
+            const itemDetails = allItems.find(i => i.id === itemId);
+            if (itemDetails && statPath.rarities.includes(itemDetails.rarity)) {
+                rarityCounts[itemDetails.rarity]++;
+            }
+        });
+
+        // For the main tiers, find the minimum count across all rarities
+        if(statPath.rarities.length > 1) {
+            return Math.min(...Object.values(rarityCounts));
+        }
+        // For the secret tier, just return the count of the single specified rarity (Kardec)
+        return Object.values(rarityCounts)[0] || 0;
+    }
+
+    // Handle simple stat paths
     if (statPath.startsWith('inventory')) {
         return itemStats?.inventory?.length || 0;
     }
@@ -31,6 +57,8 @@ function getCompletedTiers(milestone, currentProgress) {
 }
 
 export async function createMilestoneEmbed(milestone, stats, itemStats, view, t) {
+    if (milestone.type === 'PLACEHOLDER') return null; // Don't create embeds for placeholders
+    
     const userId = stats.userId || 'user'; // Assume stats has userId
     const currentProgress = getStatValue(stats, itemStats, milestone.stat);
     const completedTiersCount = getCompletedTiers(milestone, currentProgress);
@@ -56,7 +84,7 @@ export async function createMilestoneEmbed(milestone, stats, itemStats, view, t)
         let tierLine = '';
         for (let i = 0; i < tierSymbols.length; i++) {
             if (i < completedTiersCount) {
-                tierLine += `**${tierSymbols[i]}** `; // Completed: Bold and white
+                tierLine += `${tierSymbols[i]} `; // Completed: White
             } else {
                 tierLine += `~~${tierSymbols[i]}~~ `; // Incomplete: Strikethrough (appears greyish)
             }
@@ -103,6 +131,7 @@ export async function checkMilestoneCompletion(user, data) {
     let allMilestonesCompleted = true;
 
     for (const milestone of milestones) {
+        if (milestone.type === 'PLACEHOLDER') continue;
         if (milestone.id === 'secret_mastery') continue;
 
         const currentProgress = getStatValue(stats, itemStats, milestone.stat);
@@ -141,8 +170,10 @@ export async function checkMilestoneCompletion(user, data) {
         if (!stats.completedMilestones[secretMilestone.id]?.messageId) {
             stats.userId = userId;
             const secretMilestoneData = await createMilestoneEmbed(secretMilestone, stats, itemStats, 'general', t);
-            const message = await milestoneThread.send({ embeds: [secretMilestoneData.embed], components: [secretMilestoneData.row] });
-            stats.completedMilestones[secretMilestone.id] = { ...stats.completedMilestones[secretMilestone.id], messageId: message.id };
+            if(secretMilestoneData) {
+                const message = await milestoneThread.send({ embeds: [secretMilestoneData.embed], components: [secretMilestoneData.row] });
+                stats.completedMilestones[secretMilestone.id] = { ...stats.completedMilestones[secretMilestone.id], messageId: message.id };
+            }
         }
         
         // Check for secret milestone tier completion and role assignment

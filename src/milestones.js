@@ -1,4 +1,8 @@
 // src/milestones.js
+import { rarities } from './items.js';
+
+const allRaritiesExceptKardec = Object.values(rarities).filter(r => r !== rarities.KARDEC);
+
 export const milestones = [
     // 1. Raids Helded
     { 
@@ -54,16 +58,7 @@ export const milestones = [
         { level: 9, goal: 150 }, { level: 10, goal: 200 }
       ] 
     },
-    // 7. Guia da Tropa
-    { 
-      id: 'troop_guide', type: 'GUIDE_TROOP', stat: 'guidedTroop',
-      tiers: [
-        { level: 1, goal: 10 }, { level: 2, goal: 25 }, { level: 3, goal: 50 }, { level: 4, goal: 75 },
-        { level: 5, goal: 100 }, { level: 6, goal: 150 }, { level: 7, goal: 200 }, { level: 8, goal: 300 },
-        { level: 9, goal: 400 }, { level: 10, goal: 500 }
-      ] 
-    },
-    // 8. Membro Leal
+    // 7. Membro Leal
     { 
       id: 'loyal_member', type: 'STAY_LOYAL', stat: 'daysInClan',
       tiers: [
@@ -72,23 +67,28 @@ export const milestones = [
         { level: 9, goal: 365 }, { level: 10, goal: 500 }
       ] 
     },
-    // 9. Mentor de Elite
-    { 
-      id: 'elite_mentor', type: 'MENTOR_PLAYER', stat: 'mentoredPlayers',
+    // 8. Colecionador de Raridades
+    {
+      id: 'rarity_collector', type: 'COLLECT_RARITIES', stat: { name: 'rarityCollector', rarities: allRaritiesExceptKardec },
       tiers: [
-        { level: 1, goal: 5 }, { level: 2, goal: 10 }, { level: 3, goal: 20 }, { level: 4, goal: 30 },
-        { level: 5, goal: 50 }, { level: 6, goal: 75 }, { level: 7, goal: 100 }, { level: 8, goal: 150 },
-        { level: 9, goal: 200 }, { level: 10, goal: 250 }
-      ] 
+        { level: 1, goal: 1 }, { level: 2, goal: 2 }, { level: 3, goal: 3 }, { level: 4, goal: 4 },
+        { level: 5, goal: 5 }, { level: 6, goal: 6 }, { level: 7, goal: 7 }, { level: 8, goal: 8 },
+        { level: 9, goal: 9 }, { level: 10, goal: 10 }
+      ],
+      secret_tier: {
+        goal: 1, // 1 Kardec item
+        stat: { name: 'rarityCollector', rarities: [rarities.KARDEC]}
+      }
     },
-    // 10. Auctions Won
+    // 9. (Placeholder - Was auctions_won)
     { 
-      id: 'auctions_won', type: 'AUCTION_WON', stat: 'auctionsWon',
-      tiers: [
-        { level: 1, goal: 1 }, { level: 2, goal: 3 }, { level: 3, goal: 5 }, { level: 4, goal: 10 },
-        { level: 5, goal: 15 }, { level: 6, goal: 20 }, { level: 7, goal: 30 }, { level: 8, goal: 40 },
-        { level: 9, goal: 50 }, { level: 10, goal: 75 }
-      ] 
+      id: 'placeholder_1', type: 'PLACEHOLDER', stat: 'placeholder',
+      tiers: [ { level: 1, goal: 9999 } ]
+    },
+    // 10. (Placeholder - Was elite_mentor)
+    { 
+      id: 'placeholder_2', type: 'PLACEHOLDER', stat: 'placeholder',
+      tiers: [ { level: 1, goal: 9999 } ]
     },
     // 11. Secret Milestone
     {
