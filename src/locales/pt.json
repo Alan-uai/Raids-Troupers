@@ -33,6 +33,8 @@
     "was_kicked": "Foi Expulso",
     "roles": "Cargos",
     "no_roles": "Nenhum",
+    "daily": "Diárias",
+    "weekly": "Semanais",
 
     "class_guerreiro_name": "Guerreiro",
     "class_guerreiro_description": "Focado na linha de frente, causa dano massivo e resiste a ataques poderosos.",
@@ -285,7 +287,9 @@
     "shop_empty": "A loja está vazia no momento. Volte mais tarde!",
 
     "missions_none_active": "Você não tem nenhuma missão ativa no momento.",
+    "missions_none_active_category": "Você não tem nenhuma missão {category} ativa.",
     "missions_embed_title": "📜 Missões de {username}",
+    "missions_embed_title_category": "📜 Missões {category} de {username}",
     "missions_embed_description": "Complete essas tarefas para ganhar recompensas!",
     "mission_completed_notification": "🏅 Missão Concluída! Você completou \"{description}\" e ganhou {xp} XP e {coins} TC!",
     "mission_reward_item_notification": "🏅 Missão Concluída! Você completou \"{description}\" e recebeu o item: **{itemName}**!",

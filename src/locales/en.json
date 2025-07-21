@@ -33,6 +33,8 @@
     "was_kicked": "Was Kicked",
     "roles": "Roles",
     "no_roles": "None",
+    "daily": "Daily",
+    "weekly": "Weekly",
 
     "class_guerreiro_name": "Warrior",
     "class_guerreiro_description": "Focused on the front line, deals massive damage and withstands powerful attacks.",
@@ -285,7 +287,9 @@
     "shop_empty": "The shop is currently empty. Check back later!",
 
     "missions_none_active": "You don't have any active missions at the moment.",
+    "missions_none_active_category": "You don't have any active {category} missions.",
     "missions_embed_title": "📜 {username}'s Missions",
+    "missions_embed_title_category": "📜 {username}'s {category} Missions",
     "missions_embed_description": "Complete these tasks to earn rewards!",
     "mission_completed_notification": "🏅 Mission Completed! You finished \"{description}\" and earned {xp} XP and {coins} TC!",
     "mission_reward_item_notification": "🏅 Mission Completed! You finished \"{description}\" and received the item: **{itemName}**!",
