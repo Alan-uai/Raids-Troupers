@@ -185,9 +185,11 @@ client.on(Events.InteractionCreate, async interaction => {
             
             await interaction.followUp({ content: t('profile_refreshed'), ephemeral: true });
         }
-    } else if (action === 'poll' && args[0] === 'vote') {
-        const [_, pollId, optionIndex] = args;
-        await handlePollVote(interaction, pollId, parseInt(optionIndex, 10), t);
+    } else if (action === 'poll') {
+        const [_, voteAction, pollId, optionIndex] = interaction.customId.split('_');
+        if (voteAction === 'vote') {
+            await handlePollVote(interaction, pollId, parseInt(optionIndex, 10), t);
+        }
     } else if (action === 'suggestion') {
         const voteType = args[0]; // 'approve' or 'reject'
         await handleSuggestionVote(interaction, voteType, t);
@@ -1014,4 +1016,5 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
 
 client.login(process.env.DISCORD_TOKEN);
+
 
