@@ -1,7 +1,7 @@
 // src/milestones.js
-import { rarities } from './items.js';
+import { rarities, rarityOrder } from './items.js';
 
-const rarityOrder = Object.values(rarities).filter(r => r !== rarities.KARDEC);
+const filteredRarityOrder = rarityOrder.filter(r => r !== rarities.KARDEC);
 
 export const milestones = [
     // 1. Raids Helded
@@ -70,7 +70,7 @@ export const milestones = [
     // 8. Colecionador de Raridades
     {
       id: 'rarity_collector', type: 'COLLECT_RARITIES', stat: { name: 'rarityCollector' }, // Stat is complex, handled in system
-      tiers: rarityOrder.map((rarity, index) => ({
+      tiers: filteredRarityOrder.map((rarity, index) => ({
           level: index + 1,
           goal: 1,
           rarity: rarity

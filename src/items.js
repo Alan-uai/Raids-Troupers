@@ -20,7 +20,7 @@ export const rarities = {
   KARDEC: 'Kardec'
 };
 
-const rarityOrder = Object.values(rarities);
+export const rarityOrder = Object.values(rarities);
 
 const gearTypes = {
     cabeça: { base: ["Elmo", "Capacete", "Tiara", "Coroa", "Chapéu", "Gorro", "Capuz", "Máscara"], bonusMultiplier: 1.2 },
