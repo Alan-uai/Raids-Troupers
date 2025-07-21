@@ -27,7 +27,7 @@ import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionL
 import { getTranslator } from './i18n.js';
 import lojaSetup from './commands/loja_setup.js';
 import clanEnquete from './commands/clan_enquete.js';
-import { createMilestoneEmbed } from './milestone-system.js';
+import { createMilestoneEmbed, checkMilestoneCompletion } from './milestone-system.js';
 
 
 dotenv.config();
@@ -153,7 +153,7 @@ client.on(Events.InteractionCreate, async interaction => {
             if (stats) {
                 stats.autoCollectMissions = !stats.autoCollectMissions;
                 userStats.set(userId, stats);
-                const currentViewType = restArgs[0] || 'daily';
+                const currentViewType = (interaction.message.components[0].components[0].customId.includes('weekly')) ? 'daily' : 'weekly';
                 await postMissionList(interaction.message.thread, userId, currentViewType, { userMissions, userStats, client }, interaction); // Refresh view
             }
         } else if (subAction === 'collect') {
@@ -188,8 +188,8 @@ client.on(Events.InteractionCreate, async interaction => {
     } else if (action === 'poll' && args[0] === 'vote') {
         const [_, pollId, optionIndex] = args;
         await handlePollVote(interaction, pollId, parseInt(optionIndex, 10), t);
-    } else if (action === 'suggestion' && ['approve', 'reject'].includes(args[0])) {
-        const voteType = args[0];
+    } else if (action === 'suggestion') {
+        const voteType = args[0]; // 'approve' or 'reject'
         await handleSuggestionVote(interaction, voteType, t);
     } else if (action === 'milestone') {
         const [subAction, milestoneId, userId] = args;
@@ -1014,3 +1014,4 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
 
 client.login(process.env.DISCORD_TOKEN);
+
