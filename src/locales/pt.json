@@ -277,7 +277,7 @@
     "shop_select_item_desc": "Preço: {price} TC",
     "shop_buy_button_label": "Comprar",
     "shop_item_selected": "✅ Item selecionado. Agora clique no botão 'Comprar' para finalizar a compra.",
-    "shop_footer_rotation": "A loja atualiza! Próxima atualização em {time}.",
+    "shop_footer_rotation": "A loja atualiza! Próxima atualização em {time}",
     "shop_footer_rotation_raw": "A loja atualiza!",
     "shop_empty": "A loja está vazia no momento. Volte mais tarde!",
     "shop_update_error_header": "Houve problemas ao atualizar as lojas:",

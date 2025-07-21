@@ -25,9 +25,8 @@ import { missions as missionPool, missions } from './missions.js';
 import { milestones } from './milestones.js';
 import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList, animateAndCollectReward } from './mission-system.js';
 import { getTranslator } from './i18n.js';
-import lojaSetup from './commands/loja_setup.js';
 import { pollVotes } from './commands/clan_enquete.js';
-import { createMilestoneEmbed, checkMilestoneCompletion } from './milestone-system.js';
+import { createMilestoneEmbed, checkMilestoneCompletion as checkMilestone } from './milestone-system.js';
 
 
 dotenv.config();
@@ -72,7 +71,7 @@ function getAllCommandFiles(dir) {
     for (const item of items) {
         if (item.isDirectory()) {
             files = [...files, ...getAllCommandFiles(path.join(dir, item.name))];
-        } else if (item.name.endsWith('.js') && !item.name.endsWith('.data.js')) {
+        } else if (item.name.endsWith('.js') && !item.name.endsWith('.data.js') && item.name !== 'loja_setup.js') {
             files.push(path.join(dir, item.name));
         }
     }
@@ -162,7 +161,6 @@ client.on(Events.InteractionCreate, async interaction => {
                 stats.autoCollectMissions = !stats.autoCollectMissions;
                 userStats.set(userId, stats);
                 const currentViewButton = interaction.message.components[0].components[0];
-                // Determine current view from the button that was NOT clicked
                 const currentViewType = currentViewButton.customId.includes('weekly') ? 'daily' : 'weekly';
                 await postMissionList(missionThread, userId, currentViewType, { userMissions, userStats, client }, interaction);
             }
@@ -201,18 +199,16 @@ client.on(Events.InteractionCreate, async interaction => {
             const optionIndex = parseInt(customIdParts[3], 10);
             await handlePollVote(interaction, pollId, optionIndex, t);
         }
-    } else if (action === 'suggestion') {
-        const voteType = customIdParts[1]; // 'approve' or 'reject'
-        await handleSuggestionVote(interaction, voteType, t);
     } else if (action === 'milestone') {
        if (customIdParts[1] === 'back') {
-          const [, , milestoneId, userId] = customIdParts;
+          const [,, milestoneId, userId] = customIdParts;
           if (interaction.user.id !== userId) return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
           const milestone = milestones.find(m => m.id === milestoneId);
           if (milestone) {
             const stats = userStats.get(userId);
             stats.userId = userId;
-            const milestoneData = await createMilestoneEmbed(milestone, stats, userItems.get(userId), 'general', t);
+            const itemStats = userItems.get(userId);
+            const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', t);
             if (milestoneData) {
                 await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
             }
@@ -308,6 +304,8 @@ async function checkAuctionEnd() {
     if (auctionMessage) await auctionMessage.edit({ embeds: [finalEmbed], components: [] });
     
     await checkMissionCompletion(winnerUser, 'AUCTION_WON', { userStats, userMissions, client, userProfiles, userItems, clans });
+    await checkMissionCompletion(winnerUser, 'EARN_COINS', { userStats, userMissions, client, userProfiles, userItems, clans }, winningBid);
+
 
     try {
         await winnerUser.send({ content: winnerT('auction_winner_dm', { itemName: winnerT(`item_${item.id}_name`) || item.name, bid: winningBid }) });
@@ -500,12 +498,15 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
             }
 
             let xpGained = 25;
-            xpGained = Math.ceil(xpGained * (1 + xpBonusPercent / 100));
             const coinsGained = 10;
+
+            xpGained = Math.ceil(xpGained * (1 + xpBonusPercent / 100));
             
             stats.raidsHelped += 1;
             stats.xp += xpGained;
             stats.coins += coinsGained;
+
+            await checkMissionCompletion(user, 'EARN_COINS', { userStats, userMissions, client, userProfiles, userItems, clans }, coinsGained);
 
             let xpToLevelUp = 100 * stats.level;
             const previousLevel = stats.level;
@@ -516,6 +517,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
                 leveledUp = true;
             }
             if(leveledUp) {
+                await checkMissionCompletion(user, 'LEVEL_UP', { userStats, userMissions, client, userProfiles, userItems, clans }, stats.level);
                 // Check for Mentor de Elite milestone
                 if(leaderStats && leaderStats.level >= 20 && previousLevel < 10 && stats.level >= 10){
                    leaderStats.mentoredPlayers = (leaderStats.mentoredPlayers || 0) + 1;
@@ -903,87 +905,6 @@ async function handlePollVote(interaction, pollId, optionIndex, t) {
     await interaction.reply({ content: t('poll_vote_success'), ephemeral: true });
 }
 
-async function handleSuggestionVote(interaction, voteType, t) {
-    const message = interaction.message;
-    if (!message) return;
-
-    const thread = interaction.channel;
-    if (!thread.isThread()) return;
-    
-    const starterMessage = await thread.fetchStarterMessage().catch(() => null);
-    if (!starterMessage) return;
-
-    let authorId;
-    const authorField = starterMessage.embeds[0]?.author;
-    if (authorField && authorField.name) {
-        const idMatch = authorField.name.match(/\(ID: (.*?)\)/);
-        if (idMatch) {
-            authorId = idMatch[1];
-        }
-    }
-   
-     if (!authorId) {
-        const suggestionAuthorMatch = authorField?.name.match(/Sugestão de (.*)/);
-        if (suggestionAuthorMatch) {
-            const username = suggestionAuthorMatch[1];
-            const member = interaction.guild.members.cache.find(m => m.user.username === username);
-            if (member?.id === interaction.user.id) {
-                 return interaction.reply({ content: t('suggestion_cannot_vote_own'), ephemeral: true });
-            }
-        }
-    } else if (authorId === interaction.user.id) {
-         return interaction.reply({ content: t('suggestion_cannot_vote_own'), ephemeral: true });
-    }
-
-    const messageId = message.id;
-    const userId = interaction.user.id;
-
-    const userVotes = suggestionVotes.get(userId) || {};
-    if (userVotes[messageId]) {
-        return interaction.reply({ content: t('suggestion_already_voted'), ephemeral: true });
-    }
-
-    await interaction.deferUpdate();
-
-    const embed = EmbedBuilder.from(message.embeds[0]);
-    const votesField = embed.data.fields.find(f => f.name === 'Votos');
-    
-    if (!votesField) return;
-
-    const approveMatch = votesField.value.match(/Aprovar: (\d+)/);
-    const rejectMatch = votesField.value.match(/Reprovar: (\d+)/);
-
-    let approves = approveMatch ? parseInt(approveMatch[1], 10) : 0;
-    let rejects = rejectMatch ? parseInt(rejectMatch[1], 10) : 0;
-
-    if (voteType === 'approve') {
-        approves++;
-    } else if (voteType === 'reject') {
-        rejects++;
-    }
-    
-    embed.setFields(
-        ...embed.data.fields.filter(f => f.name !== 'Votos'),
-        { name: 'Votos', value: `Aprovar: ${approves}\nReprovar: ${rejects}`, inline: true }
-    );
-    
-    await message.edit({ embeds: [embed] });
-    
-    userVotes[messageId] = true;
-    suggestionVotes.set(userId, userVotes);
-
-    const stats = userStats.get(userId) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR', autoCollectMissions: false, completedMilestones: {} };
-    stats.xp = (stats.xp || 0) + 20;
-    stats.coins = (stats.coins || 0) + 10;
-    userStats.set(userId, stats);
-    
-    await interaction.followUp({ content: t('suggestion_vote_success'), ephemeral: true });
-    
-    if (rejects >= 5 && approves === 0) {
-        await message.thread.delete().catch(() => {});
-        await interaction.followUp({ content: t('suggestion_deleted_low_votes'), ephemeral: true }).catch(() => {});
-    }
-}
 
 async function handleMilestoneInteraction(interaction, milestoneId, userId, selectedLevel, t) {
     await interaction.deferUpdate();
@@ -1064,7 +985,7 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
         if (newMember.level > currentClassLevel) {
             oldStats.classLevels[currentClass] = newMember.level;
             userStats.set(newMember.id, oldStats);
-            await checkMilestoneCompletion(newMember.user, { userStats, userItems: userItems, client, userProfiles, clans });
+            await checkMilestone(newMember.user, { userStats, userItems: userItems, client, userProfiles, clans });
         }
     }
 });

@@ -1,0 +1,19 @@
+{
+  "name": "discord-raid-gpt-bot",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js",
+    "setup-shop": "node src/setup-shop.js"
+  },
+  "dependencies": {
+    "canvas": "^3.1.2",
+    "discord.js": "^14.11.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "lucide-react": "^0.411.0",
+    "uuid": "^9.0.1"
+  }
+}

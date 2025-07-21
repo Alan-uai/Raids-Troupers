@@ -5,7 +5,7 @@ import { generateProfileImage } from './profile-generator.js';
 import { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getTranslator } from './i18n.js';
 import { allItems, rarities } from './items.js';
-import { checkMilestoneCompletion } from './milestone-system.js';
+import { checkMilestoneCompletion as checkMilestone } from './milestone-system.js';
 
 // Mapa para armazenar os IDs das mensagens das listas de missões
 const missionMessageIds = new Map(); // userId -> { control: messageId, list: messageId, currentView: 'daily' }
@@ -56,19 +56,23 @@ export function assignMissions(userId, userMissions, stats) {
     
     // Assign one with 'Mais que Comum' item
     const commonItemPool = allItems.filter(i => i.source === 'mission' && i.rarity === rarities.MAIS_QUE_COMUM);
-    const dailyWithCommonItem = generateIntelligentMission(dailyTemplates.pop(), stats);
-    dailyWithCommonItem.reward = { item: commonItemPool[Math.floor(Math.random() * commonItemPool.length)].id };
-    missionsToAssign.daily.push(dailyWithCommonItem);
+    if (dailyTemplates.length > 0 && commonItemPool.length > 0) {
+        const dailyWithCommonItem = generateIntelligentMission(dailyTemplates.pop(), stats);
+        dailyWithCommonItem.reward = { item: commonItemPool[Math.floor(Math.random() * commonItemPool.length)].id };
+        missionsToAssign.daily.push(dailyWithCommonItem);
+    }
+    
 
     // Assign one with 'Comum' item
     const regularItemPool = allItems.filter(i => i.source === 'mission' && i.rarity === rarities.COMUM);
-    const dailyWithRegularItem = generateIntelligentMission(dailyTemplates.pop(), stats);
-    dailyWithRegularItem.reward = { item: regularItemPool[Math.floor(Math.random() * regularItemPool.length)].id };
-    missionsToAssign.daily.push(dailyWithRegularItem);
+    if(dailyTemplates.length > 0 && regularItemPool.length > 0) {
+        const dailyWithRegularItem = generateIntelligentMission(dailyTemplates.pop(), stats);
+        dailyWithRegularItem.reward = { item: regularItemPool[Math.floor(Math.random() * regularItemPool.length)].id };
+        missionsToAssign.daily.push(dailyWithRegularItem);
+    }
 
     // Assign 3 more regular daily missions
-    for (let i = 0; i < 3; i++) {
-        if (!dailyTemplates.length) break;
+    while (missionsToAssign.daily.length < 5 && dailyTemplates.length > 0) {
         const intelligentMission = generateIntelligentMission(dailyTemplates.pop(), stats);
         missionsToAssign.daily.push(intelligentMission);
     }
@@ -120,6 +124,8 @@ async function collectReward(user, missionProgress, data) {
     let rewardMessage = '';
 
     const stats = userStats.get(userId);
+    let coinsEarned = 0;
+    
     if (reward.item) {
         const items = userItems.get(userId) || { inventory: [], equippedGear: {}, equippedCosmetics: {} };
         items.inventory.push(reward.item);
@@ -127,6 +133,7 @@ async function collectReward(user, missionProgress, data) {
         const itemDetails = allItems.find(i => i.id === reward.item);
         const itemName = t(`item_${itemDetails.id}_name`) || itemDetails.name;
         rewardMessage = t('missions_collect_success_item', { itemName });
+        await checkMissionCompletion(user, 'ITEM_ACQUIRED', data);
 
         if (itemDetails.rarity === 'Kardec') {
             const guild = client.guilds.cache.first();
@@ -144,12 +151,14 @@ async function collectReward(user, missionProgress, data) {
     } else {
         stats.xp += reward.xp || 0;
         stats.coins += reward.coins || 0;
-        rewardMessage = t('missions_collect_success', { xp: reward.xp || 0, coins: reward.coins || 0 });
+        coinsEarned = reward.coins || 0;
+        rewardMessage = t('missions_collect_success', { xp: reward.xp || 0, coins: coinsEarned });
     }
 
     missionProgress.collected = true;
 
     let leveledUp = false;
+    let previousLevel = stats.level;
     if (stats.xp) {
         let xpToLevelUp = 100 * stats.level;
         while (stats.xp >= xpToLevelUp) {
@@ -163,9 +172,14 @@ async function collectReward(user, missionProgress, data) {
     
     if (leveledUp) {
        rewardMessage += `\n${t('level_up_from_mission', { level: stats.level })}`;
+       await checkMissionCompletion(user, 'LEVEL_UP', { ...data, previousLevel: previousLevel }, stats.level);
+    }
+
+    if (coinsEarned > 0) {
+        await checkMissionCompletion(user, 'EARN_COINS', data, coinsEarned);
     }
     
-    return { xp: reward.xp || 0, coins: reward.coins || 0, message: rewardMessage };
+    return { xp: reward.xp || 0, coins: coinsEarned, message: rewardMessage };
 }
 
 export async function collectAllRewards(interaction, userId, data) {
@@ -206,7 +220,7 @@ export async function collectAllRewards(interaction, userId, data) {
 
 
 export async function checkMissionCompletion(user, missionType, data, amount = 1) {
-    const { userMissions, userStats, client, userProfiles, userItems, clans } = data;
+    const { userMissions, userStats } = data;
     const userId = user.id;
 
     if (!userMissions.has(userId)) {
@@ -240,7 +254,7 @@ export async function checkMissionCompletion(user, missionType, data, amount = 1
     
     if (profileNeedsUpdate) {
         await updateProfileImage(user, data);
-        await checkMilestoneCompletion(user, data);
+        await checkMilestone(user, data);
     }
     
     userMissions.set(userId, activeMissions);
@@ -314,7 +328,7 @@ export async function postMissionList(thread, userId, type, data, interaction = 
     }
     
     // Clear existing messages from the bot in the thread
-    const messages = await thread.messages.fetch({ limit: 50 });
+    const messages = await thread.messages.fetch({ limit: 50 }).catch(() => []);
     const botMessages = messages.filter(m => m.author.id === client.user.id);
     if(botMessages.size > 0) {
        await thread.bulkDelete(botMessages).catch(e => console.error("Failed to bulk delete messages:", e));
