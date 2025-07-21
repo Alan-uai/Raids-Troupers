@@ -2,7 +2,7 @@
 import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getTranslator } from './i18n.js';
 import { milestones } from './milestones.js';
-import { allItems, rarities } from './items.js';
+import { allItems, rarities, rarityOrder } from './items.js';
 
 function getStatValue(stats, itemStats, statPath) {
     if (!stats && !itemStats) return 0;
@@ -35,7 +35,7 @@ function getStatValue(stats, itemStats, statPath) {
     }
 
     // Handle simple stat paths
-    if (statPath.startsWith('inventory')) {
+    if (statPath === 'inventory.length') {
         return itemStats?.inventory?.length || 0;
     }
     const path = statPath.split('.');
@@ -88,7 +88,7 @@ export async function createMilestoneEmbed(milestone, stats, itemStats, view, t)
     const selectOptions = milestone.tiers.map(tier => {
         let goalText = tier.goal;
         if (milestone.id === 'rarity_collector') goalText = `1 item ${tier.rarity}`;
-        if (milestone.id === 'versatility_master') goalText = `${tier.goal} classes no Nv. ${tier.level}`;
+        if (milestone.id === 'versatility_master') goalText = `${tier.goal} classes no Nv. ${tier.level_req}`;
 
         return {
             label: `${t(`milestone_${milestone.id}_title`)} - Nível ${tier.level}`,
@@ -101,7 +101,7 @@ export async function createMilestoneEmbed(milestone, stats, itemStats, view, t)
          let secretGoalText = milestone.secret_tier.goal;
          if (milestone.id === 'rarity_collector') secretGoalText = `${milestone.secret_tier.goal} item Kardec`;
          if (milestone.id === 'loyal_member') secretGoalText = `${milestone.secret_tier.goal} dias`;
-         if (milestone.id === 'versatility_master') secretGoalText = `${milestone.secret_tier.goal} classes no Nv. ${milestone.secret_tier.level}`;
+         if (milestone.id === 'versatility_master') secretGoalText = `${milestone.secret_tier.goal} classes no Nv. ${milestone.secret_tier.level_req}`;
         
          selectOptions.push({
             label: `${t(`milestone_${milestone.id}_title`)} - Nível Secreto`,
@@ -139,19 +139,28 @@ export async function createMilestoneEmbed(milestone, stats, itemStats, view, t)
             embed.setDescription(t(`milestone_${milestone.id}_description`));
             
             let statPath = milestone.stat;
+            let goal = tier.goal;
             let goalText = tier.goal;
             if (milestone.id === 'rarity_collector') {
                  statPath = { name: 'rarityCollector', rarity: isSecretView ? rarities.KARDEC : tier.rarity };
-                 goalText = isSecretView ? `(1 item Kardec)` : `(1 item de raridade ${tier.rarity})`;
+                 goalText = `1 item ${isSecretView ? rarities.KARDEC : tier.rarity}`;
             }
              if (milestone.id === 'versatility_master') {
-                statPath = { name: 'versatilityMaster', level: tier.level };
-                goalText = `(${tier.goal} classes no Nv. ${tier.level})`;
+                statPath = { name: 'versatilityMaster', level: tier.level_req };
+                goalText = `${tier.goal} classes no Nv. ${tier.level_req}`;
             }
 
             const currentProgress = getStatValue(stats, itemStats, statPath);
+            const percentage = Math.min(currentProgress / goal, 1);
+            const barWidth = 20;
+            const filledChars = Math.round(percentage * barWidth);
+            const emptyChars = barWidth - filledChars;
+            const progressBar = '`' + '━'.repeat(filledChars) + '─'.repeat(emptyChars) + '`';
             
-            embed.addFields({ name: `Nível ${tier.level || 'Secreto'}`, value: t('milestone_current_progress', { progress: currentProgress, goal: goalText }) });
+            embed.addFields({ 
+                name: `Nível ${tier.level || 'Secreto'}`, 
+                value: `**${currentProgress} / ${goal}**\n${progressBar}`
+            });
         }
         const backButton = new ButtonBuilder()
             .setCustomId(`milestone_back_${milestone.id}_${userId}`)
@@ -164,7 +173,7 @@ export async function createMilestoneEmbed(milestone, stats, itemStats, view, t)
 }
 
 export async function checkMilestoneCompletion(user, data) {
-    const { userStats, userItems, userProfiles, client } = data;
+    const { userStats, userItems, userProfiles, client, clans } = data;
     const userId = user.id;
     const stats = userStats.get(userId);
     const itemStats = userItems.get(userId);
@@ -189,31 +198,33 @@ export async function checkMilestoneCompletion(user, data) {
         if (milestone.type === 'PLACEHOLDER' || milestone.id === 'secret_mastery') continue;
 
         let newlyCompletedTier = null;
-        let statPathForCompletionCheck = milestone.stat;
 
         // Custom logic for complex milestones
         if (milestone.id === 'rarity_collector') {
             for (const tier of milestone.tiers) {
-                const lastKnownProgressForTier = stats.completedMilestones[milestone.id]?.[`tier_${tier.level}_progress`] || 0;
+                const wasCompleted = stats.completedMilestones[milestone.id]?.[`tier_${tier.level}_completed`];
                 const currentProgress = getStatValue(stats, itemStats, { name: 'rarityCollector', rarity: tier.rarity });
-                if (currentProgress >= tier.goal && lastKnownProgressForTier < tier.goal) {
+                if (currentProgress >= tier.goal && !wasCompleted) {
                     newlyCompletedTier = tier;
+                    stats.completedMilestones[milestone.id] = { ...stats.completedMilestones[milestone.id], [`tier_${tier.level}_completed`]: true };
                 }
             }
         } else if (milestone.id === 'versatility_master') {
              for (const tier of milestone.tiers) {
-                const lastKnownProgressForTier = stats.completedMilestones[milestone.id]?.[`tier_${tier.level}_progress`] || 0;
-                const currentProgress = getStatValue(stats, itemStats, { name: 'versatilityMaster', level: tier.level });
-                if (currentProgress >= tier.goal && lastKnownProgressForTier < tier.goal) {
+                const wasCompleted = stats.completedMilestones[milestone.id]?.[`tier_${tier.level}_completed`];
+                const currentProgress = getStatValue(stats, itemStats, { name: 'versatilityMaster', level: tier.level_req });
+                if (currentProgress >= tier.goal && !wasCompleted) {
                     newlyCompletedTier = tier;
+                     stats.completedMilestones[milestone.id] = { ...stats.completedMilestones[milestone.id], [`tier_${tier.level}_completed`]: true };
                 }
             }
         } else {
             const currentProgress = getStatValue(stats, itemStats, milestone.stat);
             for (const tier of milestone.tiers) {
-                const lastKnownProgressForTier = stats.completedMilestones[milestone.id]?.[`tier_${tier.level}_progress`] || 0;
-                if (currentProgress >= tier.goal && lastKnownProgressForTier < tier.goal) {
+                 const wasCompleted = stats.completedMilestones[milestone.id]?.[`tier_${tier.level}_completed`];
+                if (currentProgress >= tier.goal && !wasCompleted) {
                     newlyCompletedTier = tier; 
+                    stats.completedMilestones[milestone.id] = { ...stats.completedMilestones[milestone.id], [`tier_${tier.level}_completed`]: true };
                 }
             }
         }
@@ -224,7 +235,6 @@ export async function checkMilestoneCompletion(user, data) {
 
         if (newlyCompletedTier) {
             await milestoneThread.send({ content: t('milestone_completed_notification', { username: user.username, milestoneName: `${t(`milestone_${milestone.id}_title`)} Nível ${newlyCompletedTier.level}` }) });
-            stats.completedMilestones[milestone.id] = { ...stats.completedMilestones[milestone.id], [`tier_${newlyCompletedTier.level}_progress`]: getStatValue(stats, itemStats, statPathForCompletionCheck) };
         }
         
         const messageId = stats.completedMilestones[milestone.id]?.messageId;
@@ -233,7 +243,7 @@ export async function checkMilestoneCompletion(user, data) {
             if(messageToUpdate){
                  stats.userId = userId;
                  const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', t);
-                 await messageToUpdate.edit({ embeds: [milestoneData.embed], components: [milestoneData.row] });
+                 if (milestoneData) await messageToUpdate.edit({ embeds: [milestoneData.embed], components: [milestoneData.row] });
             }
         }
     }
@@ -253,17 +263,17 @@ export async function checkMilestoneCompletion(user, data) {
         const secretProgress = getStatValue(stats, itemStats, {name: 'rarityCollector', rarity: rarities.KARDEC});
         let newlyCompletedSecretTier = null;
         if (secretMilestone.secret_tier) {
-             const lastKnownProgressForTier = stats.completedMilestones[secretMilestone.id]?.[`tier_secret_progress`] || 0;
-             if (secretProgress >= secretMilestone.secret_tier.goal && lastKnownProgressForTier < secretMilestone.secret_tier.goal) {
+             const wasCompleted = stats.completedMilestones[secretMilestone.id]?.[`tier_secret_completed`];
+             if (secretProgress >= secretMilestone.secret_tier.goal && !wasCompleted) {
                 newlyCompletedSecretTier = secretMilestone.secret_tier;
+                stats.completedMilestones[secretMilestone.id] = { ...stats.completedMilestones[secretMilestone.id], [`tier_secret_completed`]: true };
              }
         }
 
         if (newlyCompletedSecretTier) {
-             await milestoneThread.send({ content: t('milestone_completed_notification', { username: user.username, milestoneName: `${t(`milestone_${secretMilestone.id}_title`)}` }) });
-             stats.completedMilestones[secretMilestone.id] = { ...stats.completedMilestones[secretMilestone.id], [`tier_secret_progress`]: secretProgress };
-
              const roleName = t(`milestone_${secretMilestone.id}_title`);
+             await milestoneThread.send({ content: t('milestone_completed_notification_role', { username: user.username, milestoneName: roleName, roleName: roleName }) });
+
              let role = guild.roles.cache.find(r => r.name === roleName);
              if (!role) {
                  try {
