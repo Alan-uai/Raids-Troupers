@@ -36,9 +36,12 @@ function generateIntelligentMission(missionTemplate, stats) {
     if(newMission.reward.coins) newMission.reward.coins = Math.ceil(newMission.reward.coins * multiplier);
     
     if (newMission.category === 'weekly') {
-        const itemRewardPool = allItems.filter(i => i.source === 'mission' && ['INCOMUM', 'RARO', 'MAIS_QUE_RARO'].includes(i.rarity));
+        const itemRewardPool = allItems.filter(i => i.source === 'mission' && ['INCOMUM', 'RARO', 'MAIS_QUE_RARO', 'MENOS_QUE_LENDARIO'].includes(i.rarity));
         if(itemRewardPool.length > 0) {
             newMission.reward.item = itemRewardPool[Math.floor(Math.random() * itemRewardPool.length)].id;
+        } else {
+             newMission.reward.coins = (newMission.reward.coins || 0) + 100;
+             newMission.reward.xp = (newMission.reward.xp || 0) + 50;
         }
     }
     
@@ -47,8 +50,6 @@ function generateIntelligentMission(missionTemplate, stats) {
 
 
 export function assignMissions(userId, userMissions, stats) {
-    if (userMissions.has(userId) && userMissions.get(userId)?.daily?.length > 0) return;
-
     const dailyMissions = missionPool.filter(m => m.category === 'daily');
     const weeklyMissions = missionPool.filter(m => m.category === 'weekly');
     
@@ -59,6 +60,7 @@ export function assignMissions(userId, userMissions, stats) {
 
     const shuffledDailies = [...dailyMissions].sort(() => 0.5 - Math.random());
     for(let i = 0; i < 3; i++) {
+        if (!shuffledDailies[i]) continue;
         const intelligentMission = generateIntelligentMission(shuffledDailies[i], stats);
         missionsToAssign.daily.push({
             id: intelligentMission.id,
@@ -146,35 +148,38 @@ async function collectReward(user, missionProgress, data) {
 }
 
 export async function collectAllRewards(interaction, userId, data) {
+    const t = await getTranslator(userId, data.userStats);
     if (interaction.user.id !== userId) {
         return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
     }
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferUpdate();
     
     const { userMissions } = data;
-    const t = await getTranslator(userId, data.userStats);
     const activeMissions = userMissions.get(userId);
     if (!activeMissions) return;
 
     const missionsToCollect = [...activeMissions.daily, activeMissions.weekly].filter(m => m && m.completed && !m.collected);
     
     if (missionsToCollect.length === 0) {
-        return await interaction.editReply({ content: t('missions_collect_all_none') });
+        await interaction.followUp({ content: t('missions_collect_all_none'), ephemeral: true });
+        return;
     }
 
     let totalXp = 0;
     let totalCoins = 0;
+    let messages = [];
 
     for (const missionProgress of missionsToCollect) {
         const result = await collectReward(interaction.user, missionProgress, data);
         totalXp += result.xp;
         totalCoins += result.coins;
+        messages.push(result.message)
     }
     
     await updateProfileImage(interaction.user, data);
     await postMissionList(interaction.message.thread, userId, 'daily', data); // Refresh the view
     
-    await interaction.editReply({ content: t('missions_collect_all_success', { xp: totalXp, coins: totalCoins }) });
+    await interaction.followUp({ content: t('missions_collect_all_success', { xp: totalXp, coins: totalCoins }), ephemeral: true });
 }
 
 
@@ -202,11 +207,11 @@ export async function checkMissionCompletion(user, missionType, data, amount = 1
             
             if (missionProgress.progress >= missionProgress.goal) {
                 missionProgress.completed = true;
-                profileNeedsUpdate = true;
                 const stats = userStats.get(userId);
                 if (stats?.autoCollectMissions && missionDetails.category === 'daily') {
                     await collectReward(user, missionProgress, data);
                 }
+                profileNeedsUpdate = true;
             }
         }
     }
@@ -221,7 +226,7 @@ export async function checkMissionCompletion(user, missionType, data, amount = 1
 
 
 export async function postMissionList(thread, userId, type, data, interaction = null) {
-    const { userMissions, userStats } = data;
+    const { userMissions, userStats, client } = data;
     const t = await getTranslator(userId, userStats);
     
     if (interaction) await interaction.deferUpdate();
@@ -231,15 +236,22 @@ export async function postMissionList(thread, userId, type, data, interaction = 
 
     const activeMissions = userMissions.get(userId);
     const missionsToShow = (type === 'daily' ? activeMissions.daily : [activeMissions.weekly]).filter(Boolean);
+    const stats = userStats.get(userId);
     
-    const row = new ActionRowBuilder()
+    const controlRow = new ActionRowBuilder()
         .addComponents(
             new ButtonBuilder().setCustomId(`mission_view_${userId}_daily`).setLabel(t('missions_view_daily_button')).setStyle(type === 'daily' ? ButtonStyle.Primary : ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`mission_view_${userId}_weekly`).setLabel(t('missions_view_weekly_button')).setStyle(type === 'weekly' ? ButtonStyle.Primary : ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`mission_collectall_${userId}`).setLabel(t('missions_collect_all_button')).setStyle(ButtonStyle.Success).setEmoji('🎉')
         );
+    
+    const autoCollectStatus = stats?.autoCollectMissions ? t('missions_autocollect_status_on') : t('missions_autocollect_status_off');
+    const autoCollectRow = new ActionRowBuilder()
+        .addComponents(
+             new ButtonBuilder().setCustomId(`mission_autocollect_${userId}`).setLabel(`${t('missions_autocollect_button')} (${autoCollectStatus})`).setStyle(ButtonStyle.Secondary)
+        );
 
-    await thread.send({ components: [row] });
+    await thread.send({ content: t('missions_autocollect_description'), components: [controlRow, autoCollectRow] });
     
     if (missionsToShow.length === 0) {
         await thread.send({ content: t('missions_no_missions_of_type', { type }) });

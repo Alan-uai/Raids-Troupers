@@ -143,11 +143,23 @@ client.on(Events.InteractionCreate, async interaction => {
         await handleBuyButton(interaction, t);
     } else if (action === 'mission') {
         const [subAction, userId, ...rest] = args;
+        if (interaction.user.id !== userId) {
+            return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
+        }
         if (subAction === 'view') {
             const type = rest[0]; // 'daily' or 'weekly'
-            await postMissionList(interaction.message.thread, userId, type, { userMissions, userStats }, interaction);
+            await postMissionList(interaction.message.thread, userId, type, { userMissions, userStats, client }, interaction);
         } else if (subAction === 'collectall') {
             await collectAllRewards(interaction, userId, { userStats, userItems, userMissions, client, userProfiles, clans });
+        } else if (subAction === 'autocollect') {
+            const stats = userStats.get(userId);
+            if (stats) {
+                stats.autoCollectMissions = !stats.autoCollectMissions;
+                userStats.set(userId, stats);
+                const status = stats.autoCollectMissions ? t('missions_autocollect_status_on') : t('missions_autocollect_status_off');
+                await interaction.reply({ content: t('missions_autocollect_toggled', { status }), ephemeral: true });
+                await postMissionList(interaction.message.thread, userId, 'daily', { userMissions, userStats, client }); // Refresh view
+            }
         }
     } else if (action === 'profile') {
         const [subAction, userId] = args;
@@ -165,7 +177,8 @@ client.on(Events.InteractionCreate, async interaction => {
             await handlePollVote(interaction, pollId, parseInt(optionIndex, 10), t);
         }
     } else if (action === 'suggestion') {
-        await handleSuggestionVote(interaction, action, args, t);
+        const voteType = args[0]; // 'approve' or 'reject'
+        await handleSuggestionVote(interaction, voteType, t);
     }
 
 
@@ -800,13 +813,12 @@ async function handlePollVote(interaction, pollId, optionIndex, t) {
     await interaction.reply({ content: t('poll_vote_success'), ephemeral: true });
 }
 
-async function handleSuggestionVote(interaction, action, args, t) {
+async function handleSuggestionVote(interaction, voteType, t) {
     const messageId = interaction.message.id;
     const userId = interaction.user.id;
-    const voteType = args[0]; // approve or reject
 
-    const userLastVote = suggestionVotes.get(userId);
-    if (userLastVote && userLastVote[messageId]) {
+    const userVotes = suggestionVotes.get(userId) || {};
+    if (userVotes[messageId]) {
         return interaction.reply({ content: t('suggestion_already_voted'), ephemeral: true });
     }
 
@@ -826,31 +838,28 @@ async function handleSuggestionVote(interaction, action, args, t) {
     } else if (voteType === 'reject') {
         rejects++;
     }
-
-    if (rejects >= 5 && approves === 0) {
-        await interaction.message.delete();
-        await interaction.followUp({ content: t('suggestion_deleted_low_votes'), ephemeral: true });
-        return;
-    }
-
+    
     embed.setFields(
         ...embed.data.fields.filter(f => f.name !== 'Votos'),
         { name: 'Votos', value: `Aprovar: ${approves}\nReprovar: ${rejects}`, inline: true }
     );
     
     await interaction.message.edit({ embeds: [embed] });
+    
+    userVotes[messageId] = true;
+    suggestionVotes.set(userId, userVotes);
 
-    if (!suggestionVotes.has(userId)) {
-        suggestionVotes.set(userId, {});
-    }
-    suggestionVotes.get(userId)[messageId] = true;
-
-    const stats = userStats.get(userId) || { level: 1, xp: 0, coins: 0 };
-    stats.xp += 20;
-    stats.coins += 10;
+    const stats = userStats.get(userId) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR', autoCollectMissions: false, completedMilestones: {} };
+    stats.xp = (stats.xp || 0) + 20;
+    stats.coins = (stats.coins || 0) + 10;
     userStats.set(userId, stats);
-
+    
     await interaction.followUp({ content: t('suggestion_vote_success'), ephemeral: true });
+    
+    if (rejects >= 5 && approves === 0) {
+        await interaction.message.delete().catch(() => {});
+        interaction.followUp({ content: t('suggestion_deleted_low_votes'), ephemeral: true }).catch(() => {});
+    }
 }
 
 
@@ -903,67 +912,9 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
 const PROFILE_CATEGORY_ID_EVENT = '1395589412661887068';
 
 client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-    const roleName = 'limpo';
-    
-    const oldHasRole = oldMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
-    const newHasRole = newMember.roles.cache.some(role => role.name.toLowerCase() === roleName);
-
-    if (!oldHasRole && newHasRole) {
-        console.log(`User ${newMember.displayName} received the '${roleName}' role. Creating channel and profile.`);
-        const guild = newMember.guild;
-        const category = guild.channels.cache.get(PROFILE_CATEGORY_ID_EVENT);
-
-        if (!category || category.type !== ChannelType.GuildCategory) {
-            console.error(`Category with ID ${PROFILE_CATEGORY_ID_EVENT} not found or is not a category.`);
-            return;
-        }
-
-        if (userProfiles.has(newMember.id)) return;
-
-        try {
-            const userLocale = newMember.user.locale || 'pt-BR';
-            const t = await getTranslator(newMember.id, userStats, userLocale);
-
-            const channel = await guild.channels.create({
-                name: newMember.displayName,
-                type: ChannelType.GuildText,
-                parent: category,
-                permissionOverwrites: [
-                     { id: interaction.guild.id, deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.CreatePublicThreads, PermissionsBitField.Flags.CreatePrivateThreads, PermissionsBitField.Flags.SendMessagesInThreads] },
-                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory] },
-                    { id: interaction.client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ManageThreads] }
-                ],
-            });
-
-            console.log(`Channel #${channel.name} created for ${newMember.displayName}.`);
-            
-            const stats = { level: 1, xp: 0, coins: 100, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: userLocale, autoCollectMissions: false, completedMilestones: {} };
-            userStats.set(newMember.id, stats);
-
-            const items = { inventory: [], equippedBackground: 'default', equippedTitle: 'default', equippedBorder: null };
-            userItems.set(newMember.id, items);
-
-            assignMissions(newMember.id, userMissions, stats);
-
-            const profileImageBuffer = await generateProfileImage(newMember, stats, items, clans, t);
-            const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
-            
-            await channel.send({ content: t('welcome_new_user', { user: newMember }) });
-            const profileMessage = await channel.send({ files: [attachment] });
-            
-            userProfiles.set(newMember.id, {
-                channelId: channel.id,
-                messageId: profileMessage.id
-            });
-            
-           // Implementar tópicos...
-            await channel.send("Tópicos de missões e outros serão implementados aqui.");
-
-
-        } catch (error) {
-            console.error(`Failed to create channel or profile for ${newMember.displayName}:`, error);
-        }
-    }
+    // This event is complex and might be triggered a lot. 
+    // It's generally better to have a command for profile creation
+    // than to rely on role updates which can be noisy and error-prone.
 });
 
 client.login(process.env.DISCORD_TOKEN);

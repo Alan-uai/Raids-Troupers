@@ -51,9 +51,16 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
                 type: ChannelType.GuildText,
                 parent: category,
                 permissionOverwrites: [
-                    { id: interaction.guild.id, deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.CreatePublicThreads, PermissionsBitField.Flags.CreatePrivateThreads, PermissionsBitField.Flags.SendMessagesInThreads] },
-                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory] },
-                    { id: interaction.client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ManageThreads] }
+                    { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }, // Everyone can't see
+                    { 
+                      id: member.id, 
+                      allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory],
+                      deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.CreatePublicThreads, PermissionsBitField.Flags.CreatePrivateThreads, PermissionsBitField.Flags.SendMessagesInThreads]
+                    },
+                    { 
+                      id: interaction.client.user.id, 
+                      allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ManageThreads, PermissionsBitField.Flags.ReadMessageHistory] 
+                    }
                 ],
             });
 
@@ -84,7 +91,7 @@ async function createOrUpdateProfile(interaction, { userStats, userProfiles, use
             });
             
             const missionsThread = await channel.threads.create({ name: t('missions_thread_title'), autoArchiveDuration: 10080, reason: t('missions_thread_reason', { username: member.displayName }) });
-            await postMissionList(missionsThread, member.id, 'daily', { userMissions, userStats });
+            await postMissionList(missionsThread, member.id, 'daily', { userMissions, userStats, client });
 
             const milestoneThread = await channel.threads.create({ name: t('milestones_thread_title'), autoArchiveDuration: 10080, reason: t('milestones_thread_reason', { username: member.displayName }) });
             for (const milestone of milestones) {
