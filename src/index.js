@@ -89,7 +89,7 @@ for (const file of commandFiles) {
         } else {
             console.log(`[WARNING] The command at ${file} is missing a required "data" or "execute" property.`);
         }
-    } catch (error) => {
+    } catch (error) {
         console.error(`Error loading command at ${file}:`, error);
     }
 }
@@ -222,20 +222,24 @@ client.on(Events.InteractionCreate, async interaction => {
             await interaction.followUp({ content: t('profile_refreshed'), ephemeral: true });
         }
     } else if (action === 'milestone') {
-       const [, subAction, milestoneId, userId] = customIdParts;
+       const [subAction, milestoneId, userId] = customIdParts;
        if (interaction.user.id !== userId) return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
+       
        const milestone = milestones.find(m => m.id === milestoneId);
        if (!milestone) return;
-
-       const view = subAction === 'back' ? 'general' : subAction; // Not used, handled in select menu
-       
+        
+       const view = 'general';
        const stats = userStats.get(userId) || {};
        stats.userId = userId;
        const itemStats = userItems.get(userId);
-       const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', await getTranslator(userId, userStats));
-       if (milestoneData) {
-           await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
-       }
+       const tForMilestone = await getTranslator(userId, userStats);
+       
+        if (subAction === 'back') {
+            const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', tForMilestone);
+            if (milestoneData) {
+                await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
+            }
+        }
     }
 
 
