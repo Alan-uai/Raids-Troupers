@@ -7,7 +7,7 @@ export default {
         .setDescription('[Líder] Dissolve seu clã permanentemente.')
         .setDescriptionLocalizations({ "en-US": "[Leader] Permanently disbands your clan." }),
     async execute(interaction, { userStats, clans }) {
-        const t = await getTranslator(interaction.user.id, userStats);
+        const t = await getTranslator(interaction.user.id);
         await interaction.deferReply({ ephemeral: true });
 
         const leaderId = interaction.user.id;
@@ -35,7 +35,7 @@ export default {
                 if (memberId !== leaderId) {
                     try {
                         const memberUser = await interaction.client.users.fetch(memberId);
-                        const memberT = await getTranslator(memberId, userStats);
+                        const memberT = await getTranslator(memberId);
                         await memberUser.send(memberT('clan_disband_dm', { clanName: clan.name }));
                     } catch (e) {
                         console.log(`Could not notify member ${memberId} about clan disband.`);

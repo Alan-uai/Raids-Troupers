@@ -39,7 +39,7 @@ export default {
                 .setRequired(true)),
 
     async execute(interaction, { userStats, clans }) {
-        const t = await getTranslator(interaction.user.id, userStats);
+        const t = await getTranslator(interaction.user.id);
         await interaction.deferReply({ ephemeral: true });
 
         const clanName = interaction.options.getString('nome');
@@ -47,21 +47,11 @@ export default {
         const clanColor = interaction.options.getString('cor');
         const createChannel = interaction.options.getBoolean('criar_canal_privado');
         const userId = interaction.user.id;
-        const creationCost = 2500;
-        const requiredLevel = 10;
         const privateChannelCategoryId = '1395583466753757326';
 
-        const stats = userStats.get(userId);
-        if (!stats || stats.level < requiredLevel) {
-            return await interaction.editReply({ content: t('clan_create_level_too_low', { level: requiredLevel }), ephemeral: true });
-        }
-        
+        const stats = userStats.get(userId) || {};
         if (stats.clanId) {
             return await interaction.editReply({ content: t('clan_create_already_in_clan'), ephemeral: true });
-        }
-
-        if (stats.coins < creationCost) {
-            return await interaction.editReply({ content: t('clan_create_not_enough_coins', { cost: creationCost, balance: stats.coins }), ephemeral: true });
         }
 
         if (!isValidHexColor(clanColor)) {
@@ -84,8 +74,6 @@ export default {
             return await interaction.editReply({ content: t('clan_create_tag_exists'), ephemeral: true });
         }
 
-        // Tudo certo, proceder com a criação
-        stats.coins -= creationCost;
         const leaderMember = await interaction.guild.members.fetch(userId);
 
         try {
@@ -154,8 +142,6 @@ export default {
 
         } catch (error) {
             console.error('Erro ao criar clã, role ou canal:', error);
-            stats.coins += creationCost; // Devolve o dinheiro se falhar
-            userStats.set(userId, stats);
             await interaction.editReply({ content: t('clan_create_error_generic'), ephemeral: true });
         }
     },

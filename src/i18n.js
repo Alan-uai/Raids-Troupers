@@ -7,6 +7,7 @@ const __dirname = path.dirname(__filename);
 const localesPath = path.join(__dirname, 'locales');
 
 const translations = new Map();
+const userLocales = new Map(); // Simple cache for user locales
 
 // Carrega todas as traduções na memória
 async function loadTranslations() {    
@@ -29,15 +30,12 @@ async function loadTranslations() {
 loadTranslations();
 
 // Função que obtém o tradutor para um usuário
-export async function getTranslator(userId, userStats, forceLocale = null) {
+export async function getTranslator(userId, forceLocale = null) {
     let locale = 'pt-BR'; // Default
     if (forceLocale) {
         locale = forceLocale;
-    } else {
-        const stats = userStats.get(userId);
-        if (stats && stats.locale) {
-            locale = stats.locale;
-        }
+    } else if (userLocales.has(userId)) {
+        locale = userLocales.get(userId);
     }
 
     // Simplifica o código do local (ex: 'en-US' -> 'en')

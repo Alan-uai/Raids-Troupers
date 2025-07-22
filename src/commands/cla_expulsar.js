@@ -14,7 +14,7 @@ export default {
                 .setDescriptionLocalizations({ "en-US": "The member you want to kick." })
                 .setRequired(true)),
     async execute(interaction, { userStats, clans }) {
-        const t = await getTranslator(interaction.user.id, userStats);
+        const t = await getTranslator(interaction.user.id);
         
         const leaderId = interaction.user.id;
         const memberToExpel = interaction.options.getUser('membro');
@@ -61,7 +61,7 @@ export default {
         await interaction.reply({ content: t('clan_kick_success', { username: memberToExpel.username }), ephemeral: true });
 
         try {
-            const memberT = await getTranslator(memberToExpel.id, userStats);
+            const memberT = await getTranslator(memberToExpel.id);
             await memberToExpel.send(memberT('clan_kick_dm_notification', { clanName: clan.name }));
         } catch (e) {
             console.log(`Could not notify ${memberToExpel.username} about their expulsion.`);

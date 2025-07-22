@@ -14,7 +14,7 @@ export default {
                 .setDescriptionLocalizations({ "en-US": "The player you want to invite." })
                 .setRequired(true)),
     async execute(interaction, { userStats, clans, pendingInvites }) {
-        const t = await getTranslator(interaction.user.id, userStats);
+        const t = await getTranslator(interaction.user.id);
         
         const leaderId = interaction.user.id;
         const memberToInvite = interaction.options.getUser('usuario');
@@ -49,7 +49,7 @@ export default {
         await interaction.reply({ content: t('clan_invite_sent', { username: memberToInvite.username, clanName: clan.name }), ephemeral: true });
 
         try {
-            const memberT = await getTranslator(memberToInvite.id, userStats);
+            const memberT = await getTranslator(memberToInvite.id);
             await memberToInvite.send(
                 memberT('clan_invite_dm_notification', { username: interaction.user.username, clanName: clan.name }) +
                 memberT('clan_invite_dm_instructions', { clanName: clan.name })

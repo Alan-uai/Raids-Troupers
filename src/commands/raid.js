@@ -1,5 +1,4 @@
 import { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } from 'discord.js';
-import { checkMissionCompletion } from '../mission-system.js';
 import { getTranslator } from '../i18n.js';
 import { data } from './raid.data.js';
 
@@ -7,10 +6,10 @@ const userLastRaidMessage = new Map();
 
 export default {
   data: data,
-  async execute(interaction, { userStats, userMissions, clans, userItems, userProfiles }) {
+  async execute(interaction, { clans }) {
     await interaction.deferReply({ ephemeral: true });
     
-    const t = await getTranslator(interaction.user.id, userStats);
+    const t = await getTranslator(interaction.user.id);
     
     const nivel = interaction.options.getString('nivel');
     const dificuldade = interaction.options.getString('dificuldade');
@@ -84,12 +83,6 @@ export default {
 
       userLastRaidMessage.set(user.id, sentMessage.id);
       
-      const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, clanId: null, locale: 'pt-BR' };
-      stats.raidsCreated += 1;
-      userStats.set(user.id, stats);
-      
-      await checkMissionCompletion(interaction.user, 'RAID_CREATED', { userStats, userMissions, client: interaction.client, userProfiles, userItems, clans });
-
       await interaction.editReply({
         content: t('raid_reply_success', { channelId: raidChannelId })
       });

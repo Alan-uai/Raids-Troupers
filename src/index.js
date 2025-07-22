@@ -1,5 +1,3 @@
-
-
 import {
   Client,
   GatewayIntentBits,
@@ -12,22 +10,13 @@ import {
   EmbedBuilder,
   ChannelType,
   PermissionsBitField,
-  AttachmentBuilder
 } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { fileURLToPath } from 'node:url';
-import { generateProfileImage } from './profile-generator.js';
-import { allItems } from './items.js';
-import { missions as missionPool, missions } from './missions.js';
-import { milestones } from './milestones.js';
-import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList, collectSingleReward } from './mission-system.js';
 import { getTranslator } from './i18n.js';
-import { createMilestoneEmbed, checkMilestoneCompletion as checkMilestone } from './milestone-system.js';
-import { postOrUpdateShopMessage } from './shop-logic.js';
-
 
 dotenv.config();
 
@@ -49,16 +38,9 @@ const client = new Client({
 
 client.commands = new Collection();
 const raidStates = new Map();
-const userStats = new Map(); 
-const userProfiles = new Map();
-const userItems = new Map(); 
-const activeAuctions = new Map();
-const pendingRatings = new Map();
-const userMissions = new Map();
 const clans = new Map();
 const pendingInvites = new Map();
-const userShopSelection = new Map();
-
+const userStats = new Map(); // Keep for locale and basic clan info if needed
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -94,39 +76,9 @@ for (const file of commandFiles) {
     }
 }
 
-const SHOP_CHANNEL_ID_PT = '1396416240263630868';
-const SHOP_CHANNEL_ID_EN = '1396725532913303612';
-
 client.once(Events.ClientReady, async (c) => {
     console.log(`✅ Logged in as ${c.user.tag}`);
-    setInterval(checkAuctionEnd, 15000);
-
-    const setupShops = async (updateItems = false) => {
-        try {
-            await Promise.all([
-                postOrUpdateShopMessage(client, await getTranslator(null, null, 'pt-BR'), SHOP_CHANNEL_ID_PT, 'pt-BR', updateItems),
-                postOrUpdateShopMessage(client, await getTranslator(null, null, 'en-US'), SHOP_CHANNEL_ID_EN, 'en-US', updateItems)
-            ]);
-        } catch (e) {
-            console.error("Error during scheduled shop update:", e);
-        }
-    };
-
-    console.log("Running initial shop setup...");
-    await setupShops(true);
-
-    if (client.shopUpdateInterval) clearInterval(client.shopUpdateInterval);
-    client.shopUpdateInterval = setInterval(() => {
-        console.log("Running periodic shop item update...");
-        setupShops(true);
-    }, 3 * 60 * 60 * 1000);
-
-    if (client.shopTimerInterval) clearInterval(client.shopTimerInterval);
-    client.shopTimerInterval = setInterval(() => {
-        setupShops(false);
-    }, 1000);
 });
-
 
 client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isChatInputCommand()) {
@@ -134,10 +86,10 @@ client.on(Events.InteractionCreate, async interaction => {
     if (!command) return;
     
     try {
-      await command.execute(interaction, { userStats, userProfiles, userItems, activeAuctions, userMissions, pendingRatings, clans, pendingInvites, client });
+      await command.execute(interaction, { clans, pendingInvites, userStats, client });
     } catch (error) {
       console.error(error);
-      const t = await getTranslator(interaction.user.id, userStats);
+      const t = await getTranslator(interaction.user.id);
       const replyOptions = { content: t('command_error'), ephemeral: true };
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(replyOptions).catch(()=>{});
@@ -146,7 +98,7 @@ client.on(Events.InteractionCreate, async interaction => {
       }
     }
   } else if (interaction.isButton()) {
-    const t = await getTranslator(interaction.user.id, userStats);
+    const t = await getTranslator(interaction.user.id);
     const customIdParts = interaction.customId.split('_');
     const action = customIdParts[0];
 
@@ -158,96 +110,9 @@ client.on(Events.InteractionCreate, async interaction => {
         } else {
             await handleRaidButton(interaction, subAction, raidArgs, t);
         }
-    } else if (action === 'auction' && customIdParts[1] === 'bid') {
-        await interaction.reply({ content: t('auction_bid_button_reply'), ephemeral: true });
-    } else if (action === 'rate') {
-        const [type, raterId, ratedId] = customIdParts.slice(1);
-        await handleRating(interaction, raterId, ratedId, type, t);
-    } else if (interaction.customId === 'shop_buy_button') {
-        await handleBuyButton(interaction, t);
-    } else if (action === 'mission') {
-        const [, subAction, userId] = customIdParts;
-        
-        if (interaction.user.id !== userId) {
-            return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
-        }
-        
-        const missionThread = interaction.channel;
-        if (!missionThread) {
-            console.error("Could not determine mission thread from interaction.");
-            return;
-        }
-
-        if (subAction === 'view') {
-            const type = customIdParts[3];
-            await postMissionList(missionThread, userId, type, { userMissions, userStats, client }, interaction);
-        } else if (subAction === 'collectall') {
-            await collectAllRewards(interaction, userId, { userStats, userItems, userMissions, client, userProfiles, clans });
-        } else if (subAction === 'autocollect') {
-            const stats = userStats.get(userId);
-            if (stats) {
-                stats.autoCollectMissions = !stats.autoCollectMissions;
-                userStats.set(userId, stats);
-                const currentViewButton = interaction.message.components[0].components[0];
-                const currentViewType = currentViewButton.customId.includes('weekly') ? 'daily' : 'weekly';
-                await postMissionList(missionThread, userId, currentViewType, { userMissions, userStats, client }, interaction);
-            }
-        } else if (subAction === 'collect') {
-             const [, , userId, missionId, missionCategory] = customIdParts;
-             const result = await collectSingleReward(interaction, userId, missionId, missionCategory, { userStats, userItems, userMissions, client, userProfiles, clans });
-             
-             if (result && result.message) {
-                await interaction.followUp({ content: result.message, ephemeral: true });
-             } else {
-                await interaction.followUp({ content: t('mission_reward_collect_error_ephemeral'), ephemeral: true });
-             }
-        }
-    } else if (action === 'profile') {
-        const [subAction, userId] = customIdParts.slice(1);
-         if (interaction.user.id !== userId) {
-            return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
-        }
-        if(subAction === 'equip') {
-            await handleEquipButton(interaction, userId, t);
-        } else if (subAction === 'class') {
-             await interaction.client.commands.get('classes').execute(interaction, { userStats });
-        } else if (subAction === 'refresh') {
-            await interaction.deferUpdate();
-            const member = await interaction.guild.members.fetch(userId);
-            const stats = userStats.get(userId);
-            const items = userItems.get(userId);
-            const profileInfo = userProfiles.get(userId);
-            
-            const profileImageBuffer = await generateProfileImage(member, stats, items, clans, t);
-            const attachment = new AttachmentBuilder(profileImageBuffer, { name: 'profile-card.png' });
-            
-            const profileChannel = await client.channels.fetch(profileInfo.channelId);
-            const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
-            await profileMessage.edit({ files: [attachment] });
-            
-            await interaction.followUp({ content: t('profile_refreshed'), ephemeral: true });
-        }
-    } else if (action === 'milestone') {
-       const [, subAction, milestoneId, userId] = customIdParts;
-       if (interaction.user.id !== userId) return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
-       
-       if (subAction === 'back') {
-            const milestone = milestones.find(m => m.id === milestoneId);
-            if (!milestone) return;
-            const stats = userStats.get(userId) || {};
-            stats.userId = userId;
-            const itemStats = userItems.get(userId);
-            const tForMilestone = await getTranslator(userId, userStats);
-            const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', tForMilestone);
-            if (milestoneData) {
-                await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
-            }
-       }
     }
-
-
   } else if (interaction.isStringSelectMenu()) {
-      const t = await getTranslator(interaction.user.id, userStats);
+      const t = await getTranslator(interaction.user.id);
       const customIdParts = interaction.customId.split('_');
       const action = customIdParts[0];
 
@@ -255,136 +120,9 @@ client.on(Events.InteractionCreate, async interaction => {
           const requesterId = customIdParts[2];
           const raidId = customIdParts[3];
           await handleRaidKick(interaction, requesterId, raidId, t);
-      } else if (action === 'rating' && customIdParts[1] === 'select') {
-          const raterId = customIdParts[2];
-          await handleRatingSelection(interaction, raterId, t);
-      } else if (interaction.customId === 'shop_select_item') {
-          const itemId = interaction.values[0];
-          userShopSelection.set(interaction.user.id, itemId);
-
-          const item = allItems.find(i => i.id === itemId);
-          if (!item) {
-              return await interaction.reply({ content: t('buy_item_not_exist'), ephemeral: true });
-          }
-
-          const embed = new EmbedBuilder()
-              .setTitle(t(`item_${item.id}_name`) || item.name)
-              .setDescription(t(`item_${item.id}_description`) || item.description)
-              .setColor('#FFA500')
-              .addFields(
-                  { name: t('price'), value: `${item.price} TC`, inline: true },
-                  { name: t('rarity'), value: item.rarity, inline: true }
-              );
-
-          if (item.url) {
-              embed.setImage(item.url);
-          }
-          if (item.bonus) {
-              embed.addFields({ name: t('xp_bonus'), value: `+${item.bonus}%`, inline: true });
-          }
-
-          const buyButton = new ActionRowBuilder().addComponents(
-              new ButtonBuilder()
-                  .setCustomId('shop_buy_button')
-                  .setLabel(t('buy_button_label'))
-                  .setStyle(ButtonStyle.Success)
-                  .setEmoji('🛒')
-          );
-
-          await interaction.reply({ embeds: [embed], components: [buyButton], ephemeral: true });
-
-      } else if (action === 'equip' && customIdParts[1] === 'select') {
-          const userId = customIdParts[2];
-          if (interaction.user.id !== userId) {
-            return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
-          }
-          const itemId = interaction.values[0];
-          await handleEquipSelection(interaction, userId, itemId, t);
-      } else if (action === 'milestone' && customIdParts[1] === 'select') {
-        const [, , milestoneId, userId] = customIdParts;
-        if (interaction.user.id !== userId) {
-            return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
-        }
-        const selectedLevel = interaction.values[0];
-        const milestone = milestones.find(m => m.id === milestoneId);
-        if (!milestone) return;
-
-        const stats = userStats.get(userId) || {};
-        stats.userId = userId;
-        const itemStats = userItems.get(userId);
-
-        const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, selectedLevel, await getTranslator(userId, userStats));
-        if (milestoneData) {
-            await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
-        }
-    }
+      }
   }
 });
-
-
-async function checkAuctionEnd() {
-    const auction = activeAuctions.get('current_auction');
-    if (!auction || new Date() < auction.endTime) return;
-
-    console.log('Finalizing auction...');
-    activeAuctions.delete('current_auction'); 
-
-    const auctionChannel = await client.channels.fetch(auction.channelId).catch(() => null);
-    if (!auctionChannel) return;
-
-    const auctionMessage = await auctionChannel.messages.fetch(auction.messageId).catch(() => null);
-    
-    const t = await getTranslator(null, null, 'pt-BR');
-    const item = allItems.find(i => i.id === auction.item.id);
-
-    const finalEmbed = new EmbedBuilder()
-        .setColor('#808080')
-        .setTitle(`🌟 ${t('auction_ended_title')} 🌟`)
-        .setDescription(t('auction_ended_desc', { itemName: t(`item_${item.id}_name`) || item.name }));
-
-    const bids = auction.bids;
-    if (bids.size === 0) {
-        finalEmbed.addFields({ name: t('result'), value: t('auction_no_bids') });
-        if(auctionMessage) await auctionMessage.edit({ embeds: [finalEmbed], components: [] });
-        return;
-    }
-
-    const winnerEntry = [...bids.entries()].sort((a, b) => b[1] - a[1])[0];
-    const [winnerId, winningBid] = winnerEntry;
-    
-    const winnerUser = await client.users.fetch(winnerId);
-    const winnerT = await getTranslator(winnerId, userStats);
-
-    const stats = userStats.get(winnerId);
-    if(stats){
-        stats.coins -= winningBid;
-        stats.auctionsWon = (stats.auctionsWon || 0) + 1;
-        userStats.set(winnerId, stats);
-    }
-
-    const items = userItems.get(winnerId) || { inventory: [], equippedGear: {}, equippedCosmetics: {} };
-    items.inventory.push(item.id);
-    userItems.set(winnerId, items);
-
-    finalEmbed.addFields(
-        { name: `🏆 ${t('winner')}`, value: `${winnerUser.username}`, inline: true },
-        { name: `💰 ${t('winning_bid')}`, value: `${winningBid} TC`, inline: true }
-    );
-    finalEmbed.setThumbnail(winnerUser.displayAvatarURL());
-    finalEmbed.setFooter({text: t('auction_winner_footer')});
-    
-    if (auctionMessage) await auctionMessage.edit({ embeds: [finalEmbed], components: [] });
-    
-    await checkMissionCompletion(winnerUser, 'AUCTION_WON', { userStats, userMissions, client, userProfiles, userItems, clans });
-    await checkMissionCompletion(winnerUser, 'EARN_COINS', { userStats, userMissions, client, userProfiles, userItems, clans }, winningBid);
-
-
-    try {
-        await winnerUser.send({ content: winnerT('auction_winner_dm', { itemName: winnerT(`item_${item.id}_name`) || item.name, bid: winningBid }) });
-    } catch (e) {
-        console.log(`Could not send DM to auction winner ${winnerUser.username}`);
-    }
-}
 
 
 async function handleRaidButton(interaction, subAction, args, t) {
@@ -454,7 +192,7 @@ async function handleRaidButton(interaction, subAction, args, t) {
         if (!currentThread) {
              raidStates.set(raidId, new Map());
              const requesterMember = await interaction.guild.members.fetch(raidRequester.id).catch(() => null);
-             const requesterT = await getTranslator(raidRequester.id, userStats);
+             const requesterT = await getTranslator(raidRequester.id);
 
              currentThread = await originalRaidMessage.startThread({ name: requesterT('raid_thread_name', { username: requesterMember?.displayName || raidRequester.username }), autoArchiveDuration: 10080 }).catch(e => { console.error("Error creating thread:", e); return null; });
              if (!currentThread) return;
@@ -473,7 +211,7 @@ async function handleRaidButton(interaction, subAction, args, t) {
         if (current >= 5) return await interaction.followUp({ content: t('raid_is_full'), ephemeral: true });
         
         await currentThread.members.add(interactor.id).catch(e => console.error(`Failed to add member ${interactor.id} to thread:`, e));
-        const interactorT = await getTranslator(interactor.id, userStats);
+        const interactorT = await getTranslator(interactor.id);
         await currentThread.send(interactorT('raid_user_joined', { username: interactor.username }));
         current++;
 
@@ -487,7 +225,6 @@ async function handleRaidButton(interaction, subAction, args, t) {
         await originalRaidMessage.edit({ embeds: [raidEmbed], components: [originalRow] });
     }
 }
-
 
 async function handleControlsButton(interaction, requesterId, raidId, t) {
     if (interaction.user.id !== requesterId) {
@@ -505,23 +242,6 @@ async function handleControlsButton(interaction, requesterId, raidId, t) {
     }
 }
 
-async function handleVoiceOptIn(interaction, raidId, t) {
-    if (!raidId) return interaction.reply({ content: t('vc_raid_data_not_found'), ephemeral: true });
-
-    const raidChannelId = '1395591154208084049';
-    const raidChannel = await client.channels.fetch(raidChannelId);
-    const originalRaidMessage = await raidChannel.messages.fetch(raidId).catch(() => null);
-    if (!originalRaidMessage) return interaction.reply({ content: t('vc_raid_not_active'), ephemeral: true });
-
-    const raidState = raidStates.get(raidId) || new Map();
-    const userHasOptedIn = raidState.get(interaction.user.id) || false;
-    raidState.set(interaction.user.id, !userHasOptedIn);
-    raidStates.set(raidId, raidState);
-
-    const feedbackMessage = !userHasOptedIn ? t('vc_opt_in_enabled') : t('vc_opt_in_disabled');
-    await interaction.reply({ content: feedbackMessage, ephemeral: true });
-}
-
 async function handleRaidStart(interaction, originalRaidMessage, requesterId, raidId, t) {
     const thread = originalRaidMessage.thread;
     const raidState = raidStates.get(raidId);
@@ -531,7 +251,7 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
 
     if (voiceOptInCount >= 2) {
         const leader = await interaction.guild.members.fetch(requesterId);
-        const leaderT = await getTranslator(requesterId, userStats);
+        const leaderT = await getTranslator(requesterId);
         voiceChannel = await interaction.guild.channels.create({
             name: leaderT('raid_voice_channel_name', { username: leader.displayName }),
             type: ChannelType.GuildVoice,
@@ -545,86 +265,11 @@ async function handleRaidStart(interaction, originalRaidMessage, requesterId, ra
     const members = await thread.members.fetch();
     const participants = [];
     
-    const leaderStats = userStats.get(requesterId);
-
     for (const member of members.values()) {
         const user = client.users.cache.get(member.id);
         if (!user || user.bot) continue;
         participants.push(user);
-        
-        const userT = await getTranslator(user.id, userStats);
-        const stats = userStats.get(user.id) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR', autoCollectMissions: false };
-        const items = userItems.get(user.id) || { inventory: [], equippedGear: {}, equippedCosmetics: {} };
-        
-        let leveledUp = false;
-        
-        if (user.id !== requesterId) {
-            let xpBonusPercent = 0;
-            if (items.equippedGear) {
-                for (const gearId of Object.values(items.equippedGear)) {
-                    const gearItem = allItems.find(i => i.id === gearId);
-                    if (gearItem && gearItem.bonus) {
-                        xpBonusPercent += gearItem.bonus;
-                    }
-                }
-            }
-
-            let xpGained = 25;
-            const coinsGained = 10;
-
-            xpGained = Math.ceil(xpGained * (1 + xpBonusPercent / 100));
-            
-            stats.raidsHelped += 1;
-            stats.xp += xpGained;
-            stats.coins += coinsGained;
-
-            await checkMissionCompletion(user, 'EARN_COINS', { userStats, userMissions, client, userProfiles, userItems, clans }, coinsGained);
-
-            let xpToLevelUp = 100 * stats.level;
-            const previousLevel = stats.level;
-            while (stats.xp >= xpToLevelUp) {
-                stats.level += 1;
-                stats.xp -= xpToLevelUp;
-                xpToLevelUp = 100 * stats.level;
-                leveledUp = true;
-            }
-            if(leveledUp) {
-                await checkMissionCompletion(user, 'LEVEL_UP', { userStats, userMissions, client, userProfiles, userItems, clans }, stats.level);
-                // Check for Mentor de Elite milestone
-                if(leaderStats && leaderStats.level >= 20 && previousLevel < 10 && stats.level >= 10){
-                   leaderStats.mentoredPlayers = (leaderStats.mentoredPlayers || 0) + 1;
-                   await checkMissionCompletion(client.users.cache.get(requesterId), 'MENTOR_PLAYER', { userStats, userMissions, client, userProfiles, userItems, clans });
-                }
-
-                 try {
-                    await user.send({ content: userT('level_up_notification', { level: stats.level }) });
-                } catch(e) {
-                    await thread.send({ content: userT('level_up_notification_public', { userId: user.id, level: stats.level }) });
-                }
-            }
-        }
-        
-        // Update Battle Strategist milestone for the leader
-        if (leaderStats?.class && leaderStats.class !== leaderStats.lastClassUsedInRaid) {
-             leaderStats.battleStrategist = (leaderStats.battleStrategist || 0) + 1;
-             await checkMissionCompletion(client.users.cache.get(requesterId), 'BATTLE_STRATEGIST', { userStats, userMissions, client, userProfiles, userItems, clans });
-        }
-        if(leaderStats?.class) leaderStats.lastClassUsedInRaid = leaderStats.class;
-        
-        userStats.set(user.id, stats);
-        await checkMissionCompletion(user, 'RAID_HELPED', { userStats, userMissions, client, userProfiles, userItems, clans });
-
-
-        const guildMember = await interaction.guild.members.fetch(user.id).catch(() => null);
-        if (voiceChannel && raidState?.get(user.id) && guildMember?.voice.channelId !== voiceChannel.id) {
-            await guildMember.voice.setChannel(voiceChannel).catch(e => console.log(`Failed to move ${guildMember.displayName}: ${e.message}`));
-        } else if (voiceChannel && !raidState?.get(user.id)) {
-            const joinVCButton = new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(voiceChannel.url));
-            try { await user.send({ content: userT('raid_started_vc_created'), components: [joinVCButton] }); } catch (dmError) { console.log(`Could not DM user ${user.id}`); }
-        }
     }
-    
-    if (participants.length > 1) await startRatingProcess(participants);
     
     const helpers = participants.filter(p => p.id !== requesterId);
     if (helpers.length > 0) {
@@ -676,7 +321,7 @@ async function handleRaidKick(interaction, requesterId, raidId, t) {
         try {
             const leaderMember = await interaction.guild.members.fetch(requesterId).catch(() => null);
             const leaderDisplayName = leaderMember?.displayName || interaction.user.username;
-            const kickedT = await getTranslator(memberToKickId, userStats);
+            const kickedT = await getTranslator(memberToKickId);
             await kickedUser.send(kickedT('kick_dm_notification', { leaderName: leaderDisplayName }));
         } catch (dmError) {
             console.error(`Could not DM kicked user ${kickedUser.username}.`);
@@ -684,14 +329,6 @@ async function handleRaidKick(interaction, requesterId, raidId, t) {
         }
 
         if (raidStates.has(raidId)) raidStates.get(raidId).delete(memberToKickId);
-
-        const leaderStats = userStats.get(requesterId);
-        if(leaderStats) leaderStats.kickedOthers = (leaderStats.kickedOthers || 0) + 1;
-
-        const kickedStats = userStats.get(memberToKickId);
-        if(kickedStats) kickedStats.wasKicked = (kickedStats.wasKicked || 0) + 1;
-        
-        await checkMissionCompletion(interaction.user, 'KICK_MEMBER', { userStats, userMissions, client, userProfiles, userItems, clans });
 
         const raidEmbed = EmbedBuilder.from(originalRaidMessage.embeds[0]);
         const membersField = raidEmbed.data.fields.find(f => f.name.includes(t('team_members')));
@@ -710,268 +347,6 @@ async function handleRaidKick(interaction, requesterId, raidId, t) {
     }
 }
 
-
-async function startRatingProcess(participants) {
-    for (const rater of participants) {
-        const othersToRate = participants.filter(p => p.id !== rater.id);
-        if (othersToRate.length === 0) continue;
-
-        pendingRatings.set(rater.id, othersToRate.map(p => p.id));
-        const raterT = await getTranslator(rater.id, userStats);
-
-        const selectOptions = othersToRate.map(p => ({
-            label: p.username, value: p.id, description: raterT('rate_user_description', { username: p.username })
-        }));
-
-        const selectMenu = new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder().setCustomId(`rating_select_${rater.id}`).setPlaceholder(raterT('rating_select_placeholder')).addOptions(selectOptions)
-        );
-
-        try {
-            await rater.send({ content: raterT('rating_dm_initial'), components: [selectMenu] });
-        } catch (e) {
-            console.log(`Could not send rating DM to ${rater.username}`);
-        }
-    }
-}
-
-async function handleRatingSelection(interaction, raterId, t) {
-    const ratedId = interaction.values[0];
-    const ratedUser = await client.users.fetch(ratedId);
-
-    const ratingButtons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`rate_up_${raterId}_${ratedId}`).setLabel(t('rate_positive')).setStyle(ButtonStyle.Success).setEmoji('👍'),
-        new ButtonBuilder().setCustomId(`rate_down_${raterId}_${ratedId}`).setLabel(t('rate_negative')).setStyle(ButtonStyle.Danger).setEmoji('👎')
-    );
-
-    await interaction.update({ content: t('rate_how', { username: ratedUser.username }), components: [ratingButtons] });
-}
-
-async function handleRating(interaction, raterId, ratedId, type, t) {
-    const raterPending = pendingRatings.get(raterId);
-    if (!raterPending || !raterPending.includes(ratedId)) {
-        return await interaction.update({ content: t('rating_already_rated'), components: [] });
-    }
-
-    const stats = userStats.get(ratedId) || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, locale: 'pt-BR', autoCollectMissions: false };
-    stats.totalRatings = (stats.totalRatings || 0) + 1;
-    if (type === 'up') {
-        stats.reputation = (stats.reputation || 0) + 1;
-    }
-    userStats.set(ratedId, stats);
-
-    const updatedPending = raterPending.filter(id => id !== ratedId);
-    if (updatedPending.length === 0) {
-        pendingRatings.delete(raterId);
-        await interaction.update({ content: t('rating_thanks_all_rated'), components: [] });
-    } else {
-        pendingRatings.set(raterId, updatedPending);
-        const selectOptions = updatedPending.map(id => {
-            const user = client.users.cache.get(id);
-            return {
-                label: user.username,
-                value: id,
-                description: t('rate_user_description', { username: user.username })
-            };
-        });
-        const selectMenu = new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder().setCustomId(`rating_select_${raterId}`).setPlaceholder(t('rating_select_placeholder_next')).addOptions(selectOptions)
-        );
-        await interaction.update({ content: t('rating_thanks_next'), components: [selectMenu] });
-    }
-    
-    await checkMissionCompletion(interaction.user, 'RATE_PLAYER', { userStats, userMissions, client, userProfiles, userItems, clans });
-
-    const profileInfo = userProfiles.get(ratedId);
-    if (profileInfo) {
-         try {
-            const profileChannel = await client.channels.fetch(profileInfo.channelId);
-            const ratedT = await getTranslator(ratedId, userStats);
-            const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
-            const guild = profileChannel.guild;
-            const member = await guild.members.fetch(ratedId);
-            const items = userItems.get(ratedId) || { inventory: [], equippedGear: {}, equippedCosmetics: {} };
-            
-            const newProfileImageBuffer = await generateProfileImage(member, stats, items, clans, ratedT);
-            const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
-            
-            await profileMessage.edit({ files: [newAttachment] });
-        } catch (updateError) {
-            console.error(`Failed to update profile image for ${ratedId} after rating:`, updateError);
-        }
-    }
-}
-
-async function handleBuyButton(interaction, t) {
-    const userId = interaction.user.id;
-    
-    if (!userProfiles.has(userId)) {
-        return await interaction.reply({ content: t('buy_profile_not_found'), ephemeral: true });
-    }
-    
-    const itemId = userShopSelection.get(userId);
-    if (!itemId) {
-        return await interaction.reply({ content: t('buy_no_item_selected'), ephemeral: true });
-    }
-
-    const itemToBuy = allItems.find(item => item.id === itemId);
-    if (!itemToBuy) {
-        return; 
-    }
-    
-    await interaction.deferReply({ ephemeral: true });
-
-    const stats = userStats.get(userId);
-    const items = userItems.get(userId);
-
-    if (items.inventory.includes(itemId)) {
-      return await interaction.editReply({ content: t('buy_interaction_fail_owned', { itemName: t(`item_${itemToBuy.id}_name`) || itemToBuy.name }) });
-    }
-
-    if (!stats || stats.coins < itemToBuy.price) {
-      return await interaction.editReply({ content: t('buy_interaction_fail_coins', { itemName: t(`item_${itemToBuy.id}_name`) || itemToBuy.name }) });
-    }
-
-    stats.coins -= itemToBuy.price;
-    items.inventory.push(itemId);
-
-    userStats.set(userId, stats);
-    userItems.set(userId, items);
-    
-    userShopSelection.delete(userId);
-    
-    await interaction.editReply({ content: t('buy_interaction_success', { itemName: t(`item_${itemToBuy.id}_name`) || itemToBuy.name, balance: stats.coins }) });
-}
-
-async function handleEquipButton(interaction, userId, t) {
-    if (interaction.user.id !== userId) {
-        return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
-    }
-
-    const userItemsData = userItems.get(userId);
-    const inventory = userItemsData?.inventory || [];
-
-    if (inventory.length === 0) {
-        return await interaction.reply({ content: t('inventory_empty'), ephemeral: true });
-    }
-
-    const equippableItems = inventory
-        .map(id => allItems.find(item => item.id === id))
-        .filter(item => item && (item.type === 'fundo' || item.type === 'titulo' || item.type === 'borda_avatar' || item.type === 'progressbar' || item.bonus));
-
-    if (equippableItems.length === 0) {
-        return await interaction.reply({ content: t('equip_no_equippable_items'), ephemeral: true });
-    }
-
-    const options = equippableItems.map(item => ({
-        label: t(`item_${item.id}_name`) || item.name,
-        description: t(`item_type_${item.type}`),
-        value: item.id
-    }));
-
-    const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId(`equip_select_${userId}`)
-        .setPlaceholder(t('equip_select_placeholder'))
-        .addOptions(options);
-
-    const row = new ActionRowBuilder().addComponents(selectMenu);
-
-    await interaction.reply({ content: t('equip_select_prompt'), components: [row], ephemeral: true });
-}
-
-async function handleEquipSelection(interaction, userId, itemId, t) {
-    await interaction.deferUpdate();
-    
-    const items = userItems.get(userId);
-    if (!items || !items.inventory.includes(itemId)) {
-      return await interaction.followUp({ content: t('equip_not_owned'), ephemeral: true });
-    }
-    
-    const itemToEquip = allItems.find(item => item.id === itemId);
-    if (!itemToEquip) {
-        return await interaction.followUp({ content: t('equip_item_not_exist'), ephemeral: true });
-    }
-
-    if (!items.equippedCosmetics) items.equippedCosmetics = {};
-    if (!items.equippedGear) items.equippedGear = {};
-
-    let replyMessage = '';
-    const itemDisplayName = t(`item_${itemToEquip.id}_name`) || itemToEquip.name;
-
-    if (['fundo', 'titulo', 'borda_avatar', 'progressbar'].includes(itemToEquip.type)) {
-        items.equippedCosmetics[itemToEquip.type] = itemToEquip.id;
-        replyMessage = t('equip_cosmetic_success', { itemType: t(`item_type_${itemToEquip.type}`), itemName: itemDisplayName });
-    } else if (itemToEquip.bonus) {
-        items.equippedGear[itemToEquip.type] = itemToEquip.id;
-        replyMessage = t('equip_gear_success', { itemType: t(`item_type_${itemToEquip.type}`), itemName: itemDisplayName });
-    } else {
-        return await interaction.followUp({ content: t('equip_cannot_equip_type'), ephemeral: true });
-    }
-
-    userItems.set(userId, items);
-    
-    const profileInfo = userProfiles.get(userId);
-    if (profileInfo?.channelId && profileInfo?.messageId) {
-        try {
-            const stats = userStats.get(userId);
-            const member = await interaction.guild.members.fetch(userId);
-
-            const newProfileImageBuffer = await generateProfileImage(member, stats, items, clans, t);
-            const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
-
-            const profileChannel = await interaction.client.channels.fetch(profileInfo.channelId);
-            const profileMessage = await profileChannel.messages.fetch(profileInfo.messageId);
-            
-            await profileMessage.edit({ files: [newAttachment] });
-
-        } catch (updateError) {
-            console.error(`Failed to update profile image for ${userId}:`, updateError);
-        }
-    }
-    
-    await interaction.followUp({ content: replyMessage, ephemeral: true });
-}
-
-
-client.on(Events.MessageCreate, async message => {
-  if (message.author.bot || !message.mentions.has(client.user.id)) return;
-  
-  const t = await getTranslator(message.author.id, userStats);
-  const question = message.content.replace(/<@!?\d+>/g, '').trim();
-  if (!question) return;
-
-  try {
-      const systemPrompt = `Analyze the user's sentence and categorize it into "pergunta" (question), "pedido" (request), or "conversa" (conversation). Respond only with the category word, in lowercase.`;
-      const categoryResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ "model": "google/gemini-pro", "messages": [{ "role": "system", "content": systemPrompt }, { "role": "user", "content": question }] })
-      });
-      const categoryData = await categoryResponse.json();
-      const category = categoryData.choices[0].message.content.toLowerCase().trim();
-
-      let feedbackMessage = t('ai_typing');
-      if (category.includes('pergunta')) feedbackMessage = t('ai_thinking');
-      else if (category.includes('pedido')) feedbackMessage = t('ai_analyzing');
-      
-      const feedbackMsg = await message.channel.send(feedbackMessage);
-
-      const mainResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ "model": "google/gemini-pro", "messages": [{ "role": "user", "content": question }] })
-      });
-      const mainData = await mainResponse.json();
-      const response = mainData.choices[0].message.content;
-
-      await feedbackMsg.delete();
-      await message.reply(response.slice(0, 2000));
-  } catch (err) {
-    console.error("Error replying to mention:", err);
-    await message.reply(t('ai_error'));
-  }
-});
-
 client.on(Events.VoiceStateUpdate, (oldState, newState) => {
     const oldChannel = oldState.channel;
     if (oldChannel && oldChannel.name.startsWith('Raid de ') && oldChannel.members.size === 0) {
@@ -979,26 +354,4 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
     }
 });
 
-client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-    const oldStats = userStats.get(newMember.id);
-    if (!oldStats || !oldStats.class) return;
-
-    // Se o nível mudou, atualize o nível da classe
-    if (oldMember.level !== newMember.level) {
-        if (!oldStats.classLevels) oldStats.classLevels = {};
-        
-        const currentClass = oldStats.class;
-        const currentClassLevel = oldStats.classLevels[currentClass] || 0;
-        
-        if (newMember.level > currentClassLevel) {
-            oldStats.classLevels[currentClass] = newMember.level;
-            userStats.set(newMember.id, oldStats);
-            await checkMilestone(newMember.user, { userStats, userItems: userItems, client, userProfiles, clans });
-        }
-    }
-});
-
-
 client.login(process.env.DISCORD_TOKEN);
-
-    

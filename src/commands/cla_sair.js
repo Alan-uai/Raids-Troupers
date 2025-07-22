@@ -9,7 +9,7 @@ export default {
             "en-US": "Leaves your current clan."
         }),
     async execute(interaction, { userStats, clans }) {
-        const t = await getTranslator(interaction.user.id, userStats);
+        const t = await getTranslator(interaction.user.id);
         
         const userId = interaction.user.id;
         const stats = userStats.get(userId);

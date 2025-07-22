@@ -11,7 +11,7 @@ export default {
                 .setDescription('O nome do clã que você quer ver (deixe em branco para ver o seu).')
                 .setDescriptionLocalizations({ "en-US": "The name of the clan you want to see (leave blank to see yours)." })),
     async execute(interaction, { userStats, clans }) {
-        const t = await getTranslator(interaction.user.id, userStats);
+        const t = await getTranslator(interaction.user.id);
 
         const clanNameArg = interaction.options.getString('nome_do_cla');
         const userId = interaction.user.id;

@@ -14,7 +14,7 @@ export default {
                 .setDescriptionLocalizations({ "en-US": "The name of the clan you want to join." })
                 .setRequired(true)),
     async execute(interaction, { userStats, clans, pendingInvites }) {
-        const t = await getTranslator(interaction.user.id, userStats);
+        const t = await getTranslator(interaction.user.id);
         
         const clanName = interaction.options.getString('nome_do_cla');
         const userId = interaction.user.id;
@@ -24,7 +24,7 @@ export default {
             return await interaction.reply({ content: t('clan_accept_no_invite'), ephemeral: true });
         }
 
-        const stats = userStats.get(userId) || { level: 1, xp: 0, coins: 0, class: null, raidsCreated: 0, raidsHelped: 0, kickedOthers: 0, wasKicked: 0, reputation: 0, totalRatings: 0, clanId: null, locale: 'pt-BR' };
+        const stats = userStats.get(userId) || { clanId: null };
         if (stats.clanId) {
             return await interaction.reply({ content: t('clan_accept_already_in_clan'), ephemeral: true });
         }
@@ -59,8 +59,7 @@ export default {
 
         try {
             const leader = await interaction.client.users.fetch(clan.leader);
-            const leaderStats = userStats.get(clan.leader);
-            const leaderT = await getTranslator(clan.leader, userStats, leaderStats?.locale);
+            const leaderT = await getTranslator(clan.leader);
             await leader.send(leaderT('clan_accept_leader_notification', { username: interaction.user.username, clanName: clan.name }));
         } catch (e) {
             console.log(`Could not notify clan leader ${clan.name} about a new member.`);

@@ -13,7 +13,7 @@ export default {
                 .setRequired(true)
                 .setMaxLength(1024)),
     async execute(interaction, { userStats, clans }) {
-        const t = await getTranslator(interaction.user.id, userStats);
+        const t = await getTranslator(interaction.user.id);
         
         const leaderId = interaction.user.id;
         const message = interaction.options.getString('mensagem');
