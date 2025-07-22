@@ -8,9 +8,10 @@ const userLastRaidMessage = new Map();
 export default {
   data: data,
   async execute(interaction, { userStats, userMissions, clans, userItems, userProfiles }) {
-    const t = await getTranslator(interaction.user.id, userStats);
     await interaction.deferReply({ ephemeral: true });
-
+    
+    const t = await getTranslator(interaction.user.id, userStats);
+    
     const nivel = interaction.options.getString('nivel');
     const dificuldade = interaction.options.getString('dificuldade');
     const user = interaction.user;
@@ -99,5 +100,3 @@ export default {
     }
   }
 };
-
-    

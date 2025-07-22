@@ -9,12 +9,12 @@ import { createMilestoneEmbed, checkMilestoneCompletion } from '../milestone-sys
 const PROFILE_CATEGORY_ID = '1395589412661887068';
 
 async function createOrUpdateProfile(interaction, { userStats, userProfiles, userItems, clans, userMissions, client }) {
+    await interaction.deferReply({ ephemeral: true });
+    
     const targetUser = interaction.options.getUser('usuario') || interaction.user;
     const isSelf = targetUser.id === interaction.user.id;
     const t = await getTranslator(interaction.user.id, userStats);
     
-    await interaction.deferReply({ ephemeral: true });
-
     const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
     if (!member) {
         return await interaction.editReply({ content: t('profile_user_not_found'), ephemeral: true });
