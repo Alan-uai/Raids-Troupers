@@ -103,40 +103,32 @@ client.once(Events.ClientReady, async (c) => {
 
     const setupShops = async (updateItems = false) => {
         try {
-            const t_pt = await getTranslator(null, null, 'pt-BR');
-            const t_en = await getTranslator(null, null, 'en-US');
-            
             await Promise.all([
-                postOrUpdateShopMessage(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', updateItems),
-                postOrUpdateShopMessage(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', updateItems)
+                postOrUpdateShopMessage(client, await getTranslator(null, null, 'pt-BR'), SHOP_CHANNEL_ID_PT, 'pt-BR', updateItems),
+                postOrUpdateShopMessage(client, await getTranslator(null, null, 'en-US'), SHOP_CHANNEL_ID_EN, 'en-US', updateItems)
             ]);
         } catch (e) {
             console.error("Error during scheduled shop update:", e);
         }
     };
 
-    // Initial shop setup with item update
     console.log("Running initial shop setup...");
     await setupShops(true);
 
-    // Interval for item rotation (every 3 hours)
     if (client.shopUpdateInterval) clearInterval(client.shopUpdateInterval);
     client.shopUpdateInterval = setInterval(() => {
         console.log("Running periodic shop item update...");
         setupShops(true);
-    }, 3 * 60 * 60 * 1000); // 3 hours
+    }, 3 * 60 * 60 * 1000);
 
-    // Interval for timer update (every second)
     if (client.shopTimerInterval) clearInterval(client.shopTimerInterval);
     client.shopTimerInterval = setInterval(() => {
         setupShops(false);
-    }, 1000); // 1 second
+    }, 1000);
 });
 
 
 client.on(Events.InteractionCreate, async interaction => {
-  const t = await getTranslator(interaction.user.id, userStats);
-
   if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
@@ -145,6 +137,7 @@ client.on(Events.InteractionCreate, async interaction => {
       await command.execute(interaction, { userStats, userProfiles, userItems, activeAuctions, userMissions, pendingRatings, clans, pendingInvites, client });
     } catch (error) {
       console.error(error);
+      const t = await getTranslator(interaction.user.id, userStats);
       const replyOptions = { content: t('command_error'), ephemeral: true };
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(replyOptions).catch(()=>{});
@@ -153,6 +146,7 @@ client.on(Events.InteractionCreate, async interaction => {
       }
     }
   } else if (interaction.isButton()) {
+    const t = await getTranslator(interaction.user.id, userStats);
     const customIdParts = interaction.customId.split('_');
     const action = customIdParts[0];
 
@@ -172,7 +166,8 @@ client.on(Events.InteractionCreate, async interaction => {
     } else if (interaction.customId === 'shop_buy_button') {
         await handleBuyButton(interaction, t);
     } else if (action === 'mission') {
-        const [, subAction, userId, ...restArgs] = customIdParts;
+        const [, subAction, userId] = customIdParts;
+        
         if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
@@ -184,7 +179,7 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         if (subAction === 'view') {
-            const type = restArgs[0];
+            const type = customIdParts[3];
             await postMissionList(missionThread, userId, type, { userMissions, userStats, client }, interaction);
         } else if (subAction === 'collectall') {
             await collectAllRewards(interaction, userId, { userStats, userItems, userMissions, client, userProfiles, clans });
@@ -198,10 +193,13 @@ client.on(Events.InteractionCreate, async interaction => {
                 await postMissionList(missionThread, userId, currentViewType, { userMissions, userStats, client }, interaction);
             }
         } else if (subAction === 'collect') {
-             const [missionId, missionCategory] = restArgs;
+             const missionId = customIdParts[3];
+             const missionCategory = customIdParts[4];
              const result = await animateAndCollectReward(interaction, userId, missionId, missionCategory, { userStats, userItems, userMissions, client, userProfiles, clans });
-              if (result && result.message) {
+             if (result && result.message) {
                 await interaction.followUp({ content: result.message, ephemeral: true });
+             } else {
+                await interaction.followUp({ content: t('mission_reward_collect_error_ephemeral'), ephemeral: true });
              }
         }
     } else if (action === 'profile') {
@@ -249,6 +247,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
 
   } else if (interaction.isStringSelectMenu()) {
+      const t = await getTranslator(interaction.user.id, userStats);
       const customIdParts = interaction.customId.split('_');
       const action = customIdParts[0];
 

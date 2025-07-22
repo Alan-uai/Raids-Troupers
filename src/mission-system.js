@@ -428,22 +428,25 @@ async function animateLine(channel, show = true) {
 
 
 export async function animateAndCollectReward(interaction, userId, missionId, missionCategory, data) {
+    if (!missionId || !missionCategory) {
+        console.error(`animateAndCollectReward called with invalid missionId or missionCategory.`);
+        return null;
+    }
+
     const { userMissions, userStats } = data;
     const t = await getTranslator(userId, userStats);
-
     await interaction.deferUpdate();
 
     const activeMissions = userMissions.get(userId);
     if (!activeMissions || !activeMissions[missionCategory]) {
          console.error(`Mission category '${missionCategory}' not found for user ${userId}.`);
-         await interaction.followUp({ content: t('mission_reward_collect_error_ephemeral'), ephemeral: true });
          return null;
     }
+
     const missionsList = activeMissions[missionCategory];
     const missionProgress = missionsList.find(m => m.id === missionId);
 
     if (!missionProgress || !missionProgress.completed || missionProgress.collected) {
-        await interaction.followUp({ content: t('mission_reward_collect_error_ephemeral'), ephemeral: true });
         return null;
     }
     
