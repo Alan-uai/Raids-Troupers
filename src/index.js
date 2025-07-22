@@ -89,7 +89,7 @@ for (const file of commandFiles) {
         } else {
             console.log(`[WARNING] The command at ${file} is missing a required "data" or "execute" property.`);
         }
-    } catch (error) {
+    } catch (error) => {
         console.error(`Error loading command at ${file}:`, error);
     }
 }
@@ -122,8 +122,9 @@ client.once(Events.ClientReady, async (c) => {
   if (client.shopTimerInterval) clearInterval(client.shopTimerInterval);
   client.shopTimerInterval = setInterval(async () => {
       const t_pt = await getTranslator(null, null, 'pt-BR');
-      const t_en = await getTranslator(null, null, 'en-US');
       await postOrUpdateShopMessage(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', false).catch(e => console.error("Error updating PT timer:", e));
+      
+      const t_en = await getTranslator(null, null, 'en-US');
       await postOrUpdateShopMessage(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', false).catch(e => console.error("Error updating EN timer:", e));
   }, 1000); // 1 second
 });
@@ -221,17 +222,19 @@ client.on(Events.InteractionCreate, async interaction => {
             await interaction.followUp({ content: t('profile_refreshed'), ephemeral: true });
         }
     } else if (action === 'milestone') {
-       const [,, milestoneId, userId] = customIdParts;
+       const [, subAction, milestoneId, userId] = customIdParts;
        if (interaction.user.id !== userId) return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
        const milestone = milestones.find(m => m.id === milestoneId);
-       if (milestone) {
-         const stats = userStats.get(userId) || {};
-         stats.userId = userId;
-         const itemStats = userItems.get(userId);
-         const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', await getTranslator(userId, userStats));
-         if (milestoneData) {
-             await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
-         }
+       if (!milestone) return;
+
+       const view = subAction === 'back' ? 'general' : subAction; // Not used, handled in select menu
+       
+       const stats = userStats.get(userId) || {};
+       stats.userId = userId;
+       const itemStats = userItems.get(userId);
+       const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', await getTranslator(userId, userStats));
+       if (milestoneData) {
+           await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
        }
     }
 

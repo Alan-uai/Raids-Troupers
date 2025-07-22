@@ -65,7 +65,6 @@ function formatTime(ms) {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     let seconds = totalSeconds % 60;
     
-    // Only show countdown for the last 10 seconds
     if (totalSeconds > 10) {
        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
     }
@@ -99,6 +98,16 @@ export async function postOrUpdateShopMessage(client, t, channelId, locale, upda
 
         if (shopItems.length === 0) {
             embed.setDescription(t('shop_empty'));
+        } else {
+             shopItems.forEach(item => {
+                const itemName = t(`item_${item.id}_name`) || item.name;
+                const bonusText = item.bonus ? `(+${item.bonus}% XP)` : '';
+                embed.addFields({
+                    name: `**${itemName}**`,
+                    value: `*${t('price')}: ${item.price} TC ${bonusText}*`,
+                    inline: false,
+                });
+            });
         }
 
         const selectMenu = new StringSelectMenuBuilder()
