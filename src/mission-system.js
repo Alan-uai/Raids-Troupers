@@ -103,6 +103,11 @@ export function assignMissions(userId, userMissions, stats) {
         intelligentWeekly.reward = { item: ultraRarePlusPool[Math.floor(Math.random() * ultraRarePlusPool.length)].id };
         missionsToAssign.weekly.push(intelligentWeekly);
     }
+     // Fill up to 5 weekly missions if pools were empty
+    while (missionsToAssign.weekly.length < 5 && weeklyTemplates.length > 0) {
+        const intelligentMission = generateIntelligentMission(weeklyTemplates.pop(), stats);
+        missionsToAssign.weekly.push(intelligentMission);
+    }
     
     // Finalize weekly missions
      missionsToAssign.weekly = missionsToAssign.weekly.map(mission => ({
@@ -274,7 +279,7 @@ function generateMissionEmbeds(missions, category, userId, t) {
         let rewardText;
         if (reward.item) {
             const itemDetails = allItems.find(i => i.id === reward.item);
-            rewardText = itemDetails ? `Item: **${t(`item_${itemDetails.id}_name`, { defaultValue: itemDetails.name })}**` : '**Item Secreto**'; // Added defaultValue
+            rewardText = itemDetails ? `Item: **${t(`item_${itemDetails.id}_name`, { defaultValue: itemDetails.name })}**` : `**${t('unknown_item')}**`;
         } else {
             rewardText = `**${reward.xp || 0}** XP & **${reward.coins || 0}** TC`;
         }
@@ -433,7 +438,8 @@ export async function animateAndCollectReward(interaction, userId, missionId, mi
     const missionProgress = missionsList.find(m => m.id === missionId);
 
     if (!missionProgress || !missionProgress.completed || missionProgress.collected) {
-        return interaction.followUp({ content: t('mission_reward_collect_error_ephemeral'), ephemeral: true });
+        await interaction.followUp({ content: t('mission_reward_collect_error_ephemeral'), ephemeral: true });
+        return null;
     }
     
     const missionMessage = interaction.message;
@@ -479,7 +485,7 @@ export async function animateAndCollectReward(interaction, userId, missionId, mi
 
     await updateProfileImage(interaction.user, data);
 
-    await interaction.followUp({ content: t('mission_reward_collected_ephemeral', { missionName: originalEmbed.data.title }), ephemeral: true });
+    return { message: t('mission_reward_collected_ephemeral', { missionName: originalEmbed.data.title }) };
 }
 
 

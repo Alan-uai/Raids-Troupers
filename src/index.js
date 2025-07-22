@@ -102,13 +102,17 @@ client.once(Events.ClientReady, async (c) => {
     setInterval(checkAuctionEnd, 15000);
 
     const setupShops = async (updateItems = false) => {
-        const t_pt = await getTranslator(null, null, 'pt-BR');
-        const t_en = await getTranslator(null, null, 'en-US');
-        
-        await Promise.all([
-            postOrUpdateShopMessage(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', updateItems),
-            postOrUpdateShopMessage(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', updateItems)
-        ]).catch(e => console.error("Error during scheduled shop update:", e));
+        try {
+            const t_pt = await getTranslator(null, null, 'pt-BR');
+            const t_en = await getTranslator(null, null, 'en-US');
+            
+            await Promise.all([
+                postOrUpdateShopMessage(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', updateItems),
+                postOrUpdateShopMessage(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', updateItems)
+            ]);
+        } catch (e) {
+            console.error("Error during scheduled shop update:", e);
+        }
     };
 
     // Initial shop setup with item update
@@ -195,7 +199,10 @@ client.on(Events.InteractionCreate, async interaction => {
             }
         } else if (subAction === 'collect') {
              const [missionId, missionCategory] = restArgs;
-             await animateAndCollectReward(interaction, userId, missionId, missionCategory, { userStats, userItems, userMissions, client, userProfiles, clans });
+             const result = await animateAndCollectReward(interaction, userId, missionId, missionCategory, { userStats, userItems, userMissions, client, userProfiles, clans });
+              if (result && result.message) {
+                await interaction.followUp({ content: result.message, ephemeral: true });
+             }
         }
     } else if (action === 'profile') {
         const [subAction, userId] = customIdParts.slice(1);
@@ -295,7 +302,7 @@ client.on(Events.InteractionCreate, async interaction => {
           const itemId = interaction.values[0];
           await handleEquipSelection(interaction, userId, itemId, t);
       } else if (action === 'milestone' && customIdParts[1] === 'select') {
-        const [,, milestoneId, userId] = customIdParts;
+        const [, , milestoneId, userId] = customIdParts;
         if (interaction.user.id !== userId) {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
