@@ -102,7 +102,8 @@ async function postOrUpdateShop(client, t, channelId, locale, updateItems = true
             shopItems.forEach(item => {
                 embed.addFields({
                     name: `${t(`item_${item.id}_name`) || item.name} - ${item.price} TC`,
-                    value: `*${t(`item_${item.id}_description`) || item.description}*\n**${t('rarity')}:** ${item.rarity}`,
+                    value: `*${t(`item_${item.id}_description`) || item.description}*
+**${t('rarity')}:** ${item.rarity}`,
                     inline: false,
                 });
             });
@@ -130,15 +131,16 @@ async function postOrUpdateShop(client, t, channelId, locale, updateItems = true
             .setEmoji('🛒')
             .setDisabled(shopItems.length === 0);
             
-        const row = new ActionRowBuilder().addComponents(selectMenu, buyButton);
+        const selectRow = new ActionRowBuilder().addComponents(selectMenu);
+        const buttonRow = new ActionRowBuilder().addComponents(buyButton);
             
         let sentMainMessage = shopData.mainMessageId ? await shopChannel.messages.fetch(shopData.mainMessageId).catch(() => null) : null;
         
         if (sentMainMessage) {
-            await sentMainMessage.edit({ embeds: [embed], components: [row] });
+            await sentMainMessage.edit({ embeds: [embed], components: [selectRow, buttonRow] });
         } else {
             await shopChannel.bulkDelete(messages.filter(m => m.author.id === client.user.id)).catch(() => {});
-            const newMainMessage = await shopChannel.send({ embeds: [embed], components: [row] });
+            const newMainMessage = await shopChannel.send({ embeds: [embed], components: [selectRow, buttonRow] });
             shopData.mainMessageId = newMainMessage.id;
         }
     }
