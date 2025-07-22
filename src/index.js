@@ -98,36 +98,37 @@ const SHOP_CHANNEL_ID_PT = '1396416240263630868';
 const SHOP_CHANNEL_ID_EN = '1396725532913303612';
 
 client.once(Events.ClientReady, async (c) => {
-  console.log(`✅ Logged in as ${c.user.tag}`);
-  setInterval(checkAuctionEnd, 15000);
+    console.log(`✅ Logged in as ${c.user.tag}`);
+    setInterval(checkAuctionEnd, 15000);
 
-  // Initial shop setup
-  console.log("Running initial shop setup...");
-  const t_pt_initial = await getTranslator(null, null, 'pt-BR');
-  const t_en_initial = await getTranslator(null, null, 'en-US');
-  await postOrUpdateShopMessage(client, t_pt_initial, SHOP_CHANNEL_ID_PT, 'pt-BR', true).catch(e => console.error("Error setting up PT shop:", e));
-  await postOrUpdateShopMessage(client, t_en_initial, SHOP_CHANNEL_ID_EN, 'en-US', true).catch(e => console.error("Error setting up EN shop:", e));
-  
-  // Interval for item rotation (every 3 hours)
-  if (client.shopUpdateInterval) clearInterval(client.shopUpdateInterval);
-  client.shopUpdateInterval = setInterval(async () => {
-      console.log("Running periodic shop item update...");
-      const t_pt = await getTranslator(null, null, 'pt-BR');
-      const t_en = await getTranslator(null, null, 'en-US');
-      await postOrUpdateShopMessage(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', true).catch(e => console.error("Error updating PT items:", e));
-      await postOrUpdateShopMessage(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', true).catch(e => console.error("Error updating EN items:", e));
-  }, 3 * 60 * 60 * 1000); // 3 hours
+    const setupShops = async (updateItems = false) => {
+        const t_pt = await getTranslator(null, null, 'pt-BR');
+        const t_en = await getTranslator(null, null, 'en-US');
 
-   // Interval for timer update
-  if (client.shopTimerInterval) clearInterval(client.shopTimerInterval);
-  client.shopTimerInterval = setInterval(async () => {
-      const t_pt = await getTranslator(null, null, 'pt-BR');
-      await postOrUpdateShopMessage(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', false).catch(e => console.error("Error updating PT timer:", e));
-      
-      const t_en = await getTranslator(null, null, 'en-US');
-      await postOrUpdateShopMessage(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', false).catch(e => console.error("Error updating EN timer:", e));
-  }, 1000); // 1 second
+        await Promise.all([
+            postOrUpdateShopMessage(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', updateItems).catch(e => console.error("Error handling PT shop:", e)),
+            postOrUpdateShopMessage(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', updateItems).catch(e => console.error("Error handling EN shop:", e))
+        ]);
+    };
+
+    // Initial shop setup
+    console.log("Running initial shop setup...");
+    await setupShops(true);
+
+    // Interval for item rotation (every 3 hours)
+    if (client.shopUpdateInterval) clearInterval(client.shopUpdateInterval);
+    client.shopUpdateInterval = setInterval(() => {
+        console.log("Running periodic shop item update...");
+        setupShops(true);
+    }, 3 * 60 * 60 * 1000); // 3 hours
+
+    // Interval for timer update (every second for countdown)
+    if (client.shopTimerInterval) clearInterval(client.shopTimerInterval);
+    client.shopTimerInterval = setInterval(() => {
+        setupShops(false);
+    }, 1000); // 1 second
 });
+
 
 client.on(Events.InteractionCreate, async interaction => {
   const t = await getTranslator(interaction.user.id, userStats);
@@ -222,24 +223,21 @@ client.on(Events.InteractionCreate, async interaction => {
             await interaction.followUp({ content: t('profile_refreshed'), ephemeral: true });
         }
     } else if (action === 'milestone') {
-       const [subAction, milestoneId, userId] = customIdParts;
+       const [, subAction, milestoneId, userId] = customIdParts;
        if (interaction.user.id !== userId) return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
        
-       const milestone = milestones.find(m => m.id === milestoneId);
-       if (!milestone) return;
-        
-       const view = 'general';
-       const stats = userStats.get(userId) || {};
-       stats.userId = userId;
-       const itemStats = userItems.get(userId);
-       const tForMilestone = await getTranslator(userId, userStats);
-       
-        if (subAction === 'back') {
+       if (subAction === 'back') {
+            const milestone = milestones.find(m => m.id === milestoneId);
+            if (!milestone) return;
+            const stats = userStats.get(userId) || {};
+            stats.userId = userId;
+            const itemStats = userItems.get(userId);
+            const tForMilestone = await getTranslator(userId, userStats);
             const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', tForMilestone);
             if (milestoneData) {
                 await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
             }
-        }
+       }
     }
 
 
