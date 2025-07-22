@@ -86,6 +86,7 @@ export default {
 
         // Tudo certo, proceder com a criação
         stats.coins -= creationCost;
+        const leaderMember = await interaction.guild.members.fetch(userId);
 
         try {
             // Criar Role
@@ -96,7 +97,6 @@ export default {
                 reason: `Role para o clã ${clanName}`,
             });
 
-            const leaderMember = await interaction.guild.members.fetch(userId);
             await leaderMember.roles.add(clanRole);
 
             let channelId = null;
@@ -119,6 +119,10 @@ export default {
                              {
                                 id: interaction.client.user.id,
                                 allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageChannels],
+                            },
+                            {
+                                id: userId, // Clan Leader
+                                allow: [PermissionsBitField.Flags.SendPolls],
                             }
                         ],
                     });

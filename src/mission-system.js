@@ -55,20 +55,19 @@ export function assignMissions(userId, userMissions, stats) {
     const dailyTemplates = [...missionPool.filter(m => m.category === 'daily')].sort(() => 0.5 - Math.random());
     
     // Assign one with 'Mais que Comum' item
-    const commonItemPool = allItems.filter(i => i.source === 'mission' && i.rarity === rarities.MAIS_QUE_COMUM);
-    if (dailyTemplates.length > 0 && commonItemPool.length > 0) {
+    const lessCommonItemPool = allItems.filter(i => i.source === 'mission' && i.rarity === rarities.MAIS_QUE_COMUM);
+    if (dailyTemplates.length > 0 && lessCommonItemPool.length > 0) {
+        const dailyWithLessCommonItem = generateIntelligentMission(dailyTemplates.pop(), stats);
+        dailyWithLessCommonItem.reward = { item: lessCommonItemPool[Math.floor(Math.random() * lessCommonItemPool.length)].id };
+        missionsToAssign.daily.push(dailyWithLessCommonItem);
+    }
+    
+    // Assign one with 'Comum' item
+    const commonItemPool = allItems.filter(i => i.source === 'mission' && i.rarity === rarities.COMUM);
+    if(dailyTemplates.length > 0 && commonItemPool.length > 0) {
         const dailyWithCommonItem = generateIntelligentMission(dailyTemplates.pop(), stats);
         dailyWithCommonItem.reward = { item: commonItemPool[Math.floor(Math.random() * commonItemPool.length)].id };
         missionsToAssign.daily.push(dailyWithCommonItem);
-    }
-    
-
-    // Assign one with 'Comum' item
-    const regularItemPool = allItems.filter(i => i.source === 'mission' && i.rarity === rarities.COMUM);
-    if(dailyTemplates.length > 0 && regularItemPool.length > 0) {
-        const dailyWithRegularItem = generateIntelligentMission(dailyTemplates.pop(), stats);
-        dailyWithRegularItem.reward = { item: regularItemPool[Math.floor(Math.random() * regularItemPool.length)].id };
-        missionsToAssign.daily.push(dailyWithRegularItem);
     }
 
     // Assign 3 more regular daily missions
@@ -357,7 +356,7 @@ export async function postMissionList(thread, userId, type, data, interaction = 
     await thread.send({ content: t('missions_autocollect_description') + `\n**Status:** ${autoCollectStatus}`, components: [controlRow] });
 
     // Get embeds for the current view
-    const missionsToShow = (type === 'daily' ? activeMissions.daily : activeMissions.weekly).filter(Boolean);
+    const missionsToShow = (type === 'daily' ? activeMissions.daily : activeMissions.weekly).filter(m => m && !m.collected);
     const missionEmbeds = generateMissionEmbeds(missionsToShow, type, userId, t);
 
     for (const {embed, row} of missionEmbeds) {
@@ -483,7 +482,7 @@ export async function animateAndCollectReward(interaction, userId, missionId, mi
 
 
 async function updateProfileImage(user, data) {
-    const { client, userProfiles, userStats, userItems, clans } = data;
+    const { client, userProfiles, userStats, userItems, clans, userMissions } = data;
     const userId = user.id;
     const profileInfo = userProfiles.get(userId);
      if (profileInfo) {
@@ -499,6 +498,14 @@ async function updateProfileImage(user, data) {
             const newAttachment = new AttachmentBuilder(newProfileImageBuffer, { name: 'profile-card.png' });
             
             await profileMessage.edit({ files: [newAttachment] });
+
+            // Also update the mission list
+            const missionThread = profileChannel.threads.cache.find(th => th.name === t('missions_thread_title'));
+            if(missionThread) {
+                const missionInfo = missionMessageIds.get(userId);
+                const currentView = missionInfo ? missionInfo.currentView : 'daily';
+                await postMissionList(missionThread, userId, currentView, { userMissions, userStats, client });
+            }
         } catch (updateError) {
             console.error(`Failed to update profile image for ${userId} after mission update:`, updateError);
         }

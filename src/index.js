@@ -25,7 +25,6 @@ import { missions as missionPool, missions } from './missions.js';
 import { milestones } from './milestones.js';
 import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList, animateAndCollectReward } from './mission-system.js';
 import { getTranslator } from './i18n.js';
-import { pollVotes } from './commands/clan_enquete.js';
 import { createMilestoneEmbed, checkMilestoneCompletion as checkMilestone } from './milestone-system.js';
 
 
@@ -58,7 +57,6 @@ const userMissions = new Map();
 const clans = new Map();
 const pendingInvites = new Map();
 const userShopSelection = new Map();
-const suggestionVotes = new Map();
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -192,12 +190,6 @@ client.on(Events.InteractionCreate, async interaction => {
             await profileMessage.edit({ files: [attachment] });
             
             await interaction.followUp({ content: t('profile_refreshed'), ephemeral: true });
-        }
-    } else if (action === 'poll') {
-        if (customIdParts[1] === 'vote') {
-            const pollId = customIdParts[2];
-            const optionIndex = parseInt(customIdParts[3], 10);
-            await handlePollVote(interaction, pollId, optionIndex, t);
         }
     } else if (action === 'milestone') {
        if (customIdParts[1] === 'back') {
@@ -860,52 +852,6 @@ async function handleEquipSelection(interaction, userId, itemId, t) {
     await interaction.followUp({ content: replyMessage, ephemeral: true });
 }
 
-async function handlePollVote(interaction, pollId, optionIndex, t) {
-    const pollData = pollVotes.get(pollId);
-    if (!pollData) {
-        return interaction.reply({ content: t('poll_ended_or_invalid'), ephemeral: true });
-    }
-
-    const userId = interaction.user.id;
-
-    if (pollData.voters.has(userId)) {
-        const previousVoteIndex = pollData.voters.get(userId);
-        if (previousVoteIndex === optionIndex) {
-            return interaction.reply({ content: t('poll_already_voted_same'), ephemeral: true });
-        }
-        pollData.counts[previousVoteIndex]--;
-    }
-
-    pollData.voters.set(userId, optionIndex);
-    pollData.counts[optionIndex]++;
-
-    const pollMessage = await interaction.channel.messages.fetch(pollId).catch(() => null);
-    if (!pollMessage) return;
-
-    const originalEmbed = pollMessage.embeds[0];
-    const newEmbed = EmbedBuilder.from(originalEmbed)
-        .setDescription(t('poll_description_updated', { count: pollData.voters.size }));
-
-    const newRows = [];
-    let currentOptionIndex = 0;
-    
-    pollMessage.components.forEach(row => {
-        const newRow = new ActionRowBuilder();
-        row.components.forEach(button => {
-            const optionLabel = button.label.split(' (')[0];
-            const newButton = ButtonBuilder.from(button)
-                .setLabel(`${optionLabel} (${pollData.counts[currentOptionIndex]})`);
-            newRow.addComponents(newButton);
-            currentOptionIndex++;
-        });
-        newRows.push(newRow);
-    });
-    
-    await pollMessage.edit({ embeds: [newEmbed], components: newRows });
-    await interaction.reply({ content: t('poll_vote_success'), ephemeral: true });
-}
-
-
 async function handleMilestoneInteraction(interaction, milestoneId, userId, selectedLevel, t) {
     await interaction.deferUpdate();
     const stats = userStats.get(userId);
@@ -920,7 +866,7 @@ async function handleMilestoneInteraction(interaction, milestoneId, userId, sele
 
     const milestoneData = await createMilestoneEmbed(milestone, stats, items, selectedLevel, t);
     if (interaction.message && milestoneData) {
-        await interaction.message.edit({ embeds: [milestoneData.embed], components: [milestoneData.row] });
+        await interaction.editReply({ embeds: [milestoneData.embed], components: [milestoneData.row] });
     }
 }
 
