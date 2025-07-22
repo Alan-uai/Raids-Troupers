@@ -398,9 +398,9 @@ async function animateLine(channel, show = true) {
                 }
             }
             if (!lineMessage) {
-                lineMessage = await channel.send(`\`${line}\``);
+                lineMessage = await channel.send(``${line}``);
             } else {
-                await lineMessage.edit(`\`${line}\``).catch(()=>{});
+                await lineMessage.edit(``${line}``).catch(()=>{});
             }
             await sleep(50);
         }
@@ -419,7 +419,7 @@ async function animateLine(channel, show = true) {
                     line += ' ';
                 }
             }
-            await lineMessage.edit(`\`${line}\``).catch(()=>{});
+            await lineMessage.edit(``${line}``).catch(()=>{});
             await sleep(50);
         }
         await lineMessage.delete().catch(()=>{});
@@ -461,7 +461,7 @@ export async function animateAndCollectReward(interaction, userId, missionId, mi
         if (title) tempEmbed.setTitle(strike(title, i));
         if (desc) tempEmbed.setDescription(strike(desc, i));
         
-        await missionMessage.edit({ embeds: [tempEmbed], components: [] }).catch(()=>{});
+        await missionMessage.edit({ embeds: [tempEmbed], components: [] }).catch(e => console.error("Error during message edit animation:", e));
         await sleep(25); // animation speed
     }
 
@@ -479,9 +479,9 @@ export async function animateAndCollectReward(interaction, userId, missionId, mi
     await sleep(3500); // wait 3.5 seconds to read the reward
 
     // Cleanup
-    await rewardDisplayMessage.delete().catch(()=>{});
+    await rewardDisplayMessage.delete().catch(e => console.error("Error deleting reward message:", e));
     await animateLine(lineMessage, false); 
-    await missionMessage.delete().catch(()=>{});
+    await missionMessage.delete().catch(e => console.error("Error deleting mission message:", e));
 
     await updateProfileImage(interaction.user, data);
 
