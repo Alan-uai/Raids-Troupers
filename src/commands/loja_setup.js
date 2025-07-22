@@ -100,14 +100,6 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
 
         if (shopItems.length === 0) {
             embed.setDescription(t('shop_empty'));
-        } else {
-            shopItems.forEach(item => {
-                embed.addFields({
-                    name: `${t(`item_${item.id}_name`) || item.name} - ${item.price} TC`,
-                    value: `*${t(`item_${item.id}_description`) || item.description}*\n**${t('rarity')}:** ${item.rarity}`,
-                    inline: false,
-                });
-            });
         }
 
         const selectMenu = new StringSelectMenuBuilder()
@@ -122,15 +114,8 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
                     value: item.id,
                 })) : [{ label: 'empty', value: 'empty' }]
             );
-
-        const buyButton = new ButtonBuilder()
-            .setCustomId('shop_buy_button')
-            .setLabel(t('shop_buy_button_label'))
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('🛒')
-            .setDisabled(shopItems.length === 0);
             
-        const row = new ActionRowBuilder().addComponents(selectMenu, buyButton);
+        const row = new ActionRowBuilder().addComponents(selectMenu);
             
         let sentMainMessage;
         if (shopData.mainMessageId) {
@@ -171,7 +156,7 @@ async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems
         });
     } 
     
-    if (!shopData.timerMessageId && sentTimerMessage === null) { // Recreate if it was deleted or never existed
+    if (!sentTimerMessage) { // Recreate if it was deleted or never existed
         const newTimerMessage = await shopChannel.send({ embeds: [timerEmbed] });
         shopData.timerMessageId = newTimerMessage.id;
     }
@@ -231,5 +216,3 @@ export default {
   },
   postOrUpdateShopMessage,
 };
-
-    

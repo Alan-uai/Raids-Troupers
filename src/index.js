@@ -221,8 +221,40 @@ client.on(Events.InteractionCreate, async interaction => {
           const raterId = customIdParts[2];
           await handleRatingSelection(interaction, raterId, t);
       } else if (interaction.customId === 'shop_select_item') {
-          userShopSelection.set(interaction.user.id, interaction.values[0]);
-          await interaction.reply({ content: t('shop_item_selected'), ephemeral: true });
+          const itemId = interaction.values[0];
+          userShopSelection.set(interaction.user.id, itemId);
+
+          const item = allItems.find(i => i.id === itemId);
+          if (!item) {
+              return await interaction.reply({ content: t('buy_item_not_exist'), ephemeral: true });
+          }
+
+          const embed = new EmbedBuilder()
+              .setTitle(t(`item_${item.id}_name`) || item.name)
+              .setDescription(t(`item_${item.id}_description`) || item.description)
+              .setColor('#FFA500')
+              .addFields(
+                  { name: t('price'), value: `${item.price} TC`, inline: true },
+                  { name: t('rarity'), value: item.rarity, inline: true }
+              );
+
+          if (item.url) {
+              embed.setImage(item.url);
+          }
+          if (item.bonus) {
+              embed.addFields({ name: t('xp_bonus'), value: `+${item.bonus}%`, inline: true });
+          }
+
+          const buyButton = new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                  .setCustomId('shop_buy_button')
+                  .setLabel(t('buy_button_label'))
+                  .setStyle(ButtonStyle.Success)
+                  .setEmoji('🛒')
+          );
+
+          await interaction.reply({ embeds: [embed], components: [buyButton], ephemeral: true });
+
       } else if (action === 'equip' && customIdParts[1] === 'select') {
           const userId = customIdParts[2];
           if (interaction.user.id !== userId) {

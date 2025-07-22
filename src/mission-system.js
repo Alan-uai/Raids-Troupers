@@ -1,4 +1,4 @@
-
+// src/mission-system.js
 
 import { missions as missionPool } from './missions.js';
 import { generateProfileImage } from './profile-generator.js';
@@ -130,7 +130,7 @@ async function collectReward(user, missionProgress, data) {
         items.inventory.push(reward.item);
         userItems.set(userId, items);
         const itemDetails = allItems.find(i => i.id === reward.item);
-        const itemName = t(`item_${itemDetails.id}_name`) || itemDetails.name;
+        const itemName = t(`item_${itemDetails.id}_name`, { defaultValue: itemDetails.name }); // Added defaultValue
         rewardMessage = t('missions_collect_success_item', { itemName });
         await checkMissionCompletion(user, 'ITEM_ACQUIRED', data);
 
@@ -170,7 +170,8 @@ async function collectReward(user, missionProgress, data) {
     userStats.set(userId, stats);
     
     if (leveledUp) {
-       rewardMessage += `\n${t('level_up_from_mission', { level: stats.level })}`;
+       rewardMessage += `
+${t('level_up_from_mission', { level: stats.level })}`;
        await checkMissionCompletion(user, 'LEVEL_UP', { ...data, previousLevel: previousLevel }, stats.level);
     }
 
@@ -273,7 +274,7 @@ function generateMissionEmbeds(missions, category, userId, t) {
         let rewardText;
         if (reward.item) {
             const itemDetails = allItems.find(i => i.id === reward.item);
-            rewardText = itemDetails ? `Item: **${t(`item_${itemDetails.id}_name`)}**` : '**Item Secreto**';
+            rewardText = itemDetails ? `Item: **${t(`item_${itemDetails.id}_name`, { defaultValue: itemDetails.name })}**` : '**Item Secreto**'; // Added defaultValue
         } else {
             rewardText = `**${reward.xp || 0}** XP & **${reward.coins || 0}** TC`;
         }
@@ -353,7 +354,8 @@ export async function postMissionList(thread, userId, type, data, interaction = 
         .setStyle(ButtonStyle.Secondary);
         
     const controlRow = new ActionRowBuilder().addComponents(viewButton, collectAllButton, autoCollectButton);
-    await thread.send({ content: t('missions_autocollect_description') + `\n**Status:** ${autoCollectStatus}`, components: [controlRow] });
+    await thread.send({ content: t('missions_autocollect_description') + `
+**Status:** ${autoCollectStatus}`, components: [controlRow] });
 
     // Get embeds for the current view
     const missionsToShow = (type === 'daily' ? activeMissions.daily : activeMissions.weekly).filter(m => m && !m.collected);

@@ -40,6 +40,15 @@ export const missions = [
     reward: { xp: 25, coins: 5 },
     category: 'daily'
   },
+  {
+    id: 'daily_level_up_1',
+    title: 'Crescimento Constante',
+    description: 'Ganhe um nível de experiência.',
+    type: 'LEVEL_UP',
+    goal: 1,
+    reward: { xp: 30, coins: 20 },
+    category: 'daily'
+  },
 
   // =====================
   // === Weekly Missions ===
@@ -50,7 +59,7 @@ export const missions = [
     description: 'Ajude em um total de 10 Raids durante a semana.',
     type: 'RAID_HELPED',
     goal: 10,
-    reward: { item: 'pocao_fraca' },
+    reward: { item: 'pocao_fraca' }, // Placeholder item
     category: 'weekly'
   },
   {
@@ -59,16 +68,34 @@ export const missions = [
     description: 'Organize 5 Raids para a comunidade esta semana.',
     type: 'RAID_CREATED',
     goal: 5,
-    reward: { item: 'anel_simples' },
+    reward: { item: 'anel_simples' }, // Placeholder item
     category: 'weekly'
   },
   {
     id: 'weekly_high_reputation',
     title: 'Reputação Impecável',
     description: 'Receba 5 avaliações positivas de outros jogadores.',
-    type: 'RATE_PLAYER', // Reutilizado, mas o contexto muda
-    goal: 5, // A contagem seria de avaliações positivas
-    reward: { item: 'botas_couro' },
+    type: 'RATE_PLAYER',
+    goal: 5,
+    reward: { item: 'botas_couro' }, // Placeholder item
+    category: 'weekly'
+  },
+  {
+    id: 'weekly_earn_coins_200',
+    title: 'Riqueza Semanal',
+    description: 'Acumule 200 Troup Coins.',
+    type: 'EARN_COINS',
+    goal: 200,
+    reward: { xp: 100, coins: 50 },
+    category: 'weekly'
+  },
+  {
+    id: 'weekly_items_acquired_3',
+    title: 'Colecionador Dedicado',
+    description: 'Adquira 3 itens (comprados, de missões, etc.).',
+    type: 'ITEM_ACQUIRED',
+    goal: 3,
+    reward: { xp: 80, coins: 40 },
     category: 'weekly'
   }
 ];

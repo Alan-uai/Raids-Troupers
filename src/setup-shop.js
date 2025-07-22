@@ -70,8 +70,17 @@ function formatTime(ms) {
     const totalSeconds = Math.floor(ms / 1000);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    let seconds = totalSeconds % 60;
+
+    if (ms > 10000) { // More than 10 seconds remaining, lock seconds to 00
+        seconds = 0;
+    }
+
+    const formattedHours = String(hours).padStart(2, '0');
+    const formattedMinutes = String(minutes).padStart(2, '0');
+    const formattedSeconds = String(seconds).padStart(2, '0');
+
+    return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
 }
 
 async function postOrUpdateShop(client, t, channelId, locale, updateItems = true) {
@@ -102,8 +111,7 @@ async function postOrUpdateShop(client, t, channelId, locale, updateItems = true
             shopItems.forEach(item => {
                 embed.addFields({
                     name: `${t(`item_${item.id}_name`) || item.name} - ${item.price} TC`,
-                    value: `*${t(`item_${item.id}_description`) || item.description}*
-**${t('rarity')}:** ${item.rarity}`,
+                    value: `**${t('rarity')}:** ${item.rarity}`,
                     inline: false,
                 });
             });
@@ -113,7 +121,7 @@ async function postOrUpdateShop(client, t, channelId, locale, updateItems = true
 
         const selectMenu = new StringSelectMenuBuilder()
             .setCustomId('shop_select_item')
-            .setPlaceholder(t('shop_select_placeholder'))
+            .setPlaceholder(t('shop_select_placeholder_buy'))
             .setDisabled(shopItems.length === 0)
             .addOptions(
                 shopItems.length > 0 ?
@@ -124,23 +132,15 @@ async function postOrUpdateShop(client, t, channelId, locale, updateItems = true
                 })) : [{ label: 'empty', value: 'empty' }]
             );
 
-        const buyButton = new ButtonBuilder()
-            .setCustomId('shop_buy_button')
-            .setLabel(t('buy_button_label'))
-            .setStyle(ButtonStyle.Success)
-            .setEmoji('🛒')
-            .setDisabled(shopItems.length === 0);
-            
         const selectRow = new ActionRowBuilder().addComponents(selectMenu);
-        const buttonRow = new ActionRowBuilder().addComponents(buyButton);
             
         let sentMainMessage = shopData.mainMessageId ? await shopChannel.messages.fetch(shopData.mainMessageId).catch(() => null) : null;
         
         if (sentMainMessage) {
-            await sentMainMessage.edit({ embeds: [embed], components: [selectRow, buttonRow] });
+            await sentMainMessage.edit({ embeds: [embed], components: [selectRow] });
         } else {
             await shopChannel.bulkDelete(messages.filter(m => m.author.id === client.user.id)).catch(() => {});
-            const newMainMessage = await shopChannel.send({ embeds: [embed], components: [selectRow, buttonRow] });
+            const newMainMessage = await shopChannel.send({ embeds: [embed], components: [selectRow] });
             shopData.mainMessageId = newMainMessage.id;
         }
     }
@@ -152,11 +152,7 @@ async function postOrUpdateShop(client, t, channelId, locale, updateItems = true
 
     const timerEmbed = new EmbedBuilder().setColor('#3498DB');
     
-    if (timeRemaining <= 10000) { // Countdown for last 10 seconds
-        timerEmbed.setDescription(`**${t('shop_footer_rotation_raw')} ${Math.ceil(timeRemaining / 1000)}**`);
-    } else {
-        timerEmbed.setDescription(timerText);
-    }
+    timerEmbed.setDescription(`**${t('shop_footer_rotation_raw')} ${timerText}**`);
     
     let sentTimerMessage = shopData.timerMessageId ? await shopChannel.messages.fetch(shopData.timerMessageId).catch(() => null) : null;
 
@@ -179,37 +175,29 @@ async function runShop() {
     await postOrUpdateShop(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', true);
     await postOrUpdateShop(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', true);
 
-    // Interval for item rotation
+    // Interval for item rotation and timer update
     setInterval(async () => {
-        console.log("Running periodic shop item update...");
+        console.log("Running periodic shop update...");
+        const t_pt = await getTranslator(null, null, 'pt-BR'); // Re-fetch translators in case of locale changes
+        const t_en = await getTranslator(null, null, 'en-US');
+        await postOrUpdateShop(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', false).catch(e => console.error("Error updating PT shop:", e));
+        await postOrUpdateShop(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', false).catch(e => console.error("Error updating EN shop:", e));
+    }, 60000); // 1 minute
+
+    // Interval for item rotation (every 3 hours)
+    setInterval(async () => {
+        console.log("Running periodic shop item rotation...");
+        const t_pt = await getTranslator(null, null, 'pt-BR'); // Re-fetch translators in case of locale changes
+        const t_en = await getTranslator(null, null, 'en-US');
         await postOrUpdateShop(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', true).catch(e => console.error("Error updating PT items:", e));
         await postOrUpdateShop(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', true).catch(e => console.error("Error updating EN items:", e));
     }, 3 * 60 * 60 * 1000); // 3 hours
-
-    // Interval for timer countdown
-    setInterval(async () => {
-        const nextUpdate = getNextUpdate(3);
-        const timeRemaining = nextUpdate.getTime() - Date.now();
-
-        const updateFrequency = timeRemaining <= 10000 ? 1000 : 60000;
-
-        await postOrUpdateShop(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', false).catch(e => console.error("Error updating PT timer:", e));
-        await postOrUpdateShop(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', false).catch(e => console.error("Error updating EN timer:", e));
-
-        // Adjust next timer update
-        const currentTimer = client.shopTimerInterval;
-        if (currentTimer && currentTimer._repeat !== updateFrequency) {
-            clearInterval(currentTimer);
-            client.shopTimerInterval = setInterval(arguments.callee, updateFrequency);
-        }
-    }, 60000); // Start with 1 minute updates
 }
 
 client.once('ready', async () => {
     console.log('Client ready, setting up shop.');
     await runShop();
     console.log('Shop setup script finished. The process will exit.');
-    process.exit(0);
 });
 
 client.login(process.env.DISCORD_TOKEN);

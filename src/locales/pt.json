@@ -267,7 +267,7 @@
     "inventory_footer": "Use o botão Equipar no seu perfil para usar um item.",
     
     "shop_title": "🛒 Loja Troupers",
-    "shop_description": "Selecione um item no menu e clique no botão para adquirir!",
+    "shop_description": "Selecione um item no menu para ver os detalhes e comprar!",
     "shop_ephemeral_description": "Estes são os itens disponíveis para compra.",
     "shop_ephemeral_footer": "Use o comando /comprar <ID> para adquirir um item.",
     "shop_channel_not_found": "Canal da loja não encontrado. Por favor, contate um administrador.",
@@ -275,7 +275,6 @@
     "shop_updated_all": "Todas as mensagens de loja foram atualizadas.",
     "shop_select_placeholder": "Selecionar",
     "shop_select_item_desc": "Preço: {price} TC",
-    "shop_buy_button_label": "Comprar",
     "shop_item_selected": "✅ Item selecionado. Agora clique no botão 'Comprar' para finalizar a compra.",
     "shop_footer_rotation": "A loja atualiza! Próxima atualização em {time}",
     "shop_footer_rotation_raw": "A loja atualiza!",
