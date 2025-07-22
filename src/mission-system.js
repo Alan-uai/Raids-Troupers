@@ -1,7 +1,7 @@
 // src/mission-system.js
 
 import { missions as missionPool } from './missions.js';
-import { generateProfileImage } from './profile-generator.js';
+import { generateProfileImage } from './profile-generator.2js';
 import { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getTranslator } from './i18n.js';
 import { allItems, rarities } from './items.js';
@@ -398,9 +398,9 @@ async function animateLine(channel, show = true) {
                 }
             }
             if (!lineMessage) {
-                lineMessage = await channel.send(``${line}``);
+                lineMessage = await channel.send(`${line}`);
             } else {
-                await lineMessage.edit(``${line}``).catch(()=>{});
+                await lineMessage.edit(`${line}`).catch(()=>{});
             }
             await sleep(50);
         }
@@ -419,7 +419,7 @@ async function animateLine(channel, show = true) {
                     line += ' ';
                 }
             }
-            await lineMessage.edit(``${line}``).catch(()=>{});
+            await lineMessage.edit(`${line}`).catch(()=>{});
             await sleep(50);
         }
         await lineMessage.delete().catch(()=>{});
