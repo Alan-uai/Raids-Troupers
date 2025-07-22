@@ -70,12 +70,23 @@ function getShopItems(locale) {
 
 function formatTime(ms) {
     if (ms <= 0) return '00:00:00';
-    const totalSeconds = Math.floor(ms / 1000);
+
+    // Visually 1 minute ahead
+    const displayMs = ms + 60000;
+    const totalSeconds = Math.floor(displayMs / 1000);
 
     if (totalSeconds <= 10) {
+        // Final 10-second countdown
         return `00:00:${String(totalSeconds).padStart(2, '0')}`;
     }
 
+    if (totalSeconds <= 60) {
+        // Countdown by 10s within the last minute
+        const seconds = Math.floor(totalSeconds / 10) * 10;
+        return `00:00:${String(seconds).padStart(2, '0')}`;
+    }
+    
+    // Display minutes and hours, updating every minute
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     
@@ -170,7 +181,7 @@ export async function postOrUpdateShopMessage(client, t, channelId, locale, upda
                 if (e.code === 10008) { 
                   console.warn(`Timer message for ${locale} was deleted. It will be recreated.`);
                   shopData.timerMessageId = null; 
-                  shopStorage.set(locale, shopData);
+                  shopStorage.set(locale, shopData); // Make sure to save the cleared ID
                 } else {
                   console.error(`Failed to edit timer message for ${locale}:`, e.message);
                 }
@@ -179,6 +190,6 @@ export async function postOrUpdateShopMessage(client, t, channelId, locale, upda
     } else {
         const newTimerMessage = await shopChannel.send({ embeds: [timerEmbed] });
         shopData.timerMessageId = newTimerMessage.id;
-        shopStorage.set(locale, shopData);
     }
+    shopStorage.set(locale, shopData); // Always save the latest state
 }
