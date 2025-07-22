@@ -40,7 +40,7 @@ client.commands = new Collection();
 const raidStates = new Map();
 const clans = new Map();
 const pendingInvites = new Map();
-const userStats = new Map(); // Keep for locale and basic clan info if needed
+const raidStats = new Map(); 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -86,7 +86,7 @@ client.on(Events.InteractionCreate, async interaction => {
     if (!command) return;
     
     try {
-      await command.execute(interaction, { clans, pendingInvites, userStats, client });
+      await command.execute(interaction, { clans, pendingInvites, raidStats, client });
     } catch (error) {
       console.error(error);
       const t = await getTranslator(interaction.user.id);
@@ -214,6 +214,10 @@ async function handleRaidButton(interaction, subAction, args, t) {
         const interactorT = await getTranslator(interactor.id);
         await currentThread.send(interactorT('raid_user_joined', { username: interactor.username }));
         current++;
+
+        const userStats = raidStats.get(interactor.id) || { created: 0, helped: 0 };
+        userStats.helped += 1;
+        raidStats.set(interactor.id, userStats);
 
         raidEmbed.setFields({ name: `👥 ${t('team_members')}`, value: `**${current}/${max}**`, inline: true });
         const originalRow = ActionRowBuilder.from(originalRaidMessage.components[0]);

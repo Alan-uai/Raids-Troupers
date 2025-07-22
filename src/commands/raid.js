@@ -6,7 +6,7 @@ const userLastRaidMessage = new Map();
 
 export default {
   data: data,
-  async execute(interaction, { clans }) {
+  async execute(interaction, { clans, raidStats }) {
     await interaction.deferReply({ ephemeral: true });
     
     const t = await getTranslator(interaction.user.id);
@@ -82,6 +82,10 @@ export default {
       await sentMessage.edit({ embeds: [embed], components: [row] });
 
       userLastRaidMessage.set(user.id, sentMessage.id);
+      
+      const userStats = raidStats.get(user.id) || { created: 0, helped: 0 };
+      userStats.created += 1;
+      raidStats.set(user.id, userStats);
       
       await interaction.editReply({
         content: t('raid_reply_success', { channelId: raidChannelId })

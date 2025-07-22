@@ -7,6 +7,15 @@ function isValidHexColor(hex) {
     return /^#[0-9A-F]{6}$/i.test(hex);
 }
 
+function createProgressBar(current, goal) {
+    const filledChar = '━';
+    const emptyChar = '─';
+    const totalLength = 10;
+    const filledLength = Math.min(totalLength, Math.floor((current / goal) * totalLength));
+    const emptyLength = totalLength - filledLength;
+    return `${filledChar.repeat(filledLength)}${emptyChar.repeat(emptyLength)}`;
+}
+
 export default {
     data: new SlashCommandBuilder()
         .setName('clan_criar')
@@ -38,19 +47,36 @@ export default {
                 .setDescriptionLocalizations({ "en-US": "Create a private text channel for the clan?" })
                 .setRequired(true)),
 
-    async execute(interaction, { userStats, clans }) {
+    async execute(interaction, { clans, raidStats }) {
         const t = await getTranslator(interaction.user.id);
         await interaction.deferReply({ ephemeral: true });
+        
+        const userId = interaction.user.id;
+        const stats = raidStats.get(userId) || { created: 0, helped: 0 };
+        const requiredRaids = 10;
+
+        if (stats.created < requiredRaids || stats.helped < requiredRaids) {
+            const createdProgress = createProgressBar(stats.created, requiredRaids);
+            const helpedProgress = createProgressBar(stats.helped, requiredRaids);
+            
+            return await interaction.editReply({
+                content: t('clan_create_requirements_not_met') + '\n\n' +
+                         `**${t('raids_created')}**: ${stats.created}/${requiredRaids}\n` +
+                         `\`${createdProgress}\`\n` +
+                         `**${t('raids_helped')}**: ${stats.helped}/${requiredRaids}\n` +
+                         `\`${helpedProgress}\``,
+                ephemeral: true
+            });
+        }
 
         const clanName = interaction.options.getString('nome');
         const clanTag = interaction.options.getString('tag');
         const clanColor = interaction.options.getString('cor');
         const createChannel = interaction.options.getBoolean('criar_canal_privado');
-        const userId = interaction.user.id;
         const privateChannelCategoryId = '1395583466753757326';
 
-        const stats = userStats.get(userId) || {};
-        if (stats.clanId) {
+        const userClan = Array.from(clans.values()).find(c => c.members.includes(userId));
+        if (userClan) {
             return await interaction.editReply({ content: t('clan_create_already_in_clan'), ephemeral: true });
         }
 
@@ -133,9 +159,6 @@ export default {
                 channelId: channelId,
             };
 
-            stats.clanId = clanId;
-
-            userStats.set(userId, stats);
             clans.set(clanName.toLowerCase(), newClan);
 
             await interaction.editReply({ content: t('clan_create_success', { clanName, clanTag }) });
