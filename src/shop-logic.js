@@ -3,15 +3,23 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType
 import { allItems } from './items.js';
 
 const shopStorage = new Map();
+let nextGlobalUpdate = 0; // Global timestamp for the next update
 
 function getNextUpdate(hours) {
-    const now = new Date();
-    const nextUpdate = new Date(now);
-    nextUpdate.setUTCHours(Math.ceil(now.getUTCHours() / hours) * hours, 0, 0, 0);
-    if (nextUpdate <= now) {
-        nextUpdate.setUTCHours(nextUpdate.getUTCHours() + hours);
+    const now = new Date().getTime();
+    
+    // If there is no global update time or it has passed, calculate a new one.
+    if (!nextGlobalUpdate || now >= nextGlobalUpdate) {
+        const nextUpdateDate = new Date(now);
+        nextUpdateDate.setUTCHours(Math.ceil(nextUpdateDate.getUTCHours() / hours) * hours, 0, 0, 0);
+        if (nextUpdateDate.getTime() <= now) {
+            nextUpdateDate.setUTCHours(nextUpdateDate.getUTCHours() + hours);
+        }
+        nextGlobalUpdate = nextUpdateDate.getTime();
+        console.log(`New global shop update time set to: ${new Date(nextGlobalUpdate).toISOString()}`);
     }
-    return nextUpdate;
+    
+    return new Date(nextGlobalUpdate);
 }
 
 function updateShopInventory(locale, nextUpdateTime) {
@@ -52,21 +60,32 @@ function getShopItems(locale) {
     const rotationHours = 3;
     const nextUpdateTime = getNextUpdate(rotationHours).getTime();
     
-    if (!shopStorage.has(locale) || shopStorage.get(locale).nextUpdate <= Date.now()) {
+    // Check if the inventory for this locale needs updating
+    const localeData = shopStorage.get(locale);
+    if (!localeData || !localeData.nextUpdate || localeData.nextUpdate <= Date.now()) {
         updateShopInventory(locale, nextUpdateTime);
     }
     return shopStorage.get(locale)?.items || [];
 }
 
+
 function formatTime(ms) {
     if (ms <= 0) return '00:00:00';
     const totalSeconds = Math.floor(ms / 1000);
+
+    // Countdown for the last 10 seconds
+    if (totalSeconds <= 10) {
+        return `00:00:${String(totalSeconds).padStart(2, '0')}`;
+    }
+
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    // For times > 10s, update every minute by zeroing seconds
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
 }
+
 
 export async function postOrUpdateShopMessage(client, t, channelId, locale, updateItems = true) {
     const shopChannel = await client.channels.fetch(channelId).catch(() => null);
@@ -89,12 +108,12 @@ export async function postOrUpdateShopMessage(client, t, channelId, locale, upda
         const embed = new EmbedBuilder()
           .setColor('#FFA500')
           .setTitle(t('shop_title'))
-          .setDescription(t('shop_description'))
           .setTimestamp();
 
         if (shopItems.length === 0) {
             embed.setDescription(t('shop_empty'));
         } else {
+             embed.setDescription(t('shop_description'));
              shopItems.forEach(item => {
                 const itemName = t(`item_${item.id}_name`) || item.name;
                 const bonusText = item.bonus ? `(+${item.bonus}% XP)` : '';
@@ -126,7 +145,11 @@ export async function postOrUpdateShopMessage(client, t, channelId, locale, upda
         if (sentMainMessage) {
             await sentMainMessage.edit({ embeds: [embed], components: [row] });
         } else {
-            await shopChannel.bulkDelete(messages.filter(m => m.author.id === client.user.id)).catch(() => {});
+            // Clear all previous bot messages to ensure a clean slate
+            const allBotMessages = (await shopChannel.messages.fetch({ limit: 50 }).catch(() => new Map())).filter(m => m.author.id === client.user.id);
+            if(allBotMessages.size > 0) {
+                await shopChannel.bulkDelete(allBotMessages).catch(() => {});
+            }
             const newMainMessage = await shopChannel.send({ embeds: [embed], components: [row] });
             shopData.mainMessageId = newMainMessage.id;
         }
@@ -144,14 +167,17 @@ export async function postOrUpdateShopMessage(client, t, channelId, locale, upda
     let sentTimerMessage = shopData.timerMessageId ? await shopChannel.messages.fetch(shopData.timerMessageId).catch(() => null) : null;
 
     if (sentTimerMessage) {
-        await sentTimerMessage.edit({ embeds: [timerEmbed] }).catch(e => {
-            if (e.code === 10008) { 
-              console.warn(`Timer message for ${locale} was deleted. It will be recreated.`);
-              shopData.timerMessageId = null;
-            } else {
-              console.error(`Failed to edit timer message for ${locale}:`, e.message);
-            }
-        });
+        // Only edit if the text has changed to avoid spamming the API
+        if (sentTimerMessage.embeds[0]?.description !== `**${timerText}**`) {
+            await sentTimerMessage.edit({ embeds: [timerEmbed] }).catch(e => {
+                if (e.code === 10008) { 
+                  console.warn(`Timer message for ${locale} was deleted. It will be recreated.`);
+                  shopData.timerMessageId = null;
+                } else {
+                  console.error(`Failed to edit timer message for ${locale}:`, e.message);
+                }
+            });
+        }
     } 
     
     if (!sentTimerMessage) {

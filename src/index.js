@@ -104,14 +104,14 @@ client.once(Events.ClientReady, async (c) => {
     const setupShops = async (updateItems = false) => {
         const t_pt = await getTranslator(null, null, 'pt-BR');
         const t_en = await getTranslator(null, null, 'en-US');
-
+        
         await Promise.all([
-            postOrUpdateShopMessage(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', updateItems).catch(e => console.error("Error handling PT shop:", e)),
-            postOrUpdateShopMessage(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', updateItems).catch(e => console.error("Error handling EN shop:", e))
-        ]);
+            postOrUpdateShopMessage(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', updateItems),
+            postOrUpdateShopMessage(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', updateItems)
+        ]).catch(e => console.error("Error during scheduled shop update:", e));
     };
 
-    // Initial shop setup
+    // Initial shop setup with item update
     console.log("Running initial shop setup...");
     await setupShops(true);
 
@@ -122,7 +122,7 @@ client.once(Events.ClientReady, async (c) => {
         setupShops(true);
     }, 3 * 60 * 60 * 1000); // 3 hours
 
-    // Interval for timer update (every second for countdown)
+    // Interval for timer update (every second)
     if (client.shopTimerInterval) clearInterval(client.shopTimerInterval);
     client.shopTimerInterval = setInterval(() => {
         setupShops(false);
