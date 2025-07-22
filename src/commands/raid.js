@@ -56,6 +56,7 @@ export default {
       .setTimestamp();
 
     try {
+      await deletePromise; // Wait for the deletion to complete
       const sentMessage = await channel.send({ embeds: [embed], components: [] });
 
       const joinButtonId = `raid_join_${user.id}_${sentMessage.id}`;
