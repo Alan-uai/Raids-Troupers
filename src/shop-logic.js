@@ -63,12 +63,8 @@ function formatTime(ms) {
     const totalSeconds = Math.floor(ms / 1000);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    let seconds = totalSeconds % 60;
+    const seconds = totalSeconds % 60;
     
-    if (totalSeconds > 10) {
-       return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
-    }
-
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
@@ -139,7 +135,7 @@ export async function postOrUpdateShopMessage(client, t, channelId, locale, upda
     // Timer message handling
     const nextUpdate = getNextUpdate(3);
     const timeRemaining = nextUpdate.getTime() - Date.now();
-    const timerText = t('shop_footer_rotation', { time: formatTime(timeRemaining) }).replace('.', '');
+    const timerText = t('shop_footer_rotation', { time: formatTime(timeRemaining) });
     
     const timerEmbed = new EmbedBuilder()
       .setColor('#3498DB')
