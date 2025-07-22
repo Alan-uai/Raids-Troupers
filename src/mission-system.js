@@ -1,7 +1,7 @@
 // src/mission-system.js
 
 import { missions as missionPool } from './missions.js';
-import { generateProfileImage } from './profile-generator.2js';
+import { generateProfileImage } from './profile-generator.js';
 import { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getTranslator } from './i18n.js';
 import { allItems, rarities } from './items.js';
