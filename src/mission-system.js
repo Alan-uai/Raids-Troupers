@@ -184,7 +184,7 @@ ${t('level_up_from_mission', { level: stats.level })}`;
         await checkMissionCompletion(user, 'EARN_COINS', data, coinsEarned);
     }
     
-    return { xp: reward.xp || 0, coins: coinsEarned, message: rewardMessage };
+    return { xp: reward.xp || 0, coins: coinsEarned, message: rewardMessage, missionName: t(`mission_${missionDetails.id}_title`) };
 }
 
 export async function collectAllRewards(interaction, userId, data) {
@@ -375,127 +375,33 @@ export async function postMissionList(thread, userId, type, data, interaction = 
     }
 }
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function animateLine(channel, show = true) {
-    const chars = ['┄', '─', '━'];
-    const width = 25; // How wide the line should be
-    let lineMessage = null;
-
-    if (show) {
-        // Expand animation
-        for (let i = 0; i <= Math.ceil(width / 2); i++) {
-            let line = '';
-            for (let j = 0; j < width; j++) {
-                const dist = Math.abs(j - Math.floor(width / 2));
-                if (dist <= i) {
-                    const charIndex = Math.min(chars.length - 1, Math.floor(dist / (width / 8)));
-                    line += chars[charIndex];
-                } else {
-                    line += ' ';
-                }
-            }
-            if (!lineMessage) {
-                lineMessage = await channel.send(`${line}`);
-            } else {
-                await lineMessage.edit(`${line}`).catch(()=>{});
-            }
-            await sleep(50);
-        }
-        return lineMessage;
-    } else {
-        // Contract animation
-        lineMessage = channel; // Here channel is actually the message object
-        for (let i = Math.ceil(width / 2); i >= 0; i--) {
-             let line = '';
-            for (let j = 0; j < width; j++) {
-                const dist = Math.abs(j - Math.floor(width / 2));
-                if (dist <= i) {
-                     const charIndex = Math.min(chars.length - 1, Math.floor(dist / (width / 8)));
-                     line += chars[charIndex];
-                } else {
-                    line += ' ';
-                }
-            }
-            await lineMessage.edit(`${line}`).catch(()=>{});
-            await sleep(50);
-        }
-        await lineMessage.delete().catch(()=>{});
-    }
-}
-
-
-export async function animateAndCollectReward(interaction, userId, missionId, missionCategory, data) {
-    if (!missionId || !missionCategory) {
-        console.error(`animateAndCollectReward called with invalid missionId or missionCategory.`);
-        return null;
-    }
-
-    const { userMissions, userStats } = data;
-    const t = await getTranslator(userId, userStats);
+export async function collectSingleReward(interaction, userId, missionId, missionCategory, data) {
     await interaction.deferUpdate();
+
+    const t = await getTranslator(userId, data.userStats);
+    const { userMissions } = data;
 
     const activeMissions = userMissions.get(userId);
     if (!activeMissions || !activeMissions[missionCategory]) {
-         console.error(`Mission category '${missionCategory}' not found for user ${userId}.`);
-         return null;
+        console.error(`Mission category '${missionCategory}' not found for user ${userId}.`);
+        return null;
     }
 
-    const missionsList = activeMissions[missionCategory];
-    const missionProgress = missionsList.find(m => m.id === missionId);
+    const missionProgress = activeMissions[missionCategory].find(m => m.id === missionId);
 
     if (!missionProgress || !missionProgress.completed || missionProgress.collected) {
         return null;
     }
     
-    const missionMessage = interaction.message;
-    const originalEmbed = EmbedBuilder.from(missionMessage.embeds[0]);
-
-    // Phase 1: Strikethrough Animation
-    const fieldsToAnimate = ['title', 'description'];
-    const maxLen = Math.max(...fieldsToAnimate.map(f => originalEmbed.data[f]?.length || 0));
-
-    for (let i = 1; i <= maxLen; i++) {
-        const tempEmbed = EmbedBuilder.from(originalEmbed);
-        tempEmbed.setColor('#FF0000'); // Change to red during animation
-        
-        let title = originalEmbed.data.title || '';
-        let desc = originalEmbed.data.description || '';
-
-        const strike = (text, len) => '~~' + text.substring(0, Math.min(len, text.length)) + '~~' + text.substring(Math.min(len, text.length));
-
-        if (title) tempEmbed.setTitle(strike(title, i));
-        if (desc) tempEmbed.setDescription(strike(desc, i));
-        
-        await missionMessage.edit({ embeds: [tempEmbed], components: [] }).catch(e => console.error("Error during message edit animation:", e));
-        await sleep(25); // animation speed
-    }
-
-    // Phase 2: Collect Reward and show line animation
     const result = await collectReward(interaction.user, missionProgress, data);
     
-    const lineMessage = await animateLine(interaction.channel, true);
-    
-    const rewardEmbed = new EmbedBuilder()
-        .setColor('#FFFF00')
-        .setDescription(result.message);
-        
-    const rewardDisplayMessage = await interaction.channel.send({ embeds: [rewardEmbed] });
-
-    await sleep(3500); // wait 3.5 seconds to read the reward
-
-    // Cleanup
-    await rewardDisplayMessage.delete().catch(e => console.error("Error deleting reward message:", e));
-    await animateLine(lineMessage, false); 
-    await missionMessage.delete().catch(e => console.error("Error deleting mission message:", e));
+    // Deleta a mensagem da missão que foi coletada
+    await interaction.message.delete().catch(e => console.error("Error deleting mission message:", e));
 
     await updateProfileImage(interaction.user, data);
 
-    return { message: t('mission_reward_collected_ephemeral', { missionName: originalEmbed.data.title }) };
+    return { message: t('mission_reward_collected_ephemeral', { missionName: result.missionName }) };
 }
-
 
 async function updateProfileImage(user, data) {
     const { client, userProfiles, userStats, userItems, clans, userMissions } = data;
@@ -515,13 +421,6 @@ async function updateProfileImage(user, data) {
             
             await profileMessage.edit({ files: [newAttachment] });
 
-            // Also update the mission list
-            const missionThread = profileChannel.threads.cache.find(th => th.name === t('missions_thread_title'));
-            if(missionThread) {
-                const missionInfo = missionMessageIds.get(userId);
-                const currentView = missionInfo ? missionInfo.currentView : 'daily';
-                await postMissionList(missionThread, userId, currentView, { userMissions, userStats, client });
-            }
         } catch (updateError) {
             console.error(`Failed to update profile image for ${userId} after mission update:`, updateError);
         }

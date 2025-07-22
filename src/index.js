@@ -23,7 +23,7 @@ import { generateProfileImage } from './profile-generator.js';
 import { allItems } from './items.js';
 import { missions as missionPool, missions } from './missions.js';
 import { milestones } from './milestones.js';
-import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList, animateAndCollectReward } from './mission-system.js';
+import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList, collectSingleReward } from './mission-system.js';
 import { getTranslator } from './i18n.js';
 import { createMilestoneEmbed, checkMilestoneCompletion as checkMilestone } from './milestone-system.js';
 import { postOrUpdateShopMessage } from './shop-logic.js';
@@ -193,9 +193,9 @@ client.on(Events.InteractionCreate, async interaction => {
                 await postMissionList(missionThread, userId, currentViewType, { userMissions, userStats, client }, interaction);
             }
         } else if (subAction === 'collect') {
-             const missionId = customIdParts[3];
-             const missionCategory = customIdParts[4];
-             const result = await animateAndCollectReward(interaction, userId, missionId, missionCategory, { userStats, userItems, userMissions, client, userProfiles, clans });
+             const [, , userId, missionId, missionCategory] = customIdParts;
+             const result = await collectSingleReward(interaction, userId, missionId, missionCategory, { userStats, userItems, userMissions, client, userProfiles, clans });
+             
              if (result && result.message) {
                 await interaction.followUp({ content: result.message, ephemeral: true });
              } else {
