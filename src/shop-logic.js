@@ -22,7 +22,7 @@ function getNextUpdate(hours) {
     return new Date(nextGlobalUpdate);
 }
 
-function updateShopInventory(locale, nextUpdateTime) {
+function updateShopInventory(locale) {
     console.log(`Updating shop inventory for ${locale}...`);
     const now = new Date();
     let shopItems = [];
@@ -53,17 +53,16 @@ function updateShopInventory(locale, nextUpdateTime) {
     }
 
     const currentData = shopStorage.get(locale) || {};
-    shopStorage.set(locale, { ...currentData, items: shopItems, nextUpdate: nextUpdateTime });
+    shopStorage.set(locale, { ...currentData, items: shopItems, nextUpdate: getNextUpdate(3).getTime() });
 }
 
 function getShopItems(locale) {
     const rotationHours = 3;
     const nextUpdateTime = getNextUpdate(rotationHours).getTime();
     
-    // Check if the inventory for this locale needs updating
     const localeData = shopStorage.get(locale);
     if (!localeData || !localeData.nextUpdate || localeData.nextUpdate <= Date.now()) {
-        updateShopInventory(locale, nextUpdateTime);
+        updateShopInventory(locale);
     }
     return shopStorage.get(locale)?.items || [];
 }
@@ -73,7 +72,6 @@ function formatTime(ms) {
     if (ms <= 0) return '00:00:00';
     const totalSeconds = Math.floor(ms / 1000);
 
-    // Countdown for the last 10 seconds
     if (totalSeconds <= 10) {
         return `00:00:${String(totalSeconds).padStart(2, '0')}`;
     }
@@ -81,7 +79,6 @@ function formatTime(ms) {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     
-    // For times > 10s, update every minute by zeroing seconds
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
 }
 
@@ -144,7 +141,6 @@ export async function postOrUpdateShopMessage(client, t, channelId, locale, upda
         if (sentMainMessage) {
             await sentMainMessage.edit({ embeds: [embed], components: [row] });
         } else {
-            // Clear all previous bot messages to ensure a clean slate
             const allBotMessages = (await shopChannel.messages.fetch({ limit: 50 }).catch(() => new Map())).filter(m => m.author.id === client.user.id);
             if(allBotMessages.size > 0) {
                 await shopChannel.bulkDelete(allBotMessages).catch(() => {});
@@ -154,7 +150,6 @@ export async function postOrUpdateShopMessage(client, t, channelId, locale, upda
         }
     }
     
-    // Timer message handling
     const nextUpdate = getNextUpdate(3);
     const timeRemaining = nextUpdate.getTime() - Date.now();
     const timerText = t('shop_footer_rotation', { time: formatTime(timeRemaining) });
@@ -163,26 +158,27 @@ export async function postOrUpdateShopMessage(client, t, channelId, locale, upda
       .setColor('#3498DB')
       .setDescription(`**${timerText}**`);
 
-    let sentTimerMessage = shopData.timerMessageId ? await shopChannel.messages.fetch(shopData.timerMessageId).catch(() => null) : null;
+    let sentTimerMessage;
+    if (shopData.timerMessageId) {
+        sentTimerMessage = await shopChannel.messages.fetch(shopData.timerMessageId).catch(() => null);
+    }
 
     if (sentTimerMessage) {
-        // Only edit if the text has changed to avoid spamming the API
-        if (sentTimerMessage.embeds[0]?.description !== `**${timerText}**`) {
+        const currentDescription = sentTimerMessage.embeds[0]?.description;
+        if (currentDescription !== `**${timerText}**`) {
             await sentTimerMessage.edit({ embeds: [timerEmbed] }).catch(e => {
                 if (e.code === 10008) { 
                   console.warn(`Timer message for ${locale} was deleted. It will be recreated.`);
-                  shopData.timerMessageId = null;
+                  shopData.timerMessageId = null; 
+                  shopStorage.set(locale, shopData);
                 } else {
                   console.error(`Failed to edit timer message for ${locale}:`, e.message);
                 }
             });
         }
-    } 
-    
-    if (!sentTimerMessage) {
+    } else {
         const newTimerMessage = await shopChannel.send({ embeds: [timerEmbed] });
         shopData.timerMessageId = newTimerMessage.id;
+        shopStorage.set(locale, shopData);
     }
-    
-    shopStorage.set(locale, shopData);
 }
