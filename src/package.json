@@ -1,3 +1,4 @@
+
 {
   "name": "discord-raid-gpt-bot",
   "version": "1.0.0",
@@ -5,8 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "deploy": "node src/deploy-commands.js",
-    "setup-shop": "node src/setup-shop.js"
+    "deploy": "node src/deploy-commands.js"
   },
   "dependencies": {
     "canvas": "^3.1.2",

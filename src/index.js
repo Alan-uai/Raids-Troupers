@@ -26,6 +26,7 @@ import { milestones } from './milestones.js';
 import { assignMissions, checkMissionCompletion, collectAllRewards, postMissionList, animateAndCollectReward } from './mission-system.js';
 import { getTranslator } from './i18n.js';
 import { createMilestoneEmbed, checkMilestoneCompletion as checkMilestone } from './milestone-system.js';
+import { postOrUpdateShopMessage } from './shop-logic.js';
 
 
 dotenv.config();
@@ -69,7 +70,7 @@ function getAllCommandFiles(dir) {
     for (const item of items) {
         if (item.isDirectory()) {
             files = [...files, ...getAllCommandFiles(path.join(dir, item.name))];
-        } else if (item.name.endsWith('.js') && !item.name.endsWith('.data.js') && item.name !== 'loja_setup.js') {
+        } else if (item.name.endsWith('.js') && !item.name.endsWith('.data.js')) {
             files.push(path.join(dir, item.name));
         }
     }
@@ -93,10 +94,38 @@ for (const file of commandFiles) {
     }
 }
 
+const SHOP_CHANNEL_ID_PT = '1396416240263630868';
+const SHOP_CHANNEL_ID_EN = '1396725532913303612';
 
 client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
   setInterval(checkAuctionEnd, 15000);
+
+  // Initial shop setup
+  console.log("Running initial shop setup...");
+  const t_pt_initial = await getTranslator(null, null, 'pt-BR');
+  const t_en_initial = await getTranslator(null, null, 'en-US');
+  await postOrUpdateShopMessage(client, t_pt_initial, SHOP_CHANNEL_ID_PT, 'pt-BR', true).catch(e => console.error("Error setting up PT shop:", e));
+  await postOrUpdateShopMessage(client, t_en_initial, SHOP_CHANNEL_ID_EN, 'en-US', true).catch(e => console.error("Error setting up EN shop:", e));
+  
+  // Interval for item rotation (every 3 hours)
+  if (client.shopUpdateInterval) clearInterval(client.shopUpdateInterval);
+  client.shopUpdateInterval = setInterval(async () => {
+      console.log("Running periodic shop item update...");
+      const t_pt = await getTranslator(null, null, 'pt-BR');
+      const t_en = await getTranslator(null, null, 'en-US');
+      await postOrUpdateShopMessage(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', true).catch(e => console.error("Error updating PT items:", e));
+      await postOrUpdateShopMessage(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', true).catch(e => console.error("Error updating EN items:", e));
+  }, 3 * 60 * 60 * 1000); // 3 hours
+
+   // Interval for timer update
+  if (client.shopTimerInterval) clearInterval(client.shopTimerInterval);
+  client.shopTimerInterval = setInterval(async () => {
+      const t_pt = await getTranslator(null, null, 'pt-BR');
+      const t_en = await getTranslator(null, null, 'en-US');
+      await postOrUpdateShopMessage(client, t_pt, SHOP_CHANNEL_ID_PT, 'pt-BR', false).catch(e => console.error("Error updating PT timer:", e));
+      await postOrUpdateShopMessage(client, t_en, SHOP_CHANNEL_ID_EN, 'en-US', false).catch(e => console.error("Error updating EN timer:", e));
+  }, 1000); // 1 second
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -142,7 +171,7 @@ client.on(Events.InteractionCreate, async interaction => {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
         
-        const missionThread = interaction.message?.thread || interaction.channel;
+        const missionThread = interaction.channel;
         if (!missionThread) {
             console.error("Could not determine mission thread from interaction.");
             return;
@@ -192,20 +221,18 @@ client.on(Events.InteractionCreate, async interaction => {
             await interaction.followUp({ content: t('profile_refreshed'), ephemeral: true });
         }
     } else if (action === 'milestone') {
-       if (customIdParts[1] === 'back') {
-          const [,, milestoneId, userId] = customIdParts;
-          if (interaction.user.id !== userId) return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
-          const milestone = milestones.find(m => m.id === milestoneId);
-          if (milestone) {
-            const stats = userStats.get(userId);
-            stats.userId = userId;
-            const itemStats = userItems.get(userId);
-            const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', t);
-            if (milestoneData) {
-                await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
-            }
-          }
-        }
+       const [,, milestoneId, userId] = customIdParts;
+       if (interaction.user.id !== userId) return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
+       const milestone = milestones.find(m => m.id === milestoneId);
+       if (milestone) {
+         const stats = userStats.get(userId) || {};
+         stats.userId = userId;
+         const itemStats = userItems.get(userId);
+         const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, 'general', await getTranslator(userId, userStats));
+         if (milestoneData) {
+             await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
+         }
+       }
     }
 
 
@@ -268,7 +295,17 @@ client.on(Events.InteractionCreate, async interaction => {
             return await interaction.reply({ content: t('not_for_you'), ephemeral: true });
         }
         const selectedLevel = interaction.values[0];
-        await handleMilestoneInteraction(interaction, milestoneId, userId, selectedLevel, t);
+        const milestone = milestones.find(m => m.id === milestoneId);
+        if (!milestone) return;
+
+        const stats = userStats.get(userId) || {};
+        stats.userId = userId;
+        const itemStats = userItems.get(userId);
+
+        const milestoneData = await createMilestoneEmbed(milestone, stats, itemStats, selectedLevel, await getTranslator(userId, userStats));
+        if (milestoneData) {
+            await interaction.update({ embeds: [milestoneData.embed], components: [milestoneData.row] });
+        }
     }
   }
 });
@@ -882,24 +919,6 @@ async function handleEquipSelection(interaction, userId, itemId, t) {
     }
     
     await interaction.followUp({ content: replyMessage, ephemeral: true });
-}
-
-async function handleMilestoneInteraction(interaction, milestoneId, userId, selectedLevel, t) {
-    await interaction.deferUpdate();
-    const stats = userStats.get(userId);
-    const items = userItems.get(userId);
-    const milestone = milestones.find(m => m.id === milestoneId);
-
-    if (!milestone || !stats) {
-        return await interaction.followUp({ content: t('milestone_error_data'), ephemeral: true });
-    }
-    
-    stats.userId = userId;
-
-    const milestoneData = await createMilestoneEmbed(milestone, stats, items, selectedLevel, t);
-    if (interaction.message && milestoneData) {
-        await interaction.editReply({ embeds: [milestoneData.embed], components: [milestoneData.row] });
-    }
 }
 
 
