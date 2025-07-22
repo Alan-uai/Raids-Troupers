@@ -434,6 +434,11 @@ export async function animateAndCollectReward(interaction, userId, missionId, mi
     await interaction.deferUpdate();
 
     const activeMissions = userMissions.get(userId);
+    if (!activeMissions || !activeMissions[missionCategory]) {
+         console.error(`Mission category '${missionCategory}' not found for user ${userId}.`);
+         await interaction.followUp({ content: t('mission_reward_collect_error_ephemeral'), ephemeral: true });
+         return null;
+    }
     const missionsList = activeMissions[missionCategory];
     const missionProgress = missionsList.find(m => m.id === missionId);
 

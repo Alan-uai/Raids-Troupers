@@ -16,6 +16,10 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
+    // Default values if stats or items are null/undefined
+    const safeStats = stats || { level: 1, xp: 0, coins: 0, class: null, clanId: null, raidsCreated: 0, raidsHelped: 0, reputation: 0, kickedOthers: 0, wasKicked: 0 };
+    const safeItems = items || { equippedCosmetics: {}, equippedGear: {} };
+
     // Helper function for rounded rectangles, now safely inside the scope
     ctx.roundRect = function (x, y, w, h, r) {
         if (w < 2 * r) r = w / 2;
@@ -30,8 +34,8 @@ export async function generateProfileImage(member, stats, items, clans, t) {
         return this;
     }
     
-    const equippedCosmetics = items?.equippedCosmetics || {};
-    const equippedGear = items?.equippedGear || {};
+    const equippedCosmetics = safeItems.equippedCosmetics || {};
+    const equippedGear = safeItems.equippedGear || {};
     
     const backgroundId = equippedCosmetics.fundo;
     const titleId = equippedCosmetics.titulo;
@@ -88,8 +92,8 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 36px sans-serif';
     let nameText = member.displayName;
-    if (stats.clanId && clans) {
-        const clan = Array.from(clans.values()).find(c => c.id === stats.clanId);
+    if (safeStats.clanId && clans) {
+        const clan = Array.from(clans.values()).find(c => c.id === safeStats.clanId);
         if (clan) {
             nameText = `[${clan.tag}] ${member.displayName}`;
         }
@@ -102,8 +106,8 @@ export async function generateProfileImage(member, stats, items, clans, t) {
         ctx.fillText(t(`item_${titleItem.id}_name`) || titleItem.name, nameX, avatarY + 80);
     }
 
-    if (stats.class) {
-        const userClass = classes.find(c => c.id === stats.class);
+    if (safeStats.class) {
+        const userClass = classes.find(c => c.id === safeStats.class);
         if (userClass) {
             ctx.font = 'bold 26px sans-serif';
             ctx.fillStyle = userClass.color || '#D2AC47';
@@ -116,8 +120,8 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     const barHeight = 25;
     const barWidth = width - 100;
     const barX = 50;
-    const xpToLevelUp = 100 * (stats.level || 1);
-    const xpPercent = Math.min((stats.xp || 0) / xpToLevelUp, 1);
+    const xpToLevelUp = 100 * (safeStats.level || 1);
+    const xpPercent = Math.min((safeStats.xp || 0) / xpToLevelUp, 1);
     
     ctx.fillStyle = '#2C2F33'; // Bar background
     ctx.roundRect(barX, xpY, barWidth, barHeight, 12);
@@ -140,7 +144,7 @@ export async function generateProfileImage(member, stats, items, clans, t) {
     
     ctx.font = 'bold 16px sans-serif';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    const xpText = `LVL ${stats.level || 1} | ${stats.xp || 0} / ${xpToLevelUp} XP`;
+    const xpText = `LVL ${safeStats.level || 1} | ${safeStats.xp || 0} / ${xpToLevelUp} XP`;
     const textMetrics = ctx.measureText(xpText);
     ctx.fillText(xpText, barX + (barWidth / 2) - (textMetrics.width / 2), xpY + 18);
 
@@ -163,13 +167,13 @@ export async function generateProfileImage(member, stats, items, clans, t) {
         }
     }
 
-    drawStat(ctx, t('troup_coins'), String(stats.coins || 0), statsXCol1, statsY, valueOffset);
-    drawStat(ctx, t('raids_created'), String(stats.raidsCreated || 0), statsXCol2, statsY, valueOffset);
-    drawStat(ctx, t('kicked_others'), String(stats.kickedOthers || 0), statsXCol3, statsY, valueOffset);
+    drawStat(ctx, t('troup_coins'), String(safeStats.coins || 0), statsXCol1, statsY, valueOffset);
+    drawStat(ctx, t('raids_created'), String(safeStats.raidsCreated || 0), statsXCol2, statsY, valueOffset);
+    drawStat(ctx, t('kicked_others'), String(safeStats.kickedOthers || 0), statsXCol3, statsY, valueOffset);
 
-    drawStat(ctx, t('reputation'), `👍 ${stats.reputation || 0}`, statsXCol1, statsY + statsSpacing, valueOffset);
-    drawStat(ctx, t('raids_helped'), String(stats.raidsHelped || 0), statsXCol2, statsY + statsSpacing, valueOffset);
-    drawStat(ctx, t('was_kicked'), String(stats.wasKicked || 0), statsXCol3, statsY + statsSpacing, valueOffset);
+    drawStat(ctx, t('reputation'), `👍 ${safeStats.reputation || 0}`, statsXCol1, statsY + statsSpacing, valueOffset);
+    drawStat(ctx, t('raids_helped'), String(safeStats.raidsHelped || 0), statsXCol2, statsY + statsSpacing, valueOffset);
+    drawStat(ctx, t('was_kicked'), String(safeStats.wasKicked || 0), statsXCol3, statsY + statsSpacing, valueOffset);
     
     ctx.fillStyle = '#39FF14'; // Special color for bonus
     ctx.fillText(t('xp_bonus'), statsXCol1, statsY + statsSpacing * 2);
